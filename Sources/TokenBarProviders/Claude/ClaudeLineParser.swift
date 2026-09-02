@@ -15,6 +15,9 @@ public struct ClaudeLineParser: Sendable {
         return f
     }()
     private nonisolated(unsafe) static let iso8601 = ISO8601DateFormatter()
+    // Decoder reutilizado: criar um JSONDecoder por linha custa caro em corpus
+    // grande (Red Team caso 2) — o uso é single-thread no ingest.
+    private nonisolated(unsafe) static let decoder = JSONDecoder()
 
     public init(account: AccountID, project: String?) {
         self.account = account
@@ -24,7 +27,7 @@ public struct ClaudeLineParser: Sendable {
     public func parse(line: String, fileModificationDate: Date) -> UsageEvent? {
         guard line.count <= 5_000_000,
               let data = line.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode(ClaudeTranscriptLine.self, from: data),
+              let decoded = try? Self.decoder.decode(ClaudeTranscriptLine.self, from: data),
               decoded.type == "assistant",
               let usage = decoded.message?.usage
         else { return nil }
@@ -33,7 +36,13 @@ public struct ClaudeLineParser: Sendable {
         let output = max(0, usage.output_tokens ?? 0)
         let cacheRead = max(0, usage.cache_read_input_tokens ?? 0)
         let cacheWrite = max(0, usage.cache_creation_input_tokens ?? 0)
-        guard input + output + cacheRead + cacheWrite > 0 else { return nil }
+        // Red Team F1 (caso 1): contagens > 10^15 por campo são lixo (não uso real;
+        // contextos reais ficam na casa de milhões) e antes estouravam a soma do
+        // guard com SIGTRAP. Saneia: rejeita a linha em vez de derrubar o app.
+        let cap: Int64 = 1_000_000_000_000_000
+        guard input <= cap, output <= cap, cacheRead <= cap, cacheWrite <= cap,
+              TokenSums(input: input, output: output, cacheRead: cacheRead, cacheWrite: cacheWrite).total > 0
+        else { return nil }
 
         // Timestamp ausente -> fallback para mtime do arquivo.
         // Timestamp presente porém inválido -> nil (contrato: "timestamp inválido" => nil).
