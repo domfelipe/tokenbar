@@ -1,0 +1,159 @@
+[0/1] Planning build
+Building for debugging...
+[0/5] Write swift-version--1AB21518FC5DEDBE.txt
+Build complete! (0.12s)
+[0/1] Planning build
+Building for debugging...
+[0/8] Write swift-version--1AB21518FC5DEDBE.txt
+[2/20] Compiling TokenBarCore FileCursor.swift
+[3/21] Compiling TokenBarCore TokenBarCore.swift
+[4/21] Compiling TokenBarCore UsageEvent.swift
+[5/21] Compiling TokenBarCore FileOffsetStore.swift
+[6/21] Compiling TokenBarCore TokenLedger.swift
+[7/21] Compiling TokenBarCore TokenSums.swift
+[8/21] Compiling TokenBarCore ProviderID.swift
+[9/21] Emitting module TokenBarCore
+[10/21] Compiling TokenBarCore TranscriptIngester.swift
+[11/21] Compiling TokenBarCore AccountID.swift
+[12/21] Compiling TokenBarCore TranscriptWatcher.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Watcher/TranscriptWatcher.swift:81:9: warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+79 |         ) else { return }
+80 |         stream = streamRef
+81 |         FSEventStreamScheduleWithRunLoop(streamRef, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+   |         `- warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+82 |         FSEventStreamStart(streamRef)
+83 |     }
+
+[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+[13/21] Compiling genfixtures GenFixtures.swift
+[14/21] Emitting module genfixtures
+[15/30] Compiling TokenBarProviders ClaudeLineParser.swift
+[16/30] Compiling TokenBarProviders ClaudeProvider.swift
+[17/30] Compiling TokenBarProviders ClaudeTranscriptLine.swift
+[18/30] Compiling TokenBarProviders TokenBarProviders.swift
+[19/30] Compiling TokenBarProviders ClaudeTranscriptLocator.swift
+[20/30] Emitting module TokenBarProviders
+[21/30] Compiling TokenBarUI MenuBarContent.swift
+[22/30] Compiling TokenBarUI SnapshotStore.swift
+[23/30] Emitting module TokenBarUI
+[24/30] Compiling TokenBarUI TokenBarUI.swift
+[24/29] Linking genfixtures
+[25/34] Applying genfixtures
+[27/34] Compiling tokenbar SelfCheck.swift
+[28/34] Emitting module tokenbar
+[29/34] Compiling tokenbar TokenBarApp.swift
+[30/34] Compiling tokenbar E2EHeartbeat.swift
+[31/34] Compiling tokenbar AppState.swift
+[31/33] Linking tokenbar
+[32/33] Applying tokenbar
+Build complete! (1.69s)
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite TokenLedgerTests started.
+◇ Suite DomainTests started.
+◇ Suite ClaudeLineParserTests started.
+◇ Suite ClaudeProviderTests started.
+◇ Suite SmokeTests started.
+◇ Suite MenuBarContentTests started.
+◇ Suite DebounceTests started.
+◇ Suite FileOffsetStoreTests started.
+◇ Suite TranscriptIngesterTests started.
+◇ Test testTokenSumsCodableRoundtrip() started.
+◇ Test testMultiProviderBreakdown() started.
+◇ Test testAccumulatesAcrossFilesAndCycles() started.
+◇ Test testTokenSumsArithmetic() started.
+◇ Test testUsageEventCodableRoundtrip() started.
+◇ Test testRolloverClearsTotalsAndFlagsRescan() started.
+◇ Test testTruncationSelfCorrects() started.
+◇ Test testAccountIDHashAndEquality() started.
+◇ Test testProviderIDCodableRoundtrip() started.
+◇ Test hugeLineDoesNotCrash() started.
+◇ Test allZeroUsageIsSkipped() started.
+◇ Test truncatedJSONIsSkippedNotFatal() started.
+◇ Test testYesterdayEventsDoNotCountForToday() started.
+◇ Test assistantLineWithUsageProducesEvent() started.
+◇ Test invalidTimestampIsSkipped() started.
+◇ Test resolvePrefersEnvironmentOverride() started.
+◇ Test resolveFallsBackToHomeClaude() started.
+◇ Test coreVersionIsSet() started.
+◇ Test binaryGarbageIsSkippedNotFatal() started.
+◇ Test ingestTwiceDoesNotDuplicate() started.
+◇ Test negativeTokensAreClampedToZero() started.
+◇ Test testAbbrevTokens() started.
+◇ Test missingDirectoryYieldsZero() started.
+◇ Test testEmptyContentShowsPlaceholder() started.
+◇ Test assistantWithoutUsageIsSkipped() started.
+◇ Test ingestOnceCountsTokensFromRealFormatFixture() started.
+◇ Test testRemoveWithNil() started.
+◇ Test userLineIsSkipped() started.
+◇ Test testMultipleProvidersFormat() started.
+◇ Test testSingleProviderFormat() started.
+◇ Test testWaitReturnsOnlyAfterQuiesceWindow() started.
+◇ Test testTouchResetsWindow() started.
+◇ Test testSetThenReloadRoundtrip() started.
+◇ Test testMissingFileStartsEmpty() started.
+◇ Test testRenderGateSkipsEqualContent() started.
+◇ Test testCorruptedFileStartsEmpty() started.
+◇ Test testSubdirectoriesAreScanned() started.
+◇ Test testIncompleteTrailingLineIsNotConsumed() started.
+◇ Test testFirstIngestReadsWholeFile() started.
+◇ Test testGarbageLinesAreSkippedButConsumed() started.
+◇ Test testSecondIngestReadsOnlyAppend() started.
+◇ Test testTruncatedFileResetsToZero() started.
+◇ Test testUnchangedFileIsNotReturned() started.
+◇ Test testTenThousandEventsUnderOneSecond() started.
+✔ Test testProviderIDCodableRoundtrip() passed after 0.002 seconds.
+✔ Test testTokenSumsArithmetic() passed after 0.002 seconds.
+✔ Test testUsageEventCodableRoundtrip() passed after 0.002 seconds.
+✔ Test testTokenSumsCodableRoundtrip() passed after 0.002 seconds.
+✔ Test testAccountIDHashAndEquality() passed after 0.002 seconds.
+✔ Test truncatedJSONIsSkippedNotFatal() passed after 0.003 seconds.
+✔ Test allZeroUsageIsSkipped() passed after 0.003 seconds.
+✔ Test testRolloverClearsTotalsAndFlagsRescan() passed after 0.007 seconds.
+✔ Test testTruncationSelfCorrects() passed after 0.007 seconds.
+✔ Test coreVersionIsSet() passed after 0.007 seconds.
+✔ Test testYesterdayEventsDoNotCountForToday() passed after 0.007 seconds.
+✔ Test testMultiProviderBreakdown() passed after 0.007 seconds.
+✔ Test testAccumulatesAcrossFilesAndCycles() passed after 0.007 seconds.
+✔ Test binaryGarbageIsSkippedNotFatal() passed after 0.007 seconds.
+✔ Test testEmptyContentShowsPlaceholder() passed after 0.007 seconds.
+✔ Test assistantWithoutUsageIsSkipped() passed after 0.007 seconds.
+✔ Test resolvePrefersEnvironmentOverride() passed after 0.007 seconds.
+✔ Test testAbbrevTokens() passed after 0.007 seconds.
+✔ Test userLineIsSkipped() passed after 0.007 seconds.
+✔ Test testMultipleProvidersFormat() passed after 0.007 seconds.
+✔ Test testSingleProviderFormat() passed after 0.007 seconds.
+✔ Test missingDirectoryYieldsZero() passed after 0.007 seconds.
+✔ Test resolveFallsBackToHomeClaude() passed after 0.007 seconds.
+✔ Test testMissingFileStartsEmpty() passed after 0.007 seconds.
+✔ Test testCorruptedFileStartsEmpty() passed after 0.007 seconds.
+✔ Test negativeTokensAreClampedToZero() passed after 0.007 seconds.
+✔ Test assistantLineWithUsageProducesEvent() passed after 0.007 seconds.
+✔ Test invalidTimestampIsSkipped() passed after 0.007 seconds.
+✔ Test testSetThenReloadRoundtrip() passed after 0.007 seconds.
+✔ Test testIncompleteTrailingLineIsNotConsumed() passed after 0.007 seconds.
+✔ Test testFirstIngestReadsWholeFile() passed after 0.006 seconds.
+✔ Test testGarbageLinesAreSkippedButConsumed() passed after 0.006 seconds.
+✔ Test testSubdirectoriesAreScanned() passed after 0.007 seconds.
+✔ Test testRemoveWithNil() passed after 0.007 seconds.
+✔ Test testRenderGateSkipsEqualContent() passed after 0.007 seconds.
+✔ Suite DomainTests passed after 0.007 seconds.
+✔ Suite SmokeTests passed after 0.007 seconds.
+✔ Suite FileOffsetStoreTests passed after 0.007 seconds.
+✔ Test ingestOnceCountsTokensFromRealFormatFixture() passed after 0.007 seconds.
+✔ Test testUnchangedFileIsNotReturned() passed after 0.006 seconds.
+✔ Suite TokenLedgerTests passed after 0.007 seconds.
+✔ Test ingestTwiceDoesNotDuplicate() passed after 0.007 seconds.
+✔ Suite MenuBarContentTests passed after 0.007 seconds.
+✔ Suite ClaudeProviderTests passed after 0.007 seconds.
+✔ Test testSecondIngestReadsOnlyAppend() passed after 0.007 seconds.
+✔ Test testTruncatedFileResetsToZero() passed after 0.007 seconds.
+✔ Test testTenThousandEventsUnderOneSecond() passed after 0.014 seconds.
+✔ Suite TranscriptIngesterTests passed after 0.015 seconds.
+✔ Test hugeLineDoesNotCrash() passed after 0.055 seconds.
+✔ Suite ClaudeLineParserTests passed after 0.055 seconds.
+✔ Test testWaitReturnsOnlyAfterQuiesceWindow() passed after 0.121 seconds.
+✔ Test testTouchResetsWindow() passed after 0.121 seconds.
+✔ Suite DebounceTests passed after 0.122 seconds.
+✔ Test run with 44 tests in 9 suites passed after 0.122 seconds.
