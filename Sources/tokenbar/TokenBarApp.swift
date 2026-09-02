@@ -2,6 +2,17 @@ import SwiftUI
 import TokenBarUI
 
 @main
+enum TokenBarMain {
+    static func main() async {
+        let arguments = CommandLine.arguments
+        if arguments.count > 1, arguments[1] == "selfcheck" {
+            try? await SelfCheck.run(arguments: Array(arguments.dropFirst()))
+            return
+        }
+        TokenBarApp.main()
+    }
+}
+
 struct TokenBarApp: App {
     @State private var appState: AppState
 
