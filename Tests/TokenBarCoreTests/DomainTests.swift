@@ -50,4 +50,27 @@ struct DomainTests {
         let data = try JSONEncoder().encode(sums)
         #expect(try JSONDecoder().decode(TokenSums.self, from: data) == sums)
     }
+
+    // Red Team caso 1: soma de usage hostil (Int64.max ×2) estourava Int64 e
+    // derrubava o app com SIGTRAP. Contrato pós-fix: aritmética saturante —
+    // acumula até .max, nunca trap.
+    @Test
+    func testTokenSumsSaturatesInsteadOfTrapping() {
+        let maxed = TokenSums(input: .max)
+        let doubled = maxed + maxed
+        #expect(doubled.input == Int64.max)
+
+        let total = TokenSums(input: .max, output: .max, cacheRead: .max, cacheWrite: .max).total
+        #expect(total == Int64.max)
+
+        var accum = TokenSums(input: .max - 1)
+        accum += TokenSums(input: 5)
+        #expect(accum.input == Int64.max)
+
+        // subtração exata não satura; só estouro satura
+        let neg = TokenSums() - TokenSums(input: .max)
+        #expect(neg.input == -.max)
+        let negSaturated = TokenSums() - TokenSums(input: .min)
+        #expect(negSaturated.input == Int64.max)
+    }
 }

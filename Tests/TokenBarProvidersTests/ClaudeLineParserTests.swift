@@ -65,4 +65,29 @@ struct ClaudeLineParserTests {
         let huge = String(repeating: "a", count: 5_000_000)
         #expect(parser().parse(line: huge, fileModificationDate: modDate) == nil)
     }
+
+    // Red Team caso 1: Int64.max em usage estourava o guard de soma (SIGTRAP).
+    // Contrato pós-fix: linha com contagens absurdas (> 10^15 por campo) é lixo,
+    // não uso — rejeitada sem crash.
+    @Test func usageFieldsNearInt64MaxAreRejectedNotCrash() {
+        let imax = String(Int64.max)
+        let bothMax = #"{"type":"assistant","timestamp":"2026-09-02T12:00:05.000Z","message":{"usage":{"input_tokens":\#(imax),"output_tokens":\#(imax)}}}"#
+        #expect(parser().parse(line: bothMax, fileModificationDate: modDate) == nil)
+
+        let singleMax = #"{"type":"assistant","timestamp":"2026-09-02T12:00:05.000Z","message":{"usage":{"input_tokens":\#(imax)}}}"#
+        #expect(parser().parse(line: singleMax, fileModificationDate: modDate) == nil)
+        // campos negativos continuam com o contrato pré-existente: clamp para 0
+        // (coberto por testLineWithNegativeTokensClampsToZero); a rejeição é só
+        // para estouro positivo.
+    }
+
+    @Test func usageFieldsAtSanityCapBoundaryStillCounted() {
+        // valor no limite do saneamento (10^15) ainda é aceito; acima, rejeitado
+        let atCap = #"{"type":"assistant","timestamp":"2026-09-02T12:00:06.000Z","message":{"usage":{"input_tokens":1000000000000000}}}"#
+        let event = parser().parse(line: atCap, fileModificationDate: modDate)
+        #expect(event?.inputTokens == 1_000_000_000_000_000)
+
+        let aboveCap = #"{"type":"assistant","timestamp":"2026-09-02T12:00:06.000Z","message":{"usage":{"input_tokens":1000000000000001}}}"#
+        #expect(parser().parse(line: aboveCap, fileModificationDate: modDate) == nil)
+    }
 }
