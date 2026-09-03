@@ -10,11 +10,17 @@ public struct UsageEvent: Sendable, Equatable, Codable {
     public var cacheReadTokens: Int64
     public var cacheWriteTokens: Int64
     public var project: String?
+    /// Id da mensagem na fonte, quando ela tem id próprio (Gemini: `id` da
+    /// linha-raiz, spec F2 §3.3). O provider dedupica por ele — a mesma
+    /// mensagem pode vir 2× (reanexo do CLI). `nil` = evento sem dedupe.
+    /// Opcional p/ compat: eventos persistidos antes do campo decodificam nil.
+    public var dedupeID: String?
 
     public init(
         ts: Date, provider: ProviderID, account: AccountID, model: String?,
         inputTokens: Int64, outputTokens: Int64,
-        cacheReadTokens: Int64, cacheWriteTokens: Int64, project: String?
+        cacheReadTokens: Int64, cacheWriteTokens: Int64, project: String?,
+        dedupeID: String? = nil
     ) {
         self.ts = ts
         self.provider = provider
@@ -25,5 +31,6 @@ public struct UsageEvent: Sendable, Equatable, Codable {
         self.cacheReadTokens = cacheReadTokens
         self.cacheWriteTokens = cacheWriteTokens
         self.project = project
+        self.dedupeID = dedupeID
     }
 }

@@ -42,4 +42,22 @@ struct FileOffsetStoreTests {
         let store = JSONFileOffsetStore(url: tempURL("never-created"))
         #expect(store.cursors().isEmpty)
     }
+
+    /// Compat do cursor estendido (Gemini, dedupe por id): seenIDs persiste no
+    /// mesmo arquivo de cursores e cursor antigo (sem a chave) decodifica nil.
+    @Test
+    func testSeenIDsRoundtripAndLegacyCursorWithoutSeenIDs() throws {
+        let url = tempURL("cursors")
+        do {
+            let store = JSONFileOffsetStore(url: url)
+            try store.set(FileCursor(offset: 55, seenIDs: ["fake-id-1", "fake-id-2"]), for: "/tmp/g.jsonl")
+        }
+        let reloaded = JSONFileOffsetStore(url: url)
+        #expect(reloaded.cursors()["/tmp/g.jsonl"]?.seenIDs == Set(["fake-id-1", "fake-id-2"]))
+
+        // Cursor persistido ANTES do campo (JSON sem seenIDs): decodifica nil.
+        let decoded = try JSONDecoder().decode(FileCursor.self, from: Data(#"{"offset": 42}"#.utf8))
+        #expect(decoded.offset == 42)
+        #expect(decoded.seenIDs == nil)
+    }
 }
