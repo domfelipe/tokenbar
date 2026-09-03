@@ -12,6 +12,12 @@ final class AppState {
     private let debouncer: Debouncer<ContinuousClock>
     private var loopTask: Task<Void, Never>?
     private let e2eDir: URL?
+    /// M1 (final review): os 3 caminhos de ingest (loop FSEvents, fallback poll,
+    /// forceIngest) podem se sobrepor; dois ingests sobrepostos leriam os mesmos
+    /// cursores e aplicariam os mesmos bytes no ledger 2×, inflando o total do dia
+    /// até restart/meia-noite. Skip-if-busy basta: o próximo evento/poll re-ingere.
+    /// AppState é @MainActor, então check+set sem await entre eles é atômico.
+    private var ingestInFlight = false
 
     init() {
         let env = ProcessInfo.processInfo.environment
@@ -52,6 +58,9 @@ final class AppState {
     }
 
     private func ingestNow() async {
+        guard !ingestInFlight else { return }
+        ingestInFlight = true
+        defer { ingestInFlight = false }
         // IngestOutcome tem init internal — extrair totals em vez de construir fallback.
         let totals = (try? await provider.ingestOnce(now: Date()))?.providerTotals ?? [:]
         let content = MenuBarContent(todayTokens: totals)
