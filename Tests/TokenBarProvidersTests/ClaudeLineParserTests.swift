@@ -90,4 +90,51 @@ struct ClaudeLineParserTests {
         let aboveCap = #"{"type":"assistant","timestamp":"2026-09-02T12:00:06.000Z","message":{"usage":{"input_tokens":1000000000000001}}}"#
         #expect(parser().parse(line: aboveCap, fileModificationDate: modDate) == nil)
     }
+
+    // Red Team caso 2: fastISO8601 substitui o ISO8601DateFormatter no hot path
+    // (30 µs → 0,06 µs por linha). Paridade com o formatter nas formas aceitas.
+    @Test func fastISO8601MatchesFormatterOnAcceptedForms() {
+        let cases: [(String, Bool)] = [
+            ("2026-09-02T12:00:00Z", true),
+            ("2026-09-02T12:00:00.500Z", true),
+            ("2026-09-02T12:00:00.123456Z", true),
+            ("2026-09-02T12:00:00+03:00", true),
+            ("2026-09-02T12:00:00.250-03:00", true),
+            ("2026-02-29T00:00:00Z", false),      // 2026 não é bissexto
+            ("2026-13-01T00:00:00Z", false),      // mês 13
+            ("2026-09-02 12:00:00Z", false),      // separador errado
+            ("2026-09-02T12:00:00", false),       // sem fuso
+            ("not-a-date", false),
+            ("", false),
+        ]
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        for (input, fastParses) in cases {
+            let fast = ClaudeLineParser.fastISO8601(input)
+            let reference = iso.date(from: input) ?? plain.date(from: input)
+            #expect((fast != nil) == fastParses, "\(input): fast=\(fast.map { String(describing: $0.timeIntervalSince1970) } ?? "nil")")
+            if let fast, let reference {
+                #expect(abs(fast.timeIntervalSince1970 - reference.timeIntervalSince1970) < 0.001,
+                        "\(input): fast vs formatter divergem")
+            }
+        }
+    }
+
+    @Test func fastISO8601MatchesFormatterOnCorpusTimestamps() {
+        // timestamps sintéticos do genfixtures (mesma forma dos transcripts reais)
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "America/Sao_Paulo")!
+        let base = Date(timeIntervalSince1970: 1_788_000_000)
+        for offset in stride(from: -86_400, through: 86_400, by: 997) {
+            let raw = iso.string(from: base.addingTimeInterval(Double(offset)))
+            let fast = ClaudeLineParser.fastISO8601(raw)
+            #expect(fast != nil, "\(raw) deveria parsear")
+            if let fast {
+                #expect(abs(fast.timeIntervalSince1970 - base.addingTimeInterval(Double(offset)).timeIntervalSince1970) < 0.001)
+            }
+        }
+    }
 }

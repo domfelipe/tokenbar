@@ -136,4 +136,128 @@ final class TranscriptIngesterTests: Sendable {
         #expect(results[0].newEvents.count == 10_000)
         #expect(elapsed < 1.0, "ingest de 10k levou \(elapsed)s")
     }
+
+    // MARK: - Red Team caso 2: núcleo streaming (memória limitada por lote)
+
+    /// Aceita "T<n>,<padding qualquer>" — permite linhas longas (arquivo > chunk)
+    /// mantendo um token numérico por linha.
+    private func tolerantParser(_ line: String, _ mod: Date) -> UsageEvent? {
+        guard line.hasPrefix("T"),
+              let n = Int64(line.dropFirst().split(separator: ",", maxSplits: 1).first ?? "")
+        else { return nil }
+        return UsageEvent(
+            ts: mod, provider: .claude,
+            account: AccountID(provider: .claude, key: "local"), model: nil,
+            inputTokens: 0, outputTokens: n, cacheReadTokens: 0, cacheWriteTokens: 0, project: nil
+        )
+    }
+
+    /// Regressão caso 2: arquivo maior que a janela de chunk (256 KB) precisa
+    /// ser entregue em MÚLTIPLOS lotes (propriedade que limita o pico de
+    /// memória) sem perder nenhum evento e com cursor idêntico ao da API de array.
+    @Test
+    func testStreamingDeliversLargeFileInBoundedBatches() throws {
+        let lineCount = 6_000  // ~200 B/linha ≈ 1,2 MB > chunk de 256 KB
+        var body = ""
+        body.reserveCapacity(lineCount * 210)
+        for i in 0..<lineCount { body += "T\(i % 1_000),padding____0123456789____0123456789____0123456789\n" }
+        try body.write(to: dir.appendingPathComponent("wide.jsonl"), atomically: true, encoding: .utf8)
+        let ingester = TranscriptIngester(parseLine: tolerantParser)
+
+        var deliveries: [(events: Int, reset: Bool)] = []
+        let updates = try ingester.ingestChangedFilesStreaming(
+            under: dir,
+            cursors: [:],
+            makeEvent: identityTag
+        ) { _, events, reset in
+            deliveries.append((events.count, reset))
+        }
+        let totalEvents = deliveries.reduce(0) { $0 + $1.events }
+        #expect(totalEvents == lineCount, "nenhum evento perdido no streaming")
+        #expect(deliveries.count >= 2, "arquivo > chunk precisa de \(deliveries.count) entregas múltiplas")
+        #expect(deliveries.allSatisfy { $0.reset == false })
+        #expect(updates.count == 1 && !updates[0].resetToZero)
+        #expect(Int(updates[0].cursor.offset) == body.utf8.count)
+    }
+
+    /// Regressão caso 2/3: truncamento a ZERO emite update de cursor 0 e
+    /// callback de reset mesmo sem linhas novas — o ledger zera a soma do
+    /// arquivo (antes o cursor ficava retido e o total ficava stale até o
+    /// próximo append).
+    @Test
+    func testTruncateToZeroEmitsResetEvenWithoutNewLines() throws {
+        try "T10\nT20\n".write(to: dir.appendingPathComponent("a.jsonl"), atomically: true, encoding: .utf8)
+        let ingester = TranscriptIngester(parseLine: countingParser)
+        let first = try ingester.ingestChangedFiles(under: dir, cursors: [:], makeEvent: identityTag)
+        #expect(first[0].cursor.offset > 0)
+
+        try "".write(to: dir.appendingPathComponent("a.jsonl"), atomically: true, encoding: .utf8)
+        var resets = 0
+        let updates = try ingester.ingestChangedFilesStreaming(
+            under: dir,
+            cursors: [first[0].path: first[0].cursor],
+            makeEvent: identityTag
+        ) { _, events, reset in
+            if reset { resets += 1 }
+            #expect(events.isEmpty)
+        }
+        #expect(resets == 1, "reset sinalizado sem linhas novas")
+        #expect(updates.count == 1)
+        #expect(updates[0].cursor.offset == 0)
+        #expect(updates[0].resetToZero)
+
+        // API de array mantém o mesmo contrato
+        let viaArray = try ingester.ingestChangedFiles(
+            under: dir,
+            cursors: [first[0].path: first[0].cursor],
+            makeEvent: identityTag
+        )
+        #expect(viaArray.count == 1)
+        #expect(viaArray[0].resetToZero)
+        #expect(viaArray[0].newEvents.isEmpty)
+        #expect(viaArray[0].cursor.offset == 0)
+    }
+
+    /// Regressão caso 3: truncamento parcial (arquivo encolhe mas permanece com
+    /// linhas completas) reinicia do zero e sinaliza reset.
+    @Test
+    func testStreamingResetFlagOnlyOnFirstBatchOfShrunkFile() throws {
+        try "T10\nT20\nT30\n".write(to: dir.appendingPathComponent("a.jsonl"), atomically: true, encoding: .utf8)
+        let ingester = TranscriptIngester(parseLine: countingParser)
+        let first = try ingester.ingestChangedFiles(under: dir, cursors: [:], makeEvent: identityTag)
+
+        try "T99\nT88\n".write(to: dir.appendingPathComponent("a.jsonl"), atomically: true, encoding: .utf8)
+        var deliveries: [(events: [Int], reset: Bool)] = []
+        let updates = try ingester.ingestChangedFilesStreaming(
+            under: dir,
+            cursors: [first[0].path: first[0].cursor],
+            makeEvent: identityTag
+        ) { _, events, reset in
+            deliveries.append((events.map { Int($0.outputTokens) }, reset))
+        }
+        let flat = deliveries.flatMap(\.events)
+        #expect(flat == [99, 88])
+        #expect(deliveries.first?.reset == true, "primeiro lote carrega o reset")
+        #expect(deliveries.dropFirst().allSatisfy { !$0.reset }, "reset não se repete entre lotes")
+        #expect(updates[0].resetToZero)
+    }
+
+    /// Cauda parcial atravessando o limite de chunk não é consumida nem duplicada.
+    @Test
+    func testStreamingCarriesPartialLineAcrossChunks() throws {
+        var body = ""
+        for i in 0..<3_000 { body += "T\(i % 1_000),x____0123456789\n" }  // ~75 KB, 1 chunk e pouco
+        body += "T7"  // cauda sem \n
+        try body.write(to: dir.appendingPathComponent("tail.jsonl"), atomically: true, encoding: .utf8)
+        let ingester = TranscriptIngester(parseLine: tolerantParser)
+
+        var total = 0
+        let updates = try ingester.ingestChangedFilesStreaming(
+            under: dir,
+            cursors: [:],
+            makeEvent: identityTag
+        ) { _, events, _ in total += events.count }
+        #expect(total == 3_000)
+        #expect(Int(updates[0].cursor.offset) == body.utf8.count - 2, "cauda 'T7' fica para o próximo ciclo")
+    }
 }
