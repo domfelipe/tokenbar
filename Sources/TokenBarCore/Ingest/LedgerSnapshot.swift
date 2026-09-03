@@ -9,15 +9,45 @@ import os
 /// agregado): restaurar por arquivo preserva a auto-correção contra
 /// truncamento da F1 — o reset de UM arquivo zera só a contribuição dele, sem
 /// perder a dos outros nem ressuscitar a do truncado.
+///
+/// `cursorStamp` é a impressão digital do store de cursores no momento do
+/// save: a restauração só vale se os cursores atuais baterem. Sem isso, um
+/// store de cursores perdido/corrompido (re-ingest completa) dobraria os
+/// totais sobre o snapshot restaurado (Red Team F2, caso 5).
 public struct LedgerSnapshot: Sendable, Equatable {
     /// `startOfDay` em que o snapshot foi tirado — só restaura se == hoje.
     public let day: Date
     /// Path do arquivo → soma do dia daquele arquivo.
     public let files: [String: TokenSums]
+    /// `nil` = snapshot sem stamp (estranho/corrompido) → nunca restaura.
+    public let cursorStamp: String?
 
-    public init(day: Date, files: [String: TokenSums]) {
+    public init(day: Date, files: [String: TokenSums], cursorStamp: String? = nil) {
         self.day = day
         self.files = files
+        self.cursorStamp = cursorStamp
+    }
+}
+
+/// Impressão digital determinística e bounded do store de cursores: FNV-1a 64
+/// sobre os pares `path <US> offset` ordenados por path. Não é criptografia —
+/// é só para detectar que o CONJUNTO de cursores mudou (perda, reset,
+/// corrupção de arquivo) entre o save do snapshot e a tentativa de restaurar.
+public enum LedgerSnapshotStamp {
+    public static func make(_ cursors: [String: FileCursor]) -> String {
+        var hash: UInt64 = 0xcbf29ce484222325
+        func fold(_ s: String) {
+            for byte in s.utf8 {
+                hash ^= UInt64(byte)
+                hash = hash &* 0x100000001b3
+            }
+            hash ^= 0x1f
+            hash = hash &* 0x100000001b3
+        }
+        for path in cursors.keys.sorted() {
+            fold("\(path)\u{1f}\(cursors[path]?.offset ?? 0)")
+        }
+        return String(hash, radix: 16)
     }
 }
 
@@ -39,6 +69,7 @@ public final class JSONLedgerSnapshotStore: LedgerSnapshotStoring {
         let day: Date
         // [input, output, cacheRead, cacheWrite] — array fixo de 4 (compacto).
         let files: [String: [Int64]]
+        let cursorStamp: String?
     }
 
     private let url: URL
@@ -59,7 +90,7 @@ public final class JSONLedgerSnapshotStore: LedgerSnapshotStoring {
                 input: sums[0], output: sums[1], cacheRead: sums[2], cacheWrite: sums[3]
             )
         }
-        return LedgerSnapshot(day: file.day, files: files)
+        return LedgerSnapshot(day: file.day, files: files, cursorStamp: file.cursorStamp)
     }
 
     public func save(_ snapshot: LedgerSnapshot?) {
@@ -69,9 +100,21 @@ public final class JSONLedgerSnapshotStore: LedgerSnapshotStoring {
         }
         let file = File(
             day: snapshot.day,
-            files: snapshot.files.mapValues { [$0.input, $0.output, $0.cacheRead, $0.cacheWrite] }
+            files: snapshot.files.mapValues { [$0.input, $0.output, $0.cacheRead, $0.cacheWrite] },
+            cursorStamp: snapshot.cursorStamp
         )
         guard let data = try? JSONEncoder().encode(file) else { return }
         try? data.write(to: url, options: .atomic)
+    }
+}
+
+/// Conveniência dos providers: grava o snapshot carimbado com o estado dos
+/// cursores (chamado DEPOIS de persistir os cursores — ordem anti-dupla-
+/// contagem documentada em `TokenLedger.daySnapshot`).
+extension LedgerSnapshotStoring {
+    public func saveDay(_ snapshot: LedgerSnapshot?, stamping cursors: [String: FileCursor]) {
+        save(snapshot.map {
+            LedgerSnapshot(day: $0.day, files: $0.files, cursorStamp: LedgerSnapshotStamp.make(cursors))
+        })
     }
 }

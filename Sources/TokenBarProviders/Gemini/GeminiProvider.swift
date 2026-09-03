@@ -173,7 +173,8 @@ public final class GeminiProvider: Sendable, UsageProvider {
         // por processo; dia divergente → no-op, o rollover re-escaneia). Os
         // ids do dedupe não são restaurados daqui — voltam dos `seenIDs` do
         // cursor (fonte canônica), então duplicata continua coberta.
-        if let store = ledgerSnapshotStore, let snapshot = store.load() {
+        if let store = ledgerSnapshotStore, let snapshot = store.load(),
+           snapshot.cursorStamp == LedgerSnapshotStamp.make(offsetStore.cursors()) {
             ledger.restoreDay(snapshot, provider: .gemini, now: now)
         }
 
@@ -231,7 +232,7 @@ public final class GeminiProvider: Sendable, UsageProvider {
         }
         // Snapshot do dia DEPOIS dos cursores (ordem anti-dupla-contagem,
         // ver `TokenLedger.daySnapshot`) — Red Team F2 caso 7.
-        ledgerSnapshotStore?.save(ledger.daySnapshot(now: now))
+        ledgerSnapshotStore?.saveDay(ledger.daySnapshot(now: now), stamping: offsetStore.cursors())
         return IngestBatch(
             events: [],  // streaming: eventos aplicados no ledger e descartados
             eventsApplied: applied,

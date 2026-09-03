@@ -184,6 +184,31 @@ final class ClaudeProviderTests {
         #expect(corrected.providerTotals[.claude] == 200)
     }
 
+    /// Red Team F2 caso 5: cursores PERDIDOS (arquivo corrompido → estado
+    /// vazio) invalidam o snapshot — restaurar sobre um re-ingest completo
+    /// dobraria o dia. Stamp divergente → não restaura; o re-ingest reconstrói.
+    @Test func lostCursorsInvalidateSnapshotNoDoubleCount() async throws {
+        try writeFixture()  // 3330
+        let cursors = SharedCursorStore()
+        let ledgerURL = dir.appendingPathComponent("claude-ledger.json")
+        let first = ClaudeProvider(
+            projectsDirectory: dir, offsetStore: cursors, calendar: calendar,
+            ledgerSnapshotStore: JSONLedgerSnapshotStore(url: ledgerURL)
+        )
+        #expect(try await first.ingestOnce(now: now).providerTotals[.claude] == 3330)
+
+        // "Corrupção": os cursores se perdem (estado vazio do store).
+        for path in cursors.cursors().keys {
+            try cursors.set(nil, for: path)
+        }
+        let restarted = ClaudeProvider(
+            projectsDirectory: dir, offsetStore: cursors, calendar: calendar,
+            ledgerSnapshotStore: JSONLedgerSnapshotStore(url: ledgerURL)
+        )
+        // Re-ingest completa reconstrói 3330 — e NÃO 6660.
+        #expect(try await restarted.ingestOnce(now: now).providerTotals[.claude] == 3330)
+    }
+
     @Test func corruptLedgerSnapshotIsIgnoredNotFatal() async throws {
         try writeFixture()
         let ledgerURL = dir.appendingPathComponent("claude-ledger.json")

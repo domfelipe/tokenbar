@@ -196,7 +196,8 @@ public final class CodexProvider: Sendable, UsageProvider {
 
         // Red Team F2 caso 7: restaura o dia do snapshot pós-restart (uma vez
         // por processo; dia divergente → no-op, o rollover re-escaneia).
-        if let store = ledgerSnapshotStore, let snapshot = store.load() {
+        if let store = ledgerSnapshotStore, let snapshot = store.load(),
+           snapshot.cursorStamp == LedgerSnapshotStamp.make(offsetStore.cursors()) {
             ledger.restoreDay(snapshot, provider: .codex, now: now)
         }
 
@@ -234,7 +235,7 @@ public final class CodexProvider: Sendable, UsageProvider {
         }
         // Snapshot do dia DEPOIS dos cursores (ordem anti-dupla-contagem,
         // ver `TokenLedger.daySnapshot`) — Red Team F2 caso 7.
-        ledgerSnapshotStore?.save(ledger.daySnapshot(now: now))
+        ledgerSnapshotStore?.saveDay(ledger.daySnapshot(now: now), stamping: offsetStore.cursors())
         return IngestBatch(
             events: [],  // streaming: eventos aplicados no ledger e descartados
             eventsApplied: applied,
