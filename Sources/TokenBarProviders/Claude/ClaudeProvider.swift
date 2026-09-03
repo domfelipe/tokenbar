@@ -28,34 +28,56 @@ public final class ClaudeProvider: Sendable {
         }
     }
 
-    /// Um ciclo completo: rollover → varre → parseia → aplica no ledger → persiste cursores.
+    /// Um ciclo completo: rollover → varre (streaming) → parseia → aplica no
+    /// ledger por lote → persiste cursores. Eventos são aplicados por segmento
+    /// de streaming e descartados — o pico de memória não escala com o tamanho
+    /// do arquivo (Red Team F1, caso 2).
     public func ingestOnce(now: Date) async throws -> IngestOutcome {
-        await ledger.rolloverIfNeeded(now: now)
+        ledger.rolloverIfNeeded(now: now)
 
         // Virada de dia: re-ingest completa (cursores zerados).
-        if await ledger.needsFullRescan {
+        if ledger.needsFullRescan {
             for path in offsetStore.cursors().keys {
                 try? offsetStore.set(nil, for: path)
             }
-            await ledger.clearRescanFlag()
+            ledger.clearRescanFlag()
         }
 
-        let results = try ingester.ingestChangedFiles(
+        var applied = 0
+        var projectCache: [String: String] = [:]  // projeto por arquivo: mesmo valor p/ todas as linhas
+        let updates = try ingester.ingestChangedFilesStreaming(
             under: projectsDirectory,
             cursors: offsetStore.cursors(),
-            makeEvent: { [account] event, path in
+            makeEvent: { event, path in
                 var e = event
                 e.account = account
-                e.project = e.project ?? URL(filePath: path).deletingLastPathComponent().lastPathComponent
+                let project: String
+                if let cached = projectCache[path] {
+                    project = cached
+                } else {
+                    project = URL(filePath: path).deletingLastPathComponent().lastPathComponent
+                    projectCache[path] = project
+                }
+                e.project = e.project ?? project
                 return e
+            },
+            onEvents: { path, events, reset in
+                applied += events.count
+                // Aplica imediatamente e descarta o lote — sem retenção de eventos.
+                ledger.apply(
+                    [FileIngestResult(
+                        path: path,
+                        newEvents: events,
+                        cursor: FileCursor(offset: 0),  // placeholder; o cursor real vai em `updates`
+                        resetToZero: reset
+                    )],
+                    now: now
+                )
             }
         )
-        let applied = results.reduce(0) { $0 + $1.newEvents.count }
-        await ledger.apply(results, now: now)
-        for result in results {
-            try? offsetStore.set(result.cursor, for: result.path)
+        for update in updates {
+            try? offsetStore.set(update.cursor, for: update.path)
         }
-        let totals = await ledger.todayByProvider(now: now)
-        return IngestOutcome(eventsApplied: applied, providerTotals: totals)
+        return IngestOutcome(eventsApplied: applied, providerTotals: ledger.todayByProvider(now: now))
     }
 }

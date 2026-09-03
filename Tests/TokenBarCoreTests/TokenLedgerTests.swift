@@ -25,26 +25,26 @@ final class TokenLedgerTests: Sendable {
     }
 
     @Test
-    func testAccumulatesAcrossFilesAndCycles() async {
+    func testAccumulatesAcrossFilesAndCycles() {
         let ledger = TokenLedger(calendar: calendar)
-        await ledger.apply([event(10, ts: today, path: "/a"), event(20, ts: today, path: "/b")], now: today)
-        await ledger.apply([event(5, ts: today, path: "/a")], now: today)
-        let byProvider = await ledger.todayByProvider(now: today)
+        ledger.apply([event(10, ts: today, path: "/a"), event(20, ts: today, path: "/b")], now: today)
+        ledger.apply([event(5, ts: today, path: "/a")], now: today)
+        let byProvider = ledger.todayByProvider(now: today)
         #expect(byProvider[.claude] == 35)
     }
 
     @Test
-    func testYesterdayEventsDoNotCountForToday() async {
+    func testYesterdayEventsDoNotCountForToday() {
         let ledger = TokenLedger(calendar: calendar)
-        await ledger.apply([event(10, ts: yesterday, path: "/a")], now: today)
-        let total = await ledger.todayTotal(now: today)
+        ledger.apply([event(10, ts: yesterday, path: "/a")], now: today)
+        let total = ledger.todayTotal(now: today)
         #expect(total == 0)
     }
 
     @Test
-    func testTruncationSelfCorrects() async {
+    func testTruncationSelfCorrects() {
         let ledger = TokenLedger(calendar: calendar)
-        await ledger.apply([event(10, ts: today, path: "/a")], now: today)
+        ledger.apply([event(10, ts: today, path: "/a")], now: today)
         let correction = FileIngestResult(
             path: "/a",
             newEvents: [UsageEvent(
@@ -54,31 +54,31 @@ final class TokenLedgerTests: Sendable {
             )],
             cursor: FileCursor(offset: 3), resetToZero: true
         )
-        await ledger.apply([correction], now: today)
-        let total = await ledger.todayTotal(now: today)
+        ledger.apply([correction], now: today)
+        let total = ledger.todayTotal(now: today)
         #expect(total == 3, "truncamento substitui, não soma")
     }
 
     @Test
-    func testRolloverClearsTotalsAndFlagsRescan() async {
+    func testRolloverClearsTotalsAndFlagsRescan() {
         let ledger = TokenLedger(calendar: calendar)
-        await ledger.apply([event(10, ts: today, path: "/a")], now: today)
+        ledger.apply([event(10, ts: today, path: "/a")], now: today)
         let tomorrow = today.addingTimeInterval(86_400)
-        await ledger.rolloverIfNeeded(now: tomorrow)
-        let needsRescan = await ledger.needsFullRescan
+        ledger.rolloverIfNeeded(now: tomorrow)
+        let needsRescan = ledger.needsFullRescan
         #expect(needsRescan)
-        let total = await ledger.todayTotal(now: tomorrow)
+        let total = ledger.todayTotal(now: tomorrow)
         #expect(total == 0)
     }
 
     @Test
-    func testMultiProviderBreakdown() async {
+    func testMultiProviderBreakdown() {
         let ledger = TokenLedger(calendar: calendar)
-        await ledger.apply(
+        ledger.apply(
             [event(10, ts: today, path: "/a"), event(7, ts: today, path: "/c", provider: .codex)],
             now: today
         )
-        let byProvider = await ledger.todayByProvider(now: today)
+        let byProvider = ledger.todayByProvider(now: today)
         #expect(byProvider[.claude] == 10)
         #expect(byProvider[.codex] == 7)
     }
