@@ -138,7 +138,7 @@ Regras de contagem:
 - **Somar `payload.info.last_token_usage`** (delta por evento). `total_token_usage` é **cumulativo** — somar os dois duplica tudo. Verificado: dois eventos consecutivos com last 110→112 e total 110→222.
 - `reasoning_output_tokens` é subconjunto de `output_tokens` — não somar separadamente.
 - Mapeamento → `UsageEvent`: `input=input_tokens`, `cacheRead=cached_input_tokens`, `cacheWrite=cache_write_input_tokens`, `output=output_tokens`, `ts=timestamp` (ISO8601 com fração + Z; reusar `fastISO8601` do padrão F1), `model` do **último** `turn_context` visto (`.payload.model`; muda no meio do arquivo), `project` = diretório do arquivo (padrão F1: `URL.deletingLastPathComponent().lastPathComponent` do projeto).
-- `rate_limits` dentro do `token_count` tem shape **diferente** do `wham/usage` (`resets_at`/`window_minutes` vs `reset_at`/`limit_window_seconds`) — não reutilizar o mesmo decoder.
+- `rate_limits` dentro do `token_count` tem shape **diferente** do `wham/usage` (`resets_at`/`window_minutes` vs `reset_at`/`limit_window_seconds`) — não reutilizar o mesmo decoder. Chaves extras observadas nesse objeto: `credits`, `individual_limit`, `limit_id`, `limit_name`, `rate_limit_reached_type`, `spend_control_reached` — decoder tolerante (ignorar desconhecidas); a fixture da Task 4 deve incluir linha com essas chaves.
 - Performance: arquivos reais têm 1000+ linhas, maioria sem uso. Prefilter barato (linha contém `"token_count"`) antes de decodificar, mesmo padrão do `ClaudeLineParser` (que filtra `assistant`+`usage`).
 - Incremental: herdar o padrão F1 (`TranscriptIngester` + `FileOffsetStore`, apêndice por byte offset).
 
@@ -161,6 +161,7 @@ Regras de contagem:
 
 - **Quota do plano:** `GET https://api.z.ai/api/monitor/usage/quota/limit` (região global)
   ou `GET https://open.bigmodel.cn/api/monitor/usage/quota/limit` (região BigModel CN)
+  - O plugin aceita override de endpoint por settings/env (`Z_AI_QUOTA_ENDPOINT`, e análogos `Z_AI_MODEL_USAGE_ENDPOINT`/`Z_AI_BALANCE_ENDPOINT`); TokenBar F2 usa as URLs canônicas, sem override.
   - Escopo team: `?type=2` + headers `Bigmodel-Organization: <org>` / `Bigmodel-Project: <project>`. **F2: personal only.**
 - **Uso por modelo (opcional, gráficos):** `GET {base}/api/monitor/usage/model-usage?startTime=<YYYY-MM-DD HH:mm:ss>&endTime=<...>` → série por hora/dia.
 - **Saldo (CN, pay-as-you-go, best-effort):** `GET https://www.bigmodel.cn/api/biz/account/query-customer-account-report` — só região CN; falha não pode derrubar a quota.
@@ -268,29 +269,64 @@ F2 = **local only** (decisão de design, spec §5.1: "sem API pública estável 
   "startTime": "2026-07-26T18:38:00.000Z", "lastUpdated": "2026-07-26T19:00:00.000Z" }
 ```
 
-- **Linhas seguintes (deltas `$set`, apêndices):**
+Depois da meta, o arquivo **mistura dois formatos de linha** (verificado 2026-09-02 nas 4 sessões locais: `$set` = 1/2/6/5 linhas vs linhas-raiz = 0/1/5/4 — os dois formatos coexistem no mesmo arquivo):
+
+- **Formato A — linha-raiz de mensagem** (apêndice, uma por mensagem; a única com tokens):
+
+```json
+{
+  "type": "gemini",
+  "id": "fake-uuid-with-dashes",
+  "timestamp": "2026-07-26T18:39:59.370Z",
+  "content": "resposta fake do modelo",
+  "model": "gemini-2.5-flash",
+  "thoughts": [ { "text": "raciocínio fake" } ],
+  "toolCalls": [ { "name": "fake-tool" } ],
+  "tokens": {
+    "input": 100, "output": 54, "cached": 0,
+    "thoughts": 39, "tool": 0, "total": 193
+  }
+}
+```
+
+  - `type` observado: `gemini` (com `model` + `tokens`) | `user` (`content` array, sem tokens) | `info` (nota do CLI, `content` string, sem tokens)
+  - `content`: **string** nas linhas `gemini`/`info`, **array** nas `user` — irrelevante p/ ingest de tokens
+  - `tokens`: `{input, output, cached, thoughts, tool, total}`; **`total = input + output + thoughts + tool`** (verificado nas 3 linhas com tokens; `cached=0` em todas — ver §3.4)
+  - `toolCalls` é opcional (ausente quando não há chamada de ferramenta)
+- **Formato B — delta `$set`** (espelha mensagens sem tokens; ignorar p/ contagem):
 
 ```json
 { "$set": {
     "lastUpdated": "2026-07-26T18:40:00.000Z",
     "messages": [
-      { "id": "fake-msg-id", "timestamp": "2026-07-26T18:39:59.000Z",
+      { "id": "fakehexid", "timestamp": "2026-07-26T18:39:59.000Z",
         "type": "user", "content": [ { "text": "mensagem fake" } ] }
     ] } }
 ```
 
-- `messages[].type` observado: `user` | `gemini`; conteúdo em `content[].text`.
-- **Não há contagem de tokens em lugar nenhum de `~/.gemini`** (verificado 2026-09-02: zero ocorrências de campos `token*`/`usage` em `tmp/`, `state.json`, `history/`, `projects.json`). Os chats guardam só texto.
+  - ids de `$set.messages` usam formato **diferente** das linhas-raiz (hex sem traços vs UUID), não colidem
+- **Duplicação real observada:** a mesma mensagem (mesmo `id`, mesmos tokens, mesmo `timestamp`) pode aparecer em **duas linhas-raiz idênticas** (o CLI reanexa a mensagem ao retomar). **Dedupe por `id` é obrigatório** — cursor por byte offset sozinho conta dobrado.
 
-### 3.4 Como "contar tokens" (decisão pendente Task 6 + QA)
+### 3.4 Contagem de tokens (tokens REAIS — sem estimativa)
 
-- **Opção A (recomendada):** estimar por mensagem (`≈ chars/4`) e expor como **estimativa** (UI com prefixo `≈`). Produz `UsageEvent` com input/output estimados por turno; `model: nil` (não há model nos chats). Atende ao objetivo do plano ("tokens (Gemini/local)") mantendo honestidade — nunca apresentar estimativa como medição.
-- **Opção B:** não gerar `UsageEvent`; expor só atividade (sessões/mensagens do dia). Mais honesto, mas não mostra tokens.
-- Proibido: apresentar estimativa como número real; usar API interna de quota "porque funciona" sem isolar o risco (§3.6).
+O ingest Gemini gera `UsageEvent` **apenas das linhas-raiz `type: "gemini"`** (as únicas com `tokens`), com dedupe por `id` (§3.3). Mapeamento recomendado:
+
+| Campo do evento | Fonte | Justificativa |
+|---|---|---|
+| `inputTokens` | `tokens.input` | prompt |
+| `outputTokens` | `tokens.output + tokens.thoughts + tokens.tool` | tudo que o modelo gerou; no Claude/Codex o `output_tokens` já engloba thinking/reasoning — consistência entre providers exige somar `thoughts` (aditivo a `output`: verificado `total = input+output+thoughts+tool`) e `tool` (0 nas amostras, mesmo raciocínio) |
+| `cacheReadTokens` | `tokens.cached` | análogo a `cache_read` do Claude. **Caverna:** `cached=0` em todas as amostras; a hipótese "`cached` ⊆ `input`" (semântica da API Gemini) não pôde ser verificada — se um dia vier `cached>0` com `total` descontando `cached`, revisar |
+| `model` | `model` da linha (ex. real observado: família `gemini-2.5-flash`) | presente nas linhas `gemini` |
+| `ts` | `timestamp` da linha (ISO8601 com fração + Z) | |
+
+- **Checksum:** `total == input + output + thoughts + tool`; divergência → aceitar os componentes (parser tolerante) e seguir, sem travar o ingest.
+- **Não usar `total` sozinho**: ele mistura input e output; o `UsageEvent` precisa do split p/ analytics — os componentes dão o split e o `total` vira verificação.
+- **Exibição: tokens reais, sem prefixo `≈`** — não há estimativa no caminho. Proibido reintroduzir estimativa (chars/4 etc.).
+- Janelas de limite: sempre `nil` (`usedFraction: nil` → UI "local", spec §5 regra 2).
 
 ### 3.5 Mapeamento
 
-`project` = nome do dir `~/.gemini/tmp/<projeto>` (mesma regra de projeto do F1); `ts` = `messages[].timestamp` (ISO8601); `account = "local"`; `provider = .gemini`. Janelas de limite: sempre `nil` (`usedFraction: nil` → UI "local"). Incremental: apêndice por byte offset com `FileOffsetStore` (linhas `$set` novas são só deltas; linhas antigas nunca são reescritas).
+`project` = nome do dir `~/.gemini/tmp/<projeto>` (mesma regra de projeto do F1); `ts`/`model`/tokens conforme §3.4; `account = "local"`; `provider = .gemini`. Incremental: apêndice por byte offset com `FileOffsetStore` + **set de `id`s já contados por arquivo** (linhas duplicadas são reanexos; se o arquivo encolher abaixo do cursor, re-ingest completa — padrão F1 `resetToZero`).
 
 ### 3.6 API de quota interna (FORA do escopo F2 — referência futura)
 
@@ -298,9 +334,10 @@ O CodexBar usa `POST https://cloudcode-pa.googleapis.com/v1internal:retrieveUser
 
 ### 3.7 Riscos
 
-- Formato `$set` delta: contar mensagem duplicada se o ingest reprocessar linha já lida — cursor por offset resolve; teste com arquivo que cresce entre leituras.
-- Sem `model` e sem tokens reais: qualquer número exibido é estimativa (rotular).
-- Mudança de versão do CLI pode migrar os chats de lugar (`~/.gemini/history/<projeto>/` hoje só tem `.project_root` vazio — monitorar).
+- **Dedupe:** linhas-raiz duplicadas (mesmo `id`) são reais e observadas; sem dedupe, contagem dobra. Teste obrigatório: arquivo que cresce com reanexo de mensagem já ingerida.
+- Mistura de formatos (`$set` + raiz) no mesmo arquivo, com proporção variável por versão do CLI — parser deve aceitar qualquer mistura e ignorar linhas sem `tokens`.
+- `cached ⊆ input` não verificado (amostras com `cached=0`); semântica de `tool` idem (`tool=0`). Reavaliar se aparecerem valores > 0.
+- Mudança de versão do CLI pode migrar os chats de lugar ou mudar o schema (`~/.gemini/history/<projeto>/` hoje só tem `.project_root` vazio — monitorar).
 
 ---
 
