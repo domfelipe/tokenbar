@@ -129,10 +129,15 @@ public final class ClaudeProvider: Sendable, UsageProvider {
 
         // Red Team F2 caso 7: restaura o dia do snapshot pós-restart (uma vez
         // por processo; dia divergente → no-op, o rollover re-escaneia).
-        if let store = ledgerSnapshotStore, let snapshot = store.load(),
-           // Stamp dos cursores: store perdido/corrompido → NÃO restaura (o
-           // re-ingest completo reconstrói o dia sem dobrar) — RT F2 caso 5.
-           snapshot.cursorStamp == LedgerSnapshotStamp.make(offsetStore.cursors()) {
+        let cursors = offsetStore.cursors()
+        // Stamp dos cursores: store perdido/corrompido → NÃO restaura (o
+        // re-ingest completo reconstrói o dia sem dobrar) — RT F2 caso 5.
+        // Filtro snapshot ⊆ cursores: entradas de paths que saíram do store
+        // são resíduo de outra corpus/instalação e não voltam — e2e T8 (P1).
+        if let store = ledgerSnapshotStore,
+           let snapshot = store.load()?.filtered(toExistingIn: cursors),
+           !snapshot.files.isEmpty,
+           snapshot.cursorStamp == LedgerSnapshotStamp.make(cursors) {
             ledger.restoreDay(snapshot, provider: .claude, now: now)
         }
 

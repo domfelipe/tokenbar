@@ -209,6 +209,31 @@ final class ClaudeProviderTests {
         #expect(try await restarted.ingestOnce(now: now).providerTotals[.claude] == 3330)
     }
 
+    /// e2e T8 (P1): o arquivo de snapshot acumula entradas de corpora
+    /// anteriores; restaurar entradas cujo CURSOR sumiu ressuscitava totais
+    /// de paths que não são mais escaneados (menu bar dobrava entre runs).
+    /// Regra snapshot ⊆ cursores: paths ausentes no store não voltam.
+    @Test func staleSnapshotPathsAreNotRestored() async throws {
+        try writeFixture()  // 3330
+        let cursors = SharedCursorStore()
+        let ledgerURL = dir.appendingPathComponent("claude-ledger.json")
+        let stamp = LedgerSnapshotStamp.make(cursors.cursors())
+        // Snapshot "de outra instalação": path que não existe no store atual.
+        let stale = LedgerSnapshot(
+            day: calendar.startOfDay(for: now),
+            files: ["/outra-instalacao/velho.jsonl": TokenSums(input: 4_000_000)],
+            cursorStamp: stamp
+        )
+        JSONLedgerSnapshotStore(url: ledgerURL).save(stale)
+
+        let provider = ClaudeProvider(
+            projectsDirectory: dir, offsetStore: cursors, calendar: calendar,
+            ledgerSnapshotStore: JSONLedgerSnapshotStore(url: ledgerURL)
+        )
+        let outcome = try await provider.ingestOnce(now: now)
+        #expect(outcome.providerTotals[.claude] == 3330, "resíduo de snapshot não entra no total")
+    }
+
     @Test func corruptLedgerSnapshotIsIgnoredNotFatal() async throws {
         try writeFixture()
         let ledgerURL = dir.appendingPathComponent("claude-ledger.json")

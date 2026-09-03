@@ -27,6 +27,16 @@ public struct LedgerSnapshot: Sendable, Equatable {
         self.files = files
         self.cursorStamp = cursorStamp
     }
+
+    /// Restringe o snapshot aos paths que AINDA EXISTEM no store de cursores
+    /// (Red Team/e2e T8, P1: o arquivo de snapshot acumula entradas de
+    /// corpora/instalações anteriores; restaurar entradas cujo cursor sumiu
+    /// ressuscita totais de paths que não são mais escaneados — a regra é
+    /// snapshot ⊆ cursores).
+    public func filtered(toExistingIn cursors: [String: FileCursor]) -> LedgerSnapshot {
+        let alive = files.filter { cursors[$0.key] != nil }
+        return LedgerSnapshot(day: day, files: alive, cursorStamp: cursorStamp)
+    }
 }
 
 /// Impressão digital determinística e bounded do store de cursores: FNV-1a 64
