@@ -1,0 +1,27 @@
+[e2e] TMP=/tmp/tokenbar-e2e.39I8CC
+[e2e] gerando corpus
+[0/1] Planning build
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'genfixtures' complete! (0.11s)
+{"cacheRead":5852575,"cacheWrite":285353,"events":574,"files":4,"input":1474479,"output":573886}
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'tokenbar' complete! (0.09s)
+[e2e] selfcheck: {"eventsApplied":574,"menuBarText":"C:6.4M","todayTokens":{"claude":6356106}}
+[0/1] Planning build
+Building for production...
+[0/3] Write swift-version--1AB21518FC5DEDBE.txt
+Build complete! (0.11s)
+build/TokenBar.app: replacing existing signature
+OK: build/TokenBar.app
+[e2e] PASS: heartbeat criado em 30s
+[e2e] PASS: menu bar text igual ao selfcheck ('C:6.4M' == 'C:6.4M')
+[e2e] PASS: live update após append (Δ=+333 observado)
+[e2e] aguardando 60s para medir recursos...
+[e2e] PASS: processo vivo (sem crash)
+[e2e] PASS: memória própria (phys_footprint) 15.0M ≤ 40MB (rss informativo: 71904KB)
+[e2e] PASS: cpu 0.0% ≤ 0.5%
+[e2e] concluído: 0 falha(s)
+./scripts/e2e.sh: line 82: 23961 Terminated: 15          TOKENBAR_CLAUDE_DIR="$CORPUS" TOKENBAR_E2E_DIR="$STATE" "build/TokenBar.app/Contents/MacOS/tokenbar"
+E2E_EXIT=0

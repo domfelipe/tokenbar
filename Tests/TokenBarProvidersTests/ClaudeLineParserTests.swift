@@ -1,0 +1,140 @@
+import Foundation
+import Testing
+@testable import TokenBarCore
+@testable import TokenBarProviders
+
+struct ClaudeLineParserTests {
+    let account = AccountID(provider: .claude, key: "local")
+    let modDate = Date(timeIntervalSince1970: 1_788_000_000)
+
+    func parser() -> ClaudeLineParser {
+        ClaudeLineParser(account: account, project: "fixture-proj")
+    }
+
+    @Test func assistantLineWithUsageProducesEvent() throws {
+        let line = #"{"type":"assistant","timestamp":"2026-09-02T12:00:00.500Z","cwd":"/tmp/proj","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":100,"output_tokens":200,"cache_read_input_tokens":300,"cache_creation_input_tokens":40}}}"#
+        let event = try #require(parser().parse(line: line, fileModificationDate: modDate))
+        #expect(event.provider == .claude)
+        #expect(event.account == account)
+        #expect(event.model == "claude-sonnet-4-6")
+        #expect(event.inputTokens == 100)
+        #expect(event.outputTokens == 200)
+        #expect(event.cacheReadTokens == 300)
+        #expect(event.cacheWriteTokens == 40)
+        #expect(event.project == "fixture-proj")
+        // "2026-09-02T12:00:00.500Z" == 1_788_350_400.5 epoch (tolerância < 1s)
+        #expect(abs(event.ts.timeIntervalSince1970 - 1_788_350_400) < 1)
+    }
+
+    @Test func userLineIsSkipped() {
+        let line = #"{"type":"user","timestamp":"2026-09-02T12:00:01.000Z","message":{"content":"oi"}}"#
+        #expect(parser().parse(line: line, fileModificationDate: modDate) == nil)
+    }
+
+    @Test func assistantWithoutUsageIsSkipped() {
+        let line = #"{"type":"assistant","timestamp":"2026-09-02T12:00:02.000Z","message":{"model":"claude-sonnet-4-6"}}"#
+        #expect(parser().parse(line: line, fileModificationDate: modDate) == nil)
+    }
+
+    @Test func truncatedJSONIsSkippedNotFatal() {
+        #expect(parser().parse(line: #"{"type":"assistant","timestamp":"2026-09-02T1"#, fileModificationDate: modDate) == nil)
+    }
+
+    @Test func binaryGarbageIsSkippedNotFatal() {
+        #expect(parser().parse(line: "\u{00}\u{01}\u{02}garbage", fileModificationDate: modDate) == nil)
+    }
+
+    @Test func invalidTimestampIsSkipped() {
+        let line = #"{"type":"assistant","timestamp":"nao-e-uma-data","message":{"usage":{"input_tokens":5,"output_tokens":5}}}"#
+        #expect(parser().parse(line: line, fileModificationDate: modDate) == nil)
+    }
+
+    @Test func negativeTokensAreClampedToZero() throws {
+        let line = #"{"type":"assistant","timestamp":"2026-09-02T12:00:03.000Z","message":{"usage":{"input_tokens":-10,"output_tokens":5}}}"#
+        let event = try #require(parser().parse(line: line, fileModificationDate: modDate))
+        #expect(event.inputTokens == 0)
+        #expect(event.outputTokens == 5)
+    }
+
+    @Test func allZeroUsageIsSkipped() {
+        let line = #"{"type":"assistant","timestamp":"2026-09-02T12:00:04.000Z","message":{"usage":{"input_tokens":0,"output_tokens":0}}}"#
+        #expect(parser().parse(line: line, fileModificationDate: modDate) == nil)
+    }
+
+    @Test func hugeLineDoesNotCrash() {
+        let huge = String(repeating: "a", count: 5_000_000)
+        #expect(parser().parse(line: huge, fileModificationDate: modDate) == nil)
+    }
+
+    // Red Team caso 1: Int64.max em usage estourava o guard de soma (SIGTRAP).
+    // Contrato pós-fix: linha com contagens absurdas (> 10^15 por campo) é lixo,
+    // não uso — rejeitada sem crash.
+    @Test func usageFieldsNearInt64MaxAreRejectedNotCrash() {
+        let imax = String(Int64.max)
+        let bothMax = #"{"type":"assistant","timestamp":"2026-09-02T12:00:05.000Z","message":{"usage":{"input_tokens":\#(imax),"output_tokens":\#(imax)}}}"#
+        #expect(parser().parse(line: bothMax, fileModificationDate: modDate) == nil)
+
+        let singleMax = #"{"type":"assistant","timestamp":"2026-09-02T12:00:05.000Z","message":{"usage":{"input_tokens":\#(imax)}}}"#
+        #expect(parser().parse(line: singleMax, fileModificationDate: modDate) == nil)
+        // campos negativos continuam com o contrato pré-existente: clamp para 0
+        // (coberto por testLineWithNegativeTokensClampsToZero); a rejeição é só
+        // para estouro positivo.
+    }
+
+    @Test func usageFieldsAtSanityCapBoundaryStillCounted() {
+        // valor no limite do saneamento (10^15) ainda é aceito; acima, rejeitado
+        let atCap = #"{"type":"assistant","timestamp":"2026-09-02T12:00:06.000Z","message":{"usage":{"input_tokens":1000000000000000}}}"#
+        let event = parser().parse(line: atCap, fileModificationDate: modDate)
+        #expect(event?.inputTokens == 1_000_000_000_000_000)
+
+        let aboveCap = #"{"type":"assistant","timestamp":"2026-09-02T12:00:06.000Z","message":{"usage":{"input_tokens":1000000000000001}}}"#
+        #expect(parser().parse(line: aboveCap, fileModificationDate: modDate) == nil)
+    }
+
+    // Red Team caso 2: fastISO8601 substitui o ISO8601DateFormatter no hot path
+    // (30 µs → 0,06 µs por linha). Paridade com o formatter nas formas aceitas.
+    @Test func fastISO8601MatchesFormatterOnAcceptedForms() {
+        let cases: [(String, Bool)] = [
+            ("2026-09-02T12:00:00Z", true),
+            ("2026-09-02T12:00:00.500Z", true),
+            ("2026-09-02T12:00:00.123456Z", true),
+            ("2026-09-02T12:00:00+03:00", true),
+            ("2026-09-02T12:00:00.250-03:00", true),
+            ("2026-02-29T00:00:00Z", false),      // 2026 não é bissexto
+            ("2026-13-01T00:00:00Z", false),      // mês 13
+            ("2026-09-02 12:00:00Z", false),      // separador errado
+            ("2026-09-02T12:00:00", false),       // sem fuso
+            ("not-a-date", false),
+            ("", false),
+        ]
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        for (input, fastParses) in cases {
+            let fast = ClaudeLineParser.fastISO8601(input)
+            let reference = iso.date(from: input) ?? plain.date(from: input)
+            #expect((fast != nil) == fastParses, "\(input): fast=\(fast.map { String(describing: $0.timeIntervalSince1970) } ?? "nil")")
+            if let fast, let reference {
+                #expect(abs(fast.timeIntervalSince1970 - reference.timeIntervalSince1970) < 0.001,
+                        "\(input): fast vs formatter divergem")
+            }
+        }
+    }
+
+    @Test func fastISO8601MatchesFormatterOnCorpusTimestamps() {
+        // timestamps sintéticos do genfixtures (mesma forma dos transcripts reais)
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "America/Sao_Paulo")!
+        let base = Date(timeIntervalSince1970: 1_788_000_000)
+        for offset in stride(from: -86_400, through: 86_400, by: 997) {
+            let raw = iso.string(from: base.addingTimeInterval(Double(offset)))
+            let fast = ClaudeLineParser.fastISO8601(raw)
+            #expect(fast != nil, "\(raw) deveria parsear")
+            if let fast {
+                #expect(abs(fast.timeIntervalSince1970 - base.addingTimeInterval(Double(offset)).timeIntervalSince1970) < 0.001)
+            }
+        }
+    }
+}
