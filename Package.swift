@@ -11,7 +11,7 @@ let package = Package(
     targets: [
         .target(name: "TokenBarCore"),
         .target(name: "TokenBarProviders", dependencies: ["TokenBarCore"]),
-        .target(name: "TokenBarUI", dependencies: ["TokenBarCore"]),
+        .target(name: "TokenBarUI", dependencies: ["TokenBarCore", "TokenBarProviders"]),
         .executableTarget(
             name: "tokenbar",
             dependencies: ["TokenBarCore", "TokenBarProviders", "TokenBarUI"]
