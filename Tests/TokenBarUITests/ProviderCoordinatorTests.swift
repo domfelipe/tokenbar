@@ -139,7 +139,7 @@ struct ProviderCoordinatorTests {
         let coordinator = ProviderCoordinator(config: ProviderCoordinatorConfig(
             environment: fixture.environment,
             home: fixture.root,
-            supportDirectory: fixture.root.appendingPathComponent("support"),
+            supportDirectory: fixture.root,
             e2eDirectory: fixture.e2eDirectory,
             makeOffsetStore: { _ in MemOffsetStore() }
         ))
@@ -155,5 +155,57 @@ struct ProviderCoordinatorTests {
         let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         #expect((json["providers"] as? [String: Any])?.count == 4)
         #expect(json["menuBarText"] as? String == "TB")
+    }
+
+    /// Regressão T8 (Red Team/e2e): provider API-driven cujo PRIMEIRO ciclo
+    /// falha com throw (rede morta) NÃO pode sumir do heartbeat v2 — sem
+    /// display, o payload omitia o provider inteiro e o token de erro se
+    /// perdia (o zai com credencial contra base morta desaparecia do
+    /// diagnóstico; o selfcheck de degradação do e2e demonstrou o sintoma).
+    @Test("provider degradado com throw no 1º ciclo permanece no heartbeat com erro")
+    func providerWithErrorOnFirstCycleStaysInPayload() async throws {
+        let fakeToken = "t8-synthetic-token-never-real"
+        let fixture = try Fixture.make(fakeToken: fakeToken)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+
+        // Z.ai COM credencial sintética e base morta: fetchUsage lança
+        // `.network` no 1º ciclo (caminho que não criava display).
+        try Data("""
+        {"provider": {"builtin:zai-coding-plan": {"options": {"apiKey": "\(fakeToken)"}}}}
+        """.utf8).write(to: fixture.root.appendingPathComponent("zai-config.json"))
+
+        let coordinator = ProviderCoordinator(config: ProviderCoordinatorConfig(
+            environment: fixture.environment,
+            home: fixture.root,
+            supportDirectory: fixture.root.appendingPathComponent("support"),
+            e2eDirectory: fixture.e2eDirectory,
+            makeOffsetStore: { _ in MemOffsetStore() }
+        ))
+
+        await coordinator.refreshAllNow()
+
+        let data = try Data(contentsOf: fixture.e2eDirectory.appendingPathComponent("state.json"))
+        let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let providers = try #require(json["providers"] as? [String: Any])
+
+        // TODOS os 4 registrados continuam no payload — inclusive o zai em erro.
+        #expect(Set(providers.keys) == ["claude", "codex", "gemini", "zai"])
+
+        // O zai degradado entra vazio (sem dado inventado) com o erro tokenizado
+        // no diagnóstico — nunca mensagem crua com URL (spec §9).
+        let zai = try #require(providers["zai"] as? [String: Any])
+        #expect(zai["menuBar"] is NSNull)
+        #expect(zai["percent"] is NSNull)
+        #expect(zai["authState"] as? String == "missing")
+
+        let diagnostic = coordinator.diagnosticPayload()
+        let diagnosticData = try JSONSerialization.data(withJSONObject: diagnostic, options: [.sortedKeys])
+        let diagnosticJSON = try #require(try JSONSerialization.jsonObject(with: diagnosticData) as? [String: Any])
+        let zaiEntry = try #require((diagnosticJSON["providers"] as? [String: Any])?["zai"] as? [String: Any])
+        #expect(zaiEntry["error"] as? String == "network")
+
+        // A credencial sintética não vaza em artefato nenhum (spec §9).
+        let raw = String(decoding: data, as: UTF8.self)
+        #expect(!raw.contains(fakeToken))
     }
 }

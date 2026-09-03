@@ -232,9 +232,13 @@ public final class ProviderCoordinator {
                 display.fetchedAt = Date()
                 displays[id] = display
             } catch {
-                // Mantém o último total bom (nunca dado errado).
+                // Mantém o último total bom (nunca dado errado). Provider sem
+                // display nenhum ainda entra no payload — o heartbeat v2 lista
+                // TODOS os registrados, e o token de erro não pode se perder
+                // num provider que nunca conseguiu dado (regressão T8).
                 ok = false
                 errorToken = Self.errorToken(error)
+                if displays[id] == nil { displays[id] = .empty }
             }
         }
 
@@ -253,6 +257,10 @@ public final class ProviderCoordinator {
         } catch {
             ok = false
             errorToken = errorToken ?? Self.errorToken(error)
+            // Idem: provider API-driven com o primeiro ciclo em erro (rede
+            // morta, 401, 500…) NÃO some do diagnóstico — entra vazio com o
+            // token do erro anexado (regressão T8: zai sumia do heartbeat v2).
+            if displays[id] == nil { displays[id] = .empty }
         }
 
         if let errorToken {
