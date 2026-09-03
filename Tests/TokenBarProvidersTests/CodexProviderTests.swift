@@ -478,6 +478,35 @@ final class CodexProviderTests {
             try await provider.ingestLocal(stranger, from: IngestCursor(), now: CodexFixtures.now)
         }
     }
+
+    /// Red Team F2 caso 7: restart mid-day — ledger novo, mesmo cursor store
+    /// (instância compartilhada simula a persistência) + snapshot do dia → o
+    /// total de hoje sobrevive ao relançamento (era 0 até o rollover).
+    @Test func restartMidDayRestoresTodayTotals() async throws {
+        try writeRolloutFixture()  // 377 (só last_token_usage, F2-CODEX-DELTA)
+        let cursors = InMemoryOffsetStore()
+        let ledgerURL = dir.appendingPathComponent("codex-ledger.json")
+
+        func make(snapshots: JSONLedgerSnapshotStore?) -> CodexProvider {
+            CodexProvider(
+                sessionsDirectory: dir,
+                authReader: CodexAuthReader(authFileURL: dir.appendingPathComponent("auth-ausente.json")),
+                client: UsageHTTPClient(baseURL: URL(string: "https://codex.example.com")!),
+                offsetStore: cursors,
+                calendar: calendar,
+                ledgerSnapshotStore: snapshots
+            )
+        }
+
+        let outcome = try await make(snapshots: JSONLedgerSnapshotStore(url: ledgerURL))
+            .ingestLocal(CodexFixtures.localRef, from: IngestCursor(fileOffsets: cursors.cursors()), now: CodexFixtures.now)
+        #expect(outcome.providerTotals[.codex] == 377)
+
+        // "Restart": provider novo, cursor semeado do store fresco (contrato).
+        let after = try await make(snapshots: JSONLedgerSnapshotStore(url: ledgerURL))
+            .ingestLocal(CodexFixtures.localRef, from: IngestCursor(fileOffsets: cursors.cursors()), now: CodexFixtures.now)
+        #expect(after.providerTotals[.codex] == 377)
+    }
 }
 
 // MARK: - CodexProvider (usage API via stub)

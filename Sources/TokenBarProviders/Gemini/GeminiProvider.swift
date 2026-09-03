@@ -88,17 +88,24 @@ public final class GeminiProvider: Sendable, UsageProvider {
     private let homeDotGemini: URL
     private let accountID: AccountID
     private let offsetStore: any FileOffsetStoring
+    private let ledgerSnapshotStore: (any LedgerSnapshotStoring)?
     private let ledger: TokenLedger
     private let dedupe: GeminiDedupe
     private let sessionIngester: GeminiSessionIngester
     private let calendar: Calendar
 
-    public init(geminiDirectory: URL, offsetStore: any FileOffsetStoring, calendar: Calendar) {
+    public init(
+        geminiDirectory: URL,
+        offsetStore: any FileOffsetStoring,
+        calendar: Calendar,
+        ledgerSnapshotStore: (any LedgerSnapshotStoring)? = nil
+    ) {
         let account = AccountID(provider: .gemini, key: "local")
         self.accountID = account
         self.homeDotGemini = geminiDirectory
         self.tmpDirectory = geminiDirectory.appendingPathComponent("tmp", isDirectory: true)
         self.offsetStore = offsetStore
+        self.ledgerSnapshotStore = ledgerSnapshotStore
         self.ledger = TokenLedger(calendar: calendar)
         self.dedupe = GeminiDedupe()
         self.calendar = calendar
@@ -162,6 +169,14 @@ public final class GeminiProvider: Sendable, UsageProvider {
 
         ledger.rolloverIfNeeded(now: now)
 
+        // Red Team F2 caso 7: restaura o dia do snapshot pós-restart (uma vez
+        // por processo; dia divergente → no-op, o rollover re-escaneia). Os
+        // ids do dedupe não são restaurados daqui — voltam dos `seenIDs` do
+        // cursor (fonte canônica), então duplicata continua coberta.
+        if let store = ledgerSnapshotStore, let snapshot = store.load() {
+            ledger.restoreDay(snapshot, provider: .gemini, now: now)
+        }
+
         var scanCursors = cursor.fileOffsets
         if ledger.needsFullRescan {
             for path in offsetStore.cursors().keys {
@@ -214,6 +229,9 @@ public final class GeminiProvider: Sendable, UsageProvider {
             try? offsetStore.set(next, for: update.path)
             nextOffsets[update.path] = next
         }
+        // Snapshot do dia DEPOIS dos cursores (ordem anti-dupla-contagem,
+        // ver `TokenLedger.daySnapshot`) — Red Team F2 caso 7.
+        ledgerSnapshotStore?.save(ledger.daySnapshot(now: now))
         return IngestBatch(
             events: [],  // streaming: eventos aplicados no ledger e descartados
             eventsApplied: applied,

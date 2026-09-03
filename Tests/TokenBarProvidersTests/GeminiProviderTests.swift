@@ -445,4 +445,32 @@ final class GeminiProviderTests {
             try await provider.ingestLocal(stranger, from: IngestCursor(), now: GeminiFixtures.now)
         }
     }
+
+    /// Red Team F2 caso 7: restart mid-day — ledger novo, mesmo cursor store
+    /// (instância compartilhada simula a persistência) + snapshot do dia → o
+    /// total de hoje sobrevive ao relançamento (era 0 até o rollover).
+    @Test func restartMidDayRestoresTodayTotals() async throws {
+        try writeMixedSession()  // 193 + 45 = 238
+        let cursors = InMemoryOffsetStore()
+        let ledgerURL = dir.appendingPathComponent("gemini-ledger.json")
+
+        let first = GeminiProvider(
+            geminiDirectory: dir, offsetStore: cursors, calendar: calendar,
+            ledgerSnapshotStore: JSONLedgerSnapshotStore(url: ledgerURL)
+        )
+        let outcome = try await first.ingestLocal(
+            GeminiFixtures.localRef, from: IngestCursor(fileOffsets: cursors.cursors()), now: GeminiFixtures.now
+        )
+        #expect(outcome.providerTotals[.gemini] == 238)
+
+        // "Restart": provider novo, cursor semeado do store fresco (contrato).
+        let restarted = GeminiProvider(
+            geminiDirectory: dir, offsetStore: cursors, calendar: calendar,
+            ledgerSnapshotStore: JSONLedgerSnapshotStore(url: ledgerURL)
+        )
+        let after = try await restarted.ingestLocal(
+            GeminiFixtures.localRef, from: IngestCursor(fileOffsets: cursors.cursors()), now: GeminiFixtures.now
+        )
+        #expect(after.providerTotals[.gemini] == 238)
+    }
 }

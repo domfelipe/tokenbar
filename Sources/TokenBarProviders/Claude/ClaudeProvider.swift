@@ -37,13 +37,20 @@ public final class ClaudeProvider: Sendable, UsageProvider {
 
     private let projectsDirectory: URL
     private let offsetStore: any FileOffsetStoring
+    private let ledgerSnapshotStore: (any LedgerSnapshotStoring)?
     private let ledger: TokenLedger
     private let ingester: TranscriptIngester
     private let calendar: Calendar
 
-    public init(projectsDirectory: URL, offsetStore: any FileOffsetStoring, calendar: Calendar) {
+    public init(
+        projectsDirectory: URL,
+        offsetStore: any FileOffsetStoring,
+        calendar: Calendar,
+        ledgerSnapshotStore: (any LedgerSnapshotStoring)? = nil
+    ) {
         self.projectsDirectory = projectsDirectory
         self.offsetStore = offsetStore
+        self.ledgerSnapshotStore = ledgerSnapshotStore
         self.ledger = TokenLedger(calendar: calendar)
         self.calendar = calendar
         let account = AccountID(provider: .claude, key: "local")
@@ -120,6 +127,12 @@ public final class ClaudeProvider: Sendable, UsageProvider {
 
         ledger.rolloverIfNeeded(now: now)
 
+        // Red Team F2 caso 7: restaura o dia do snapshot pós-restart (uma vez
+        // por processo; dia divergente → no-op, o rollover re-escaneia).
+        if let store = ledgerSnapshotStore, let snapshot = store.load() {
+            ledger.restoreDay(snapshot, provider: .claude, now: now)
+        }
+
         // Virada de dia: re-ingest completa (cursores zerados). F1: o mapa
         // semeado no scan é lido do store DEPOIS da zerada (== vazio).
         var scanCursors = cursor.fileOffsets
@@ -170,6 +183,9 @@ public final class ClaudeProvider: Sendable, UsageProvider {
             try? offsetStore.set(update.cursor, for: update.path)
             nextOffsets[update.path] = update.cursor
         }
+        // Snapshot do dia DEPOIS dos cursores (ordem anti-dupla-contagem,
+        // ver `TokenLedger.daySnapshot`) — Red Team F2 caso 7.
+        ledgerSnapshotStore?.save(ledger.daySnapshot(now: now))
         return IngestBatch(
             events: [],  // streaming: eventos aplicados no ledger e descartados
             eventsApplied: applied,

@@ -105,6 +105,7 @@ public final class CodexProvider: Sendable, UsageProvider {
     private let authReader: CodexAuthReader
     private let client: UsageHTTPClient
     private let offsetStore: any FileOffsetStoring
+    private let ledgerSnapshotStore: (any LedgerSnapshotStoring)?
     private let ledger: TokenLedger
     private let sessionIngester: CodexSessionIngester
     private let calendar: Calendar
@@ -114,12 +115,14 @@ public final class CodexProvider: Sendable, UsageProvider {
         authReader: CodexAuthReader,
         client: UsageHTTPClient,
         offsetStore: any FileOffsetStoring,
-        calendar: Calendar
+        calendar: Calendar,
+        ledgerSnapshotStore: (any LedgerSnapshotStoring)? = nil
     ) {
         self.sessionsDirectory = sessionsDirectory
         self.authReader = authReader
         self.client = client
         self.offsetStore = offsetStore
+        self.ledgerSnapshotStore = ledgerSnapshotStore
         self.ledger = TokenLedger(calendar: calendar)
         self.calendar = calendar
         self.sessionIngester = CodexSessionIngester(
@@ -191,6 +194,12 @@ public final class CodexProvider: Sendable, UsageProvider {
 
         ledger.rolloverIfNeeded(now: now)
 
+        // Red Team F2 caso 7: restaura o dia do snapshot pós-restart (uma vez
+        // por processo; dia divergente → no-op, o rollover re-escaneia).
+        if let store = ledgerSnapshotStore, let snapshot = store.load() {
+            ledger.restoreDay(snapshot, provider: .codex, now: now)
+        }
+
         var scanCursors = cursor.fileOffsets
         if ledger.needsFullRescan {
             for path in offsetStore.cursors().keys {
@@ -223,6 +232,9 @@ public final class CodexProvider: Sendable, UsageProvider {
             try? offsetStore.set(update.cursor, for: update.path)
             nextOffsets[update.path] = update.cursor
         }
+        // Snapshot do dia DEPOIS dos cursores (ordem anti-dupla-contagem,
+        // ver `TokenLedger.daySnapshot`) — Red Team F2 caso 7.
+        ledgerSnapshotStore?.save(ledger.daySnapshot(now: now))
         return IngestBatch(
             events: [],  // streaming: eventos aplicados no ledger e descartados
             eventsApplied: applied,

@@ -29,7 +29,10 @@ enum SelfCheck {
             supportDirectory: FileManager.default.temporaryDirectory
                 .appendingPathComponent("tokenbar-selfcheck", isDirectory: true),
             e2eDirectory: nil,
-            makeOffsetStore: { _ in SelfCheckOffsetStore() }
+            makeOffsetStore: { _ in SelfCheckOffsetStore() },
+            // Sem snapshot de ledger: o selfcheck é somente-leitura sobre o
+            // mundo real — nunca toca os arquivos do app (padrão dos cursores).
+            makeLedgerSnapshotStore: { _ in nil }
         ))
         await coordinator.refreshAllNow()
         let payload = coordinator.diagnosticPayload()

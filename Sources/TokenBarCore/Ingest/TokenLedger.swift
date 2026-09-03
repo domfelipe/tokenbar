@@ -17,8 +17,16 @@ public final class TokenLedger: Sendable {
     private struct State {
         var files: [String: FileLedger] = [:]
         var providerByPath: [String: ProviderID] = [:]
-        var currentDay: Date
+        /// Dia corrente — `nil` até o primeiro `rolloverIfNeeded` (o ledger não
+        /// consulta o relógio real no init: o dia vem do `now` do ciclo, senão
+        /// um primeiro ciclo com `now` divergente do launch dispararia um
+        /// re-scan de rollover espúrio — achado do Red Team F2 caso 7).
+        var currentDay: Date?
         var needsFullRescan = false
+        /// Restauração do snapshot pós-restart é UMA vez por processo (Red Team
+        /// F2 caso 7): o ledger em memória é sempre ≥ o snapshot a partir do
+        /// primeiro ciclo, e re-ler um snapshot velho poderia regredir estado.
+        var didRestoreDay = false
     }
 
     private let calendar: Calendar
@@ -26,7 +34,7 @@ public final class TokenLedger: Sendable {
 
     public init(calendar: Calendar) {
         self.calendar = calendar
-        self.state = OSAllocatedUnfairLock(initialState: State(currentDay: calendar.startOfDay(for: Date())))
+        self.state = OSAllocatedUnfairLock(initialState: State(currentDay: nil))
     }
 
     public var needsFullRescan: Bool {
@@ -82,7 +90,13 @@ public final class TokenLedger: Sendable {
     public func rolloverIfNeeded(now: Date) {
         let today = calendar.startOfDay(for: now)
         state.withLock { s in
-            guard today != s.currentDay else { return }
+            guard s.currentDay != today else { return }
+            if s.currentDay == nil {
+                // Primeiro ciclo do processo: apenas registra o dia — não é
+                // rollover, quem manda nos bytes é o cursor persistido.
+                s.currentDay = today
+                return
+            }
             s.currentDay = today
             s.files = [:]
             s.needsFullRescan = true
@@ -91,5 +105,44 @@ public final class TokenLedger: Sendable {
 
     public func clearRescanFlag() {
         state.withLock { $0.needsFullRescan = false }
+    }
+
+    // MARK: - Snapshot do dia (Red Team F2, caso 7 — restart mid-day)
+
+    /// Restaura o estado do dia a partir do snapshot persistido, UMA vez por
+    /// processo. Entrada por arquivo: o total restaurado pertence aos MESMOS
+    /// paths dos cursores persistidos (o par cursor+snapshot é escrito no
+    /// mesmo ciclo), então restaurar NÃO duplica — o tail já consumido fica
+    /// atrás do cursor. Dia divergente (snapshot de ontem, rollover) → no-op:
+    /// o re-scan do rollover reconstrói tudo. Nunca rebaixa entrada viva.
+    public func restoreDay(_ snapshot: LedgerSnapshot, provider: ProviderID, now: Date) {
+        let today = calendar.startOfDay(for: now)
+        state.withLock { s in
+            guard !s.didRestoreDay else { return }
+            s.didRestoreDay = true
+            guard today == s.currentDay, snapshot.day == today else { return }
+            for (path, sums) in snapshot.files {
+                guard s.files[path] == nil else { continue }
+                s.files[path] = FileLedger(todaySums: sums, day: today)
+                s.providerByPath[path] = provider
+            }
+        }
+    }
+
+    /// Snapshot do dia corrente p/ persistência. O chamador (provider) salva
+    /// ao fim do ciclo, DEPOIS de persistir os cursores — ordem que evita
+    /// dupla contagem no crash entre as duas escritas: com cursor novo e
+    /// snapshot velho o tail falta no total (subconta honesta, last-good); no
+    /// ordem inversa o tail seria relido SOBRE o total restaurado (dobra).
+    public func daySnapshot(now: Date) -> LedgerSnapshot? {
+        let today = calendar.startOfDay(for: now)
+        return state.withLock { s -> LedgerSnapshot? in
+            guard today == s.currentDay else { return nil }
+            var files: [String: TokenSums] = [:]
+            for (path, ledger) in s.files where ledger.day == today {
+                files[path] = ledger.todaySums
+            }
+            return files.isEmpty ? nil : LedgerSnapshot(day: today, files: files)
+        }
     }
 }

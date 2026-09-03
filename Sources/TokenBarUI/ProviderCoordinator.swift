@@ -14,13 +14,15 @@ public struct ProviderCoordinatorConfig: Sendable {
     public let supportDirectory: URL
     public let e2eDirectory: URL?
     public let makeOffsetStore: @Sendable (ProviderID) -> any FileOffsetStoring
+    public let makeLedgerSnapshotStore: @Sendable (ProviderID) -> (any LedgerSnapshotStoring)?
 
     public init(
         environment: [String: String],
         home: URL,
         supportDirectory: URL,
         e2eDirectory: URL? = nil,
-        makeOffsetStore: (@Sendable (ProviderID) -> any FileOffsetStoring)? = nil
+        makeOffsetStore: (@Sendable (ProviderID) -> any FileOffsetStoring)? = nil,
+        makeLedgerSnapshotStore: (@Sendable (ProviderID) -> (any LedgerSnapshotStoring)?)? = nil
     ) {
         self.environment = environment
         self.home = home
@@ -33,6 +35,15 @@ public struct ProviderCoordinatorConfig: Sendable {
             self.makeOffsetStore = { id in
                 try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
                 return JSONFileOffsetStore(url: support.appendingPathComponent("\(id.rawValue)-cursors.json"))
+            }
+        }
+        if let makeLedgerSnapshotStore {
+            self.makeLedgerSnapshotStore = makeLedgerSnapshotStore
+        } else {
+            let support = supportDirectory
+            self.makeLedgerSnapshotStore = { id in
+                try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+                return JSONLedgerSnapshotStore(url: support.appendingPathComponent("\(id.rawValue)-ledger.json"))
             }
         }
     }
@@ -106,25 +117,35 @@ public final class ProviderCoordinator {
             .gemini: config.makeOffsetStore(.gemini),
         ]
         offsetStores = stores
+        // Snapshot do dia por provider (restart mid-day, Red Team F2 caso 7):
+        // mesmo diretório dos cursores; Z.ai não tem ingest → sem snapshot.
+        let ledgerStores: [ProviderID: any LedgerSnapshotStoring] = [
+            .claude: config.makeLedgerSnapshotStore(.claude),
+            .codex: config.makeLedgerSnapshotStore(.codex),
+            .gemini: config.makeLedgerSnapshotStore(.gemini),
+        ].compactMapValues { $0 }
 
         let claudeDirectory = ClaudeTranscriptLocator.resolve(environment: env, home: home).projectsDirectory
         let geminiDirectory = GeminiProvider.resolveGeminiDirectory(environment: env, home: home)
         let claude = ClaudeProvider(
             projectsDirectory: claudeDirectory,
             offsetStore: stores[.claude]!,
-            calendar: calendar
+            calendar: calendar,
+            ledgerSnapshotStore: ledgerStores[.claude]
         )
         let codex = CodexProvider(
             sessionsDirectory: CodexProvider.resolveSessionsDirectory(environment: env, home: home),
             authReader: CodexAuthReader.resolve(environment: env, home: home),
             client: UsageHTTPClient(baseURL: CodexProvider.resolveBaseURL(environment: env)),
             offsetStore: stores[.codex]!,
-            calendar: calendar
+            calendar: calendar,
+            ledgerSnapshotStore: ledgerStores[.codex]
         )
         let gemini = GeminiProvider(
             geminiDirectory: geminiDirectory,
             offsetStore: stores[.gemini]!,
-            calendar: calendar
+            calendar: calendar,
+            ledgerSnapshotStore: ledgerStores[.gemini]
         )
         let zaiReader = ZaiCredentialReader.resolve(environment: env, home: home)
         let zai = ZaiProvider(
