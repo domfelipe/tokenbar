@@ -150,6 +150,19 @@ struct GeminiLineParserTests {
         let event = try #require(parser.parse(line: line, fileModificationDate: GeminiFixtures.now))
         #expect(event.ts == GeminiFixtures.now)
     }
+
+    /// Red Team F2 caso 1 (P1, crash): composição `output + thoughts + tool`
+    /// com `+` comum trapava (SIGTRAP/exit 133) com campos ~Int64.max ANTES de
+    /// chegar ao saneamento. Com a soma saturante a linha vira lixo rejeitado.
+    @Test func nearInt64MaxComponentSumIsRejectedNotCrash() {
+        let imax = "9223372036854775807"
+        let line = #"{"type":"gemini","id":"fuzz-imax","timestamp":"\#(GeminiFixtures.iso(GeminiFixtures.now))","model":"g","tokens":{"input":\#(imax),"output":\#(imax),"cached":\#(imax),"thoughts":\#(imax),"tool":\#(imax),"total":\#(imax)}}"#
+        #expect(parser.parse(line: line, fileModificationDate: GeminiFixtures.now) == nil)
+
+        // Só a composição estoura (output ok + thoughts max): saturação → cap → nil.
+        let linePartial = #"{"type":"gemini","id":"fuzz-imax2","timestamp":"\#(GeminiFixtures.iso(GeminiFixtures.now))","model":"g","tokens":{"input":1,"output":2,"thoughts":9223372036854775807,"tool":1,"total":0}}"#
+        #expect(parser.parse(line: linePartial, fileModificationDate: GeminiFixtures.now) == nil)
+    }
 }
 
 // MARK: - GeminiProvider (ingest local + dedupe por id + rollover)

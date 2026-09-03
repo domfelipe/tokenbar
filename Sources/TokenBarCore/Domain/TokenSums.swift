@@ -20,6 +20,13 @@ public struct TokenSums: Sendable, Equatable, Codable {
         return overflow ? (b > 0 ? Int64.max : Int64.min) : sum
     }
 
+    /// Soma saturante pública p/ compositores que somam campos Int64 ANTES do
+    /// saneamento — Red Team F2 (caso 1): o `output + thoughts + tool` do
+    /// Gemini com campos ~Int64.max trapava (`+` comum) antes de chegar ao cap.
+    public static func saturatingSum(_ a: Int64, _ b: Int64) -> Int64 {
+        saturating(a, b)
+    }
+
     public var total: Int64 {
         Self.saturating(Self.saturating(input, output), Self.saturating(cacheRead, cacheWrite))
     }

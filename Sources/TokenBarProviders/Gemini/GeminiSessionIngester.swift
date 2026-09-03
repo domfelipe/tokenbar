@@ -98,11 +98,16 @@ public struct GeminiLineParser: Sendable {
               let tokens = decoded.tokens
         else { return nil }
 
-        // F2-GEMINI-FIELDS: componentes, não o total (checksum).
+        // F2-GEMINI-FIELDS: componentes, não o total (checksum). A composição
+        // do output é SATURANTE (Red Team F2 caso 1: campos ~Int64.max com `+`
+        // comum trapavam aqui, antes do saneamento de baixo).
         let input = max(0, tokens.input ?? 0)
         let thoughts = max(0, tokens.thoughts ?? 0)
         let tool = max(0, tokens.tool ?? 0)
-        let output = max(0, tokens.output ?? 0) + thoughts + tool
+        let output = TokenSums.saturatingSum(
+            TokenSums.saturatingSum(max(0, tokens.output ?? 0), thoughts),
+            tool
+        )
         let cacheRead = max(0, tokens.cached ?? 0)
         let cacheWrite: Int64 = 0
 
