@@ -31,8 +31,11 @@ final class ClaudeUsageProviderConformanceTests {
         AccountRef(id: AccountID(provider: .claude, key: "local"), label: "local")
     }
 
-    func makeProvider(offsetStore: FileOffsetStoring = InMemoryOffsetStore()) -> ClaudeProvider {
-        ClaudeProvider(projectsDirectory: dir, offsetStore: offsetStore, calendar: calendar)
+    func makeProvider(
+        offsetStore: FileOffsetStoring = InMemoryOffsetStore(),
+        calendar: Calendar? = nil
+    ) -> ClaudeProvider {
+        ClaudeProvider(projectsDirectory: dir, offsetStore: offsetStore, calendar: calendar ?? self.calendar)
     }
 
     /// Duas linhas no formato real do Claude Code; devolve o byte length do arquivo.
@@ -45,6 +48,28 @@ final class ClaudeUsageProviderConformanceTests {
         let content = line1 + "\n" + line2 + "\n"
         try content.write(to: session.appendingPathComponent("s1.jsonl"), atomically: true, encoding: .utf8)
         return content.utf8.count
+    }
+
+    /// Duas linhas (10+20 tokens cada) com ts explícito; devolve o byte length.
+    @discardableResult
+    func writeFixture(eventsAt dates: [Date]) throws -> Int {
+        let session = dir.appendingPathComponent("proj", isDirectory: true)
+        try FileManager.default.createDirectory(at: session, withIntermediateDirectories: true)
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let lines = dates.map { d in
+            #"{"type":"assistant","timestamp":"\#(f.string(from: d))","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":10,"output_tokens":20}}}"#
+        }
+        let content = lines.joined(separator: "\n") + "\n"
+        try content.write(to: session.appendingPathComponent("s1.jsonl"), atomically: true, encoding: .utf8)
+        return content.utf8.count
+    }
+
+    /// Calendário UTC + âncora do dia-1 compartilhada pelos testes de rollover.
+    func makeUTCCalendar() -> Calendar {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "UTC")!
+        return c
     }
 
     // MARK: - Identidade no protocolo
@@ -112,6 +137,56 @@ final class ClaudeUsageProviderConformanceTests {
         await #expect(throws: ClaudeProviderError.self) {
             try await provider.ingestLocal(stranger, from: IngestCursor(), now: now)
         }
+    }
+
+    // MARK: - Rollover (virada de dia)
+
+    /// Regressão 43c6e0d: no ciclo de rollover, o scan semeava dos cursores
+    /// PRÉ-zerada do store (a zerada acontecia depois da semeadura) e não
+    /// re-entregava nenhum evento. F1: cursores avaliados DEPOIS da zerada →
+    /// re-ingest completa no dia seguinte.
+    @Test func rolloverRescansFullFileOnDayChange() async throws {
+        let c = makeUTCCalendar()
+        let startDay1 = c.startOfDay(for: Date(timeIntervalSince1970: 1_788_000_000))
+        let eventDate = c.date(byAdding: .hour, value: 10, to: startDay1)!
+        let now1 = c.date(byAdding: .hour, value: 11, to: startDay1)!
+        let now2 = c.date(byAdding: .day, value: 1, to: now1)!
+
+        try writeFixture(eventsAt: [eventDate, c.date(byAdding: .minute, value: 30, to: eventDate)!])
+
+        let provider = makeProvider(calendar: c)
+        let day1 = try await provider.ingestOnce(now: now1)
+        #expect(day1.eventsApplied == 2)
+        #expect(day1.providerTotals[.claude] == 60)  // 2 × (10+20)
+
+        let day2 = try await provider.ingestOnce(now: now2)
+        #expect(day2.eventsApplied == 2)  // re-scan completo re-entrega os 2 eventos
+        #expect(day2.providerTotals.isEmpty)  // eventos são do dia-1: total do dia-2 zerado
+    }
+
+    /// Coerência do nextCursor no rollover (via protocolo): o batch devolvido
+    /// reflete os cursores realmente usados pelo scan — cheios, iguais ao store
+    /// persistido — e não o store zerado do meio do ciclo.
+    @Test func rolloverViaProtocolKeepsNextCursorCoherent() async throws {
+        let c = makeUTCCalendar()
+        let startDay1 = c.startOfDay(for: Date(timeIntervalSince1970: 1_788_000_000))
+        let eventDate = c.date(byAdding: .hour, value: 10, to: startDay1)!
+        let now1 = c.date(byAdding: .hour, value: 11, to: startDay1)!
+        let now2 = c.date(byAdding: .day, value: 1, to: now1)!
+
+        let byteLength = try writeFixture(eventsAt: [eventDate, eventDate])
+        let store = InMemoryOffsetStore()
+        let provider = makeProvider(offsetStore: store, calendar: c)
+
+        let batch1 = try await provider.ingestLocal(localRef, from: IngestCursor(), now: now1)
+        #expect(batch1.eventsApplied == 2)
+
+        let batch2 = try await provider.ingestLocal(localRef, from: batch1.nextCursor, now: now2)
+        #expect(batch2.eventsApplied == 2)  // rollover re-entrega (contrato F1)
+        let path = try #require(batch2.nextCursor.fileOffsets.keys.first)
+        #expect(path.hasSuffix("s1.jsonl"))
+        #expect(batch2.nextCursor.fileOffsets[path]?.offset == UInt64(byteLength))
+        #expect(batch2.nextCursor.fileOffsets == store.cursors())
     }
 
     // MARK: - fetchUsage (modo local)

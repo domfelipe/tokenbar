@@ -26,6 +26,11 @@ public struct ClaudeProviderError: Error, Sendable, Equatable {
 /// `offsetStore` injetado, eventos aplicados no ledger por segmento e
 /// descartados (memória não escala com o arquivo — Red Team F1, caso 2).
 public final class ClaudeProvider: Sendable, UsageProvider {
+    /// Rótulo da janela diária no modo local. Decisão única de UI: providers
+    /// F2+ em modo local (Codex, Gemini) replicam esta constante em vez de
+    /// cunhar label próprio — a UI trata "janela local" de forma uniforme.
+    public static let localDailyWindowLabel = "Hoje"
+
     public var account: AccountID { AccountID(provider: .claude, key: "local") }
 
     public var accountRef: AccountRef { AccountRef(id: account, label: "local") }
@@ -48,12 +53,9 @@ public final class ClaudeProvider: Sendable, UsageProvider {
         }
     }
 
-    /// Um ciclo completo: rollover → varre (streaming) → parseia → aplica no
-    /// ledger por lote → persiste cursores. Eventos são aplicados por segmento
-    /// de streaming e descartados — o pico de memória não escala com o tamanho
-    /// do arquivo (Red Team F1, caso 2).
-    /// Wrapper determinístico do `ingestLocal`: semeia o cursor com o estado
-    /// atual do `offsetStore` (mesmo comportamento da F1).
+    /// Ciclo do app (F1): wrapper determinístico do `ingestLocal` — semeia o
+    /// cursor com o estado atual do `offsetStore` e devolve só o outcome.
+    /// O detalhamento do ciclo (rollover, streaming, ledger) está no motor.
     public func ingestOnce(now: Date) async throws -> IngestOutcome {
         let batch = try await ingestLocal(accountRef, from: IngestCursor(fileOffsets: offsetStore.cursors()), now: now)
         return IngestOutcome(eventsApplied: batch.eventsApplied, providerTotals: batch.providerTotals)
@@ -83,7 +85,7 @@ public final class ClaudeProvider: Sendable, UsageProvider {
         return UsageSnapshot(
             provider: .claude,
             account: self.account,
-            windows: [UsageWindow(kind: .daily, usedFraction: nil, resetsAt: resetsAt, label: "Hoje")],
+            windows: [UsageWindow(kind: .daily, usedFraction: nil, resetsAt: resetsAt, label: Self.localDailyWindowLabel)],
             credits: nil,
             fetchedAt: fetchedAt,
             source: .localOnly,
@@ -99,26 +101,41 @@ public final class ClaudeProvider: Sendable, UsageProvider {
     }
 
     /// Motor do ingest com `now` explícito (determinismo dos testes e do
-    /// scheduler). O cursor inicial é o fornecido; os cursores finais são
-    /// persistidos no `offsetStore` como na F1.
+    /// scheduler). Um ciclo completo: rollover → varre (streaming) → parseia →
+    /// aplica no ledger por lote → persiste cursores. Eventos são aplicados por
+    /// segmento de streaming e descartados — o pico de memória não escala com o
+    /// tamanho do arquivo (Red Team F1, caso 2).
+    ///
+    /// Contrato de cursor (obrigatório p/ quem semeia, ver `UsageProvider`):
+    /// passe o `nextCursor` devolvido por ESTE provider no ciclo anterior, ou
+    /// o estado fresco do `offsetStore` — nunca cursor construído fora daí.
+    ///
+    /// Ordem da F1 preservada na virada de dia (regressão 43c6e0d): o mapa de
+    /// cursores usado pelo scan é avaliado DEPOIS da zerada do store — semear
+    /// dos cursores pré-zerada fazia o rollover re-ingest 0 eventos. O
+    /// `nextCursor` do batch é o estado semeado + as atualizações do ciclo,
+    /// coerente com o que o scan de fato consumiu.
     public func ingestLocal(_ account: AccountRef, from cursor: IngestCursor, now: Date) async throws -> IngestBatch {
         try guardKnownAccount(account)
 
         ledger.rolloverIfNeeded(now: now)
 
-        // Virada de dia: re-ingest completa (cursores zerados).
+        // Virada de dia: re-ingest completa (cursores zerados). F1: o mapa
+        // semeado no scan é lido do store DEPOIS da zerada (== vazio).
+        var scanCursors = cursor.fileOffsets
         if ledger.needsFullRescan {
             for path in offsetStore.cursors().keys {
                 try? offsetStore.set(nil, for: path)
             }
             ledger.clearRescanFlag()
+            scanCursors = offsetStore.cursors()
         }
 
         var applied = 0
         var projectCache: [String: String] = [:]  // projeto por arquivo: mesmo valor p/ todas as linhas
         let updates = try ingester.ingestChangedFilesStreaming(
             under: projectsDirectory,
-            cursors: cursor.fileOffsets,
+            cursors: scanCursors,
             makeEvent: { event, path in
                 var e = event
                 e.account = account.id
@@ -146,14 +163,18 @@ public final class ClaudeProvider: Sendable, UsageProvider {
                 )
             }
         )
+        // nextCursor por construção: semeado + atualizações do ciclo (não re-lê
+        // o store, que pode conter estado de escritas externas a este ciclo).
+        var nextOffsets = scanCursors
         for update in updates {
             try? offsetStore.set(update.cursor, for: update.path)
+            nextOffsets[update.path] = update.cursor
         }
         return IngestBatch(
             events: [],  // streaming: eventos aplicados no ledger e descartados
             eventsApplied: applied,
             providerTotals: ledger.todayByProvider(now: now),
-            nextCursor: IngestCursor(fileOffsets: offsetStore.cursors())
+            nextCursor: IngestCursor(fileOffsets: nextOffsets)
         )
     }
 

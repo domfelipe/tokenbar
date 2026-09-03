@@ -68,5 +68,14 @@ public protocol UsageProvider: Sendable {
     func fetchUsage(_ account: AccountRef) async throws -> UsageSnapshot
 
     /// Ingest incremental de arquivos locais a partir de `cursor`.
+    ///
+    /// Contrato de cursor (obrigatório p/ schedulers): semeie o ciclo apenas
+    /// com (a) o `IngestBatch.nextCursor` que ESTE provider devolveu no ciclo
+    /// anterior, ou (b) o estado fresco do store de cursores do próprio
+    /// provider. Nunca construa cursor fora dessas fontes — cursor alheio ou
+    /// defasado pode causar re-leitura total (duplicação de totais) ou perda
+    /// silenciosa de eventos. Na virada de dia, o provider pode descartar o
+    /// cursor semeado e re-escanear do zero (rollover); o `nextCursor`
+    /// devolvido reflete o que o ciclo de fato consumiu.
     func ingestLocal(_ account: AccountRef, from cursor: IngestCursor) async throws -> IngestBatch
 }
