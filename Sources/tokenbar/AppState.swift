@@ -20,7 +20,7 @@ final class AppState {
         // próprio — sem ele, corpora descartáveis acumulam entradas no App
         // Support real e o snapshot do dia as ressuscita entre runs.
         let supportDir = env["TOKENBAR_SUPPORT_DIR"].map {
-            let url = URL(filePath: $0, isDirectory: true)
+            let url = URL(fileURLWithPath: $0, isDirectory: true)
             try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             return url
         } ?? FileManager.default

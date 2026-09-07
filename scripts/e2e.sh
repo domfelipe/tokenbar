@@ -8,9 +8,14 @@
 # API-driven (X/Z) a verdade é o próprio mock: percentuais sintéticos fixos
 # (Codex 42%, Z.ai 81%) que o check exige verbatim.
 #
-# Degradação (spec §5): mock morto → app segue vivo (heartbeat continua via
-# providers locais), selfcheck diagnostica erro tokenizado ("network") e NÃO há
-# retry storm — o mock loga cada request e a janela de degradação é contada.
+# Degradação (spec §5): 500 persistente → selfcheck tokeniza "http"; mock morto
+# → app segue vivo (heartbeat continua via providers locais) e selfcheck
+# diagnostica "network". NÃO há retry storm: o mock loga cada request com o
+# header Authorization e as credenciais do APP são tokens fake distintos das do
+# SELFcheck — o contador atribui cada request e prova que o app não fez nada
+# além do burst inicial (≤ 4 na vida do mock) e que o pico por janela
+# deslizante de 10 s é ≤ 2 (backoff ×2 a partir de 5 min torna storm
+# estruturalmente impossível).
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -119,9 +124,9 @@ trap 'kill "$APP_PID" "$MOCK_PID" 2>/dev/null || true; sleep 0.3; rm -rf "$TMP"'
 say "mock em 127.0.0.1:$PORT (pid $MOCK_PID)"
 
 check "mock no ar: wham/usage 200 com rate_limit.primary_window" \
-  "curl -s \"http://127.0.0.1:$PORT/backend-api/wham/usage\" | python3 -c 'import json,sys;d=json.load(sys.stdin);exit(0 if d[\"rate_limit\"][\"primary_window\"][\"used_percent\"]==42 else 1)'"
+  "curl -s --max-time 5 \"http://127.0.0.1:$PORT/backend-api/wham/usage\" | python3 -c 'import json,sys;d=json.load(sys.stdin);exit(0 if d[\"rate_limit\"][\"primary_window\"][\"used_percent\"]==42 else 1)'"
 check "mock no ar: quota/limit 200 com success=true" \
-  "curl -s \"http://127.0.0.1:$PORT/api/monitor/usage/quota/limit\" | python3 -c 'import json,sys;d=json.load(sys.stdin);exit(0 if d[\"success\"] and d[\"code\"]==200 else 1)'"
+  "curl -s --max-time 5 \"http://127.0.0.1:$PORT/api/monitor/usage/quota/limit\" | python3 -c 'import json,sys;d=json.load(sys.stdin);exit(0 if d[\"success\"] and d[\"code\"]==200 else 1)'"
 
 # ---------------------------------------------------------------------------
 # 2. Corpora sintéticos + credenciais fake (NUNCA reais — spec §9).
@@ -144,6 +149,19 @@ cat > "$CRED/zai-config.json" <<'EOF'
 {"provider": {"builtin:zai-coding-plan":
   {"options": {"apiKey": "fake-api-key-e2e", "baseURL": "https://api.z.ai/api/anthropic"}}}}
 EOF
+# Gêmeas com token DISTINTO para o selfcheck: o log do mock registra o header
+# Authorization, então o contador consegue atribuir cada request ao APP (tokens
+# acima) ou ao SELFcheck (tokens -selfcheck) — é o que torna a prova de retry
+# storm por atribuição possível (curl não manda Authorization e já sai de fora).
+cat > "$CRED/codex-auth-selfcheck.json" <<'EOF'
+{"OPENAI_API_KEY": null, "auth_mode": "chatgpt",
+ "tokens": {"access_token": "fake-token-e2e-selfcheck", "account_id": "fake-account-e2e",
+            "id_token": "fake-jwt-e2e", "refresh_token": "fake-refresh-e2e"}}
+EOF
+cat > "$CRED/zai-config-selfcheck.json" <<'EOF'
+{"provider": {"builtin:zai-coding-plan":
+  {"options": {"apiKey": "fake-api-key-e2e-selfcheck", "baseURL": "https://api.z.ai/api/anthropic"}}}}
+EOF
 
 # Env comum app/selfcheck: TODOS os caminhos apontam p/ o TMP (nunca os reais
 # de ~/.codex, ~/.gemini, ~/.zcode — o e2e não pode depender nem tocar a
@@ -163,18 +181,39 @@ COMMON_ENV=(
   TOKENBAR_CLAUDE_DIR="$CORPUS"
 )
 mkdir -p "$TMP/support"
+# Selfcheck usa as credenciais "-selfcheck" (mesmo shape, token distinto) —
+# ver comentário das fixtures; todo o mais é idêntico ao env do app.
+SELF_ENV=(
+  "${COMMON_ENV[@]}"
+  TOKENBAR_CODEX_AUTH="$CRED/codex-auth-selfcheck.json"
+  TOKENBAR_ZAI_CONFIG="$CRED/zai-config-selfcheck.json"
+)
 
 # ---------------------------------------------------------------------------
 # 3. Verdade de referência: selfcheck v2 com o mock NO AR (mesma pipeline do
 #    app; exit code não é sinal — SDD-9 — só o parse do JSON importa).
 # ---------------------------------------------------------------------------
-SELFCHECK="$(env "${COMMON_ENV[@]}" swift run -c release tokenbar selfcheck "$CORPUS")"
+SELFCHECK="$(env "${SELF_ENV[@]}" swift run -c release tokenbar selfcheck "$CORPUS")"
 say "selfcheck (mock no ar): $SELFCHECK"
 SC_TEXT="$(echo "$SELFCHECK" | python3 -c "import json,sys;print(json.load(sys.stdin)['menuBarText'])")"
 check "selfcheck v2 mostra os API-driven com % do mock (X:42% e Z:81% em '$SC_TEXT')" \
   "echo \"\$SC_TEXT\" | grep -q 'X:42%' && echo \"\$SC_TEXT\" | grep -q 'Z:81%'"
 check "selfcheck v2 mostra os locais (C e G) em '$SC_TEXT'" \
   "echo \"\$SC_TEXT\" | grep -qE 'C:[0-9]' && echo \"\$SC_TEXT\" | grep -q 'G:193'"
+
+# ---------------------------------------------------------------------------
+# 3.5 Erro HTTP persistente ANTES do app subir: mock em modo 500 → selfcheck
+#     diagnostica o token "http" nos API-driven (mesmo caminho de
+#     UsageHTTPError.http que o app pega sob 500). Volta p/ "ok" em seguida
+#     para o burst inicial do app ser 200 — o contador de requests (seção 7)
+#     precisa distinguir exatamente quem pediu o quê.
+# ---------------------------------------------------------------------------
+echo 500 > "$MOCK_MODE"
+SELFCHECK_500="$(env "${SELF_ENV[@]}" swift run -c release tokenbar selfcheck "$CORPUS")"
+say "selfcheck (mock 500): $SELFCHECK_500"
+check "selfcheck sob 500: erro tokenizado 'http' em codex e zai" \
+  "echo \"\$SELFCHECK_500\" | python3 -c 'import json,sys;p=json.load(sys.stdin)[\"providers\"];exit(0 if p[\"codex\"].get(\"error\")==\"http\" and p[\"zai\"].get(\"error\")==\"http\" else 1)'"
+echo ok > "$MOCK_MODE"
 
 # ---------------------------------------------------------------------------
 # 4. App real com os mesmos overrides — MESMO caminho de corpus do selfcheck.
@@ -219,10 +258,12 @@ check "live update após append (Δ=+333 observado)" "[ '$UPDATED' = '1' ]"
 
 # ---------------------------------------------------------------------------
 # 7. Degradação: mock MORRE no meio do ciclo → app segue vivo (heartbeat
-#    continua pelos providers locais), sem crash e SEM retry storm (o mock
-#    loga cada request; depois de morto, ninguém consegue pedir de mais — a
-#    prova complementar de storm sob erro persistente 500 é o Red Team caso 3,
-#    que usa o modo 500 do MESMO mock com o app rodando por ~11 min).
+#    continua pelos providers locais), sem crash e SEM retry storm. Duas provas
+#    com o contador do mock (seção 1 loga cada request): o app não fez request
+#    além do burst inicial na vida inteira do mock, e o pico por janela
+#    deslizante de 10 s fica ≤ 6 (o caminho de erro PERSISTENTE 500 já foi
+#    exercitado na seção 3.5 via selfcheck — o Red Team caso 3 repete com o
+#    app rodando ~11 min no modo 500 do MESMO mock).
 # ---------------------------------------------------------------------------
 kill -9 "$MOCK_PID" 2>/dev/null
 wait "$MOCK_PID" 2>/dev/null
@@ -242,12 +283,42 @@ done
 check "degradação: mock morto → app vivo e heartbeat continua (Δ=+222, updatedAt avança)" \
   "[ '$DEGRADED' = '1' ] && kill -0 $APP_PID 2>/dev/null"
 APP_REQ=$(( $(wc -l < "$MOCK_LOG" | tr -d ' ') - BASE_REQ ))
-check "sem retry storm: $APP_REQ request(s) do app na janela inteira (≤ 3 = burst inicial)" \
+check "sem retry storm: $APP_REQ request(s) do app além do burst inicial (≤ 3)" \
   "[ '$APP_REQ' -le 3 ]"
+
+# Contador do mock, atribuído por credencial: linhas com o Authorization do APP
+# (os selfchecks usam tokens "-selfcheck" e o curl não manda header — saem da
+# conta). Duas provas de backoff: o app fez ≤ 4 requests na vida INTEIRA do
+# mock (esperado 2 = burst inicial, 1 por provider) e o pico em qualquer janela
+# deslizante de 10 s é ≤ 2 (um storm real apareceria como dezenas por segundo —
+# o backoff ×2 parte de 5 min, então cadência alta é estruturalmente impossível).
+read -r APP_TOTAL BURST_10S <<EOF2
+$(python3 - "$MOCK_LOG" <<'PYEOF'
+import sys
+app_auth = ("Bearer fake-token-e2e", "Bearer fake-api-key-e2e")
+ts = []
+for line in open(sys.argv[1]):
+    parts = line.split(None, 2)
+    if len(parts) >= 3 and parts[2].strip() in app_auth:
+        ts.append(float(parts[0]))
+ts.sort()
+best = j = 0
+for i in range(len(ts)):
+    while ts[i] - ts[j] > 10.0:
+        j += 1
+    best = max(best, i - j + 1)
+print(len(ts), best)
+PYEOF
+)
+EOF2
+check "requests do APP na vida do mock atribuídos pelo token: ${APP_TOTAL:-99} (≤ 4; esperado 2 = burst)" \
+  "[ '${APP_TOTAL:-99}' -le 4 ]"
+check "requests/10s do APP limitado pelo backoff: pico ${BURST_10S:-99} na janela deslizante de 10s (≤ 2)" \
+  "[ '${BURST_10S:-99}' -le 2 ]"
 
 # Diagnóstico da degradação (selfcheck v2 com o mock MORTO): erro tokenizado
 # "network" por provider — nunca mensagem crua com URL (spec §9).
-SELFCHECK_DOWN="$(env "${COMMON_ENV[@]}" swift run -c release tokenbar selfcheck "$CORPUS")"
+SELFCHECK_DOWN="$(env "${SELF_ENV[@]}" swift run -c release tokenbar selfcheck "$CORPUS")"
 say "selfcheck (mock morto): $SELFCHECK_DOWN"
 check "selfcheck pós-morte: erro tokenizado 'network' em codex e zai" \
   "echo \"\$SELFCHECK_DOWN\" | python3 -c 'import json,sys;p=json.load(sys.stdin)[\"providers\"];exit(0 if p[\"codex\"].get(\"error\")==\"network\" and p[\"zai\"].get(\"error\")==\"network\" else 1)'"
