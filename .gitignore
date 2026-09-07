@@ -4,3 +4,4 @@ build/
 xcuserdata/
 *.sqlite*
 .DS_Store
+.superpowers/

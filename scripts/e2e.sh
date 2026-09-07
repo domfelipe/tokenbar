@@ -147,10 +147,14 @@ EOF
 
 # Env comum app/selfcheck: TODOS os caminhos apontam p/ o TMP (nunca os reais
 # de ~/.codex, ~/.gemini, ~/.zcode — o e2e não pode depender nem tocar a
-# máquina; o scan do Codex real ~10 GB tornaria o teste inviável).
+# máquina; o scan do Codex real ~10 GB tornaria o teste inviável). O SUPPORT
+#_DIR isola cursores/ledger do App Support real: sem ele, corpora descartáveis
+# acumulam entradas no store real e o snapshot do dia as ressuscita entre runs
+# (achado P1 do e2e final da T8).
 COMMON_ENV=(
   TOKENBAR_CODEX_API="http://127.0.0.1:$PORT"
   TOKENBAR_ZAI_API="http://127.0.0.1:$PORT"
+  TOKENBAR_SUPPORT_DIR="$TMP/support"
   TOKENBAR_CODEX_DIR="$CODEX_DIR"
   TOKENBAR_CODEX_AUTH="$CRED/codex-auth.json"
   TOKENBAR_ZAI_CONFIG="$CRED/zai-config.json"
@@ -158,6 +162,7 @@ COMMON_ENV=(
   TOKENBAR_GEMINI_DIR="$GEMINI_DIR"
   TOKENBAR_CLAUDE_DIR="$CORPUS"
 )
+mkdir -p "$TMP/support"
 
 # ---------------------------------------------------------------------------
 # 3. Verdade de referência: selfcheck v2 com o mock NO AR (mesma pipeline do

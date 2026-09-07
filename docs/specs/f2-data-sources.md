@@ -363,3 +363,16 @@ O CodexBar usa `POST https://cloudcode-pa.googleapis.com/v1internal:retrieveUser
 
 - CodexBar `main`: `Sources/CodexBarCore/Providers/Codex/CodexOAuth/CodexOAuthUsageFetcher.swift`, `.../CodexOAuth/CodexOAuthCredentials.swift`, `.../Zai/ZaiAPIRegion.swift`, `.../Zai/ZaiSettingsReader.swift`, `Sources/CodexBarCore/Resources/Plugins/zai.js`, `Sources/CodexBarCore/Providers/Gemini/GeminiStatusProbe.swift`
 - Máquina local (jq em chaves/estrutura, sem valores): `~/.codex/auth.json`, `~/.codex/sessions/2026/{07,09}/…rollout-*.jsonl`, `~/.zcode/v2/credentials.json`, `~/.zcode/v2/config.json`, `~/.gemini/{tmp,history,state.json,projects.json,oauth_creds.json,settings.json}`
+
+---
+
+## 7. Emenda T8 (2026-09-03) — o que a implementação confirmou ou decidiu diferente
+
+Registrado ao fechamento da F2 (Task 8); detalhes em `docs/decisoes-f2.md`.
+
+1. **§2.2 auth Z.ai (validação):** implementada a ordem apiKey (`config.json`) → OAuth (`credentials.json`), no máximo 2 requests por ciclo. Na T8 o app consultou o endpoint real e recebeu dados válidos; QUAL credencial foi aceita não é distinguível sem logar credencial (proibido) — a validação isolada por tipo segue pendente, mitigada pelo fallback.
+2. **§2.3/§2.4 `TIME_LIMIT` e tipos desconhecidos:** a spec admitia descartar entradas desconhecidas; a implementação exibe percentuais reais sob rótulo honesto — `TIME` com `unit=5, number=1` → label "MCP"; tipo desconhecido → `.daily` com label cru (ex.: `UNKNOWN u99`). Nunca descartar dado que a API mandou.
+3. **§1.5/§3.5 cursores:** confirmado o padrão incremental F1, com obrigação dura de UM arquivo de cursores por provider (`claude/codex/gemini-cursors.json`) — compartilhar cruzaria providers no rollover.
+4. **§1.7 404:** ruling F2-CODEX-404 — 404 tratado como transiente (backoff), NÃO degradação para local; desvio consciente do texto original desta spec.
+5. **§3.4 checksum:** implementado como especificado (componentes vencem; `total` só verificação), com a composição do output saturante (Red Team T8, P1).
+6. **Snapshot do dia (novo):** além dos cursores, cada provider com ingest persiste `<provider>-ledger.json` (estado do dia por arquivo, carimbado com o estado dos cursores) para sobreviver ao restart mid-day — ver decisões F2 nº 10.
