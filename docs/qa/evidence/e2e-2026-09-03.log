@@ -1,0 +1,86 @@
+[e2e] TMP=/tmp/tokenbar-e2e.1Wn6lA
+[e2e] mock em 127.0.0.1:61983 (pid 72119)
+[e2e] PASS: mock no ar: wham/usage 200 com rate_limit.primary_window
+[e2e] PASS: mock no ar: quota/limit 200 com success=true
+[e2e] gerando corpus Claude + sessão Gemini + credenciais fake
+Building for production...
+[0/4] Write sources
+[1/4] Write swift-version--1AB21518FC5DEDBE.txt
+[3/5] Compiling genfixtures GenFixtures.swift
+[3/5] Write Objects.LinkFileList
+[4/5] Linking genfixtures
+Build of product 'genfixtures' complete! (109.08s)
+[0/1] Planning build
+Building for production...
+[0/7] Write sources
+[4/7] Write swift-version--1AB21518FC5DEDBE.txt
+[6/8] Compiling TokenBarCore AccountID.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:122:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+120 |                     let tail = pending - idx - 1
+121 |                     if tail > 0 {
+122 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+123 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+124 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:143:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+141 |                     let tail = pending - idx - 1
+142 |                     if tail > 0 {
+143 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+144 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+145 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:198:9: warning: no calls to throwing functions occur within 'try' expression
+196 |     ) throws {
+197 |         var batch: [UsageEvent] = []
+198 |         try autoreleasepool {
+    |         `- warning: no calls to throwing functions occur within 'try' expression
+199 |             for lineData in segment.split(separator: UInt8(ascii: "\n")) {
+200 |                 let line = String(decoding: lineData, as: UTF8.self)
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Watcher/TranscriptWatcher.swift:81:9: warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+79 |         ) else { return }
+80 |         stream = streamRef
+81 |         FSEventStreamScheduleWithRunLoop(streamRef, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+   |         `- warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+82 |         FSEventStreamStart(streamRef)
+83 |     }
+
+[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+[7/9] Compiling TokenBarProviders ClaudeLineParser.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarProviders/Claude/ClaudeLineParser.swift:20:13: warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 18 |     // Decoder reutilizado: criar um JSONDecoder por linha custa caro em corpus
+ 19 |     // grande (Red Team caso 2) — o uso é single-thread no ingest.
+ 20 |     private nonisolated(unsafe) static let decoder = JSONDecoder()
+    |             `- warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 21 | 
+ 22 |     /// ISO8601 "yyyy-MM-ddTHH:mm:ss[.frac][Z|±HH:MM]" parseado à mão: ~0,06 µs
+[8/10] Compiling TokenBarUI E2EHeartbeat.swift
+[9/11] Compiling tokenbar AppState.swift
+[9/11] Write Objects.LinkFileList
+[10/11] Linking tokenbar
+Build of product 'tokenbar' complete! (97.45s)
+[e2e] selfcheck (mock no ar): {"menuBarText":"C:4.0M X:42% G:193 Z:81%","providers":{"claude":{"authState":"ok","fetchedAt":"2026-09-03T14:36:43Z","menuBar":"C:4.0M","percent":null,"todayTokens":4007985},"codex":{"authState":"ok","fetchedAt":"2026-09-03T14:36:43Z","menuBar":"X:42%","percent":42,"todayTokens":0},"gemini":{"authState":"ok","fetchedAt":"2026-09-03T14:36:43Z","menuBar":"G:193","percent":null,"todayTokens":193},"zai":{"authState":"ok","fetchedAt":"2026-09-03T14:36:43Z","menuBar":"Z:81%","percent":81,"todayTokens":0}},"updatedAt":"2026-09-03T14:36:43Z"}
+[e2e] PASS: selfcheck v2 mostra os API-driven com % do mock (X:42% e Z:81% em 'C:4.0M X:42% G:193 Z:81%')
+[e2e] PASS: selfcheck v2 mostra os locais (C e G) em 'C:4.0M X:42% G:193 Z:81%'
+build/TokenBar.app: replacing existing signature
+[e2e] PASS: heartbeat criado em 30s
+[e2e] FAIL: menu bar text igual ao selfcheck ('C:15.7M X:42% G:772 Z:81%' == 'C:4.0M X:42% G:193 Z:81%')
+[e2e] PASS: heartbeat: percent API-driven do mock (codex=42, zai=81)
+[e2e] PASS: heartbeat v2: authState ok e fetchedAt fresco nos API-driven
+[e2e] PASS: live update após append (Δ=+333 observado)
+[e2e] PASS: degradação: mock morto → app vivo e heartbeat continua (Δ=+222, updatedAt avança)
+[e2e] PASS: sem retry storm: 0 request(s) do app na janela inteira (≤ 3 = burst inicial)
+[0/1] Planning build
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'tokenbar' complete! (0.41s)
+[e2e] selfcheck (mock morto): {"menuBarText":"C:4.0M G:193","providers":{"claude":{"authState":"ok","fetchedAt":"2026-09-03T14:37:01Z","menuBar":"C:4.0M","percent":null,"todayTokens":4008540},"codex":{"authState":"missing","error":"network","fetchedAt":"2026-09-03T14:37:01Z","menuBar":null,"percent":null,"todayTokens":0},"gemini":{"authState":"ok","fetchedAt":"2026-09-03T14:37:01Z","menuBar":"G:193","percent":null,"todayTokens":193},"zai":{"authState":"missing","error":"network","fetchedAt":"1970-01-01T00:00:00Z","menuBar":null,"percent":null,"todayTokens":0}},"updatedAt":"2026-09-03T14:37:01Z"}
+[e2e] PASS: selfcheck pós-morte: erro tokenizado 'network' em codex e zai
+[e2e] aguardando 60s para medir recursos...
+[e2e] PASS: processo vivo (sem crash, mock morto há >60s)
+[e2e] PASS: memória própria (phys_footprint) 17.6M ≤ 40MB (rss informativo: 27392KB)
+[e2e] PASS: cpu 0.1% ≤ 0.5%
+[e2e] concluído: 1 falha(s)
+./scripts/e2e.sh: line 268: 87629 Terminated: 15          env "${COMMON_ENV[@]}" TOKENBAR_E2E_DIR="$STATE" "build/TokenBar.app/Contents/MacOS/tokenbar"

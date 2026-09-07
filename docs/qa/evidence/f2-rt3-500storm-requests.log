@@ -1,0 +1,17 @@
+# RT T8 caso 3 — 500-storm com CONTADOR (refaz o log parcial de 2026-09-03)
+# Setup: app real + mock python3 SEMPRE 500 nas 2 rotas (wham/usage, quota/limit).
+# Credenciais 100% fake (Bearer fake-*). Janela observada: 1896 s (~31.6 min).
+# Formato: <n> do provider | <path> | <gap desde o request anterior do MESMO provider>
+#
+#1 /backend-api/wham/usage gap=  --  (1788812671.290)
+#1 /api/monitor/usage/quota/limit gap=  --  (1788812671.359)
+#2 /api/monitor/usage/quota/limit gap=642s  (1788813313.463)
+#2 /backend-api/wham/usage gap=642s  (1788813313.463)
+#3 /api/monitor/usage/quota/limit gap=1253s  (1788814566.791)
+#3 /backend-api/wham/usage gap=1253s  (1788814566.791)
+#
+# Gaps por provider: burst inicial -> +642 s (nominal 600 = idle 300 x2) -> +1253 s (nominal 1200 = 600 x2).
+# Backoff CRESCENTE visivel; ~1 request/provider a cada ~11-21 min; 0 retries do mesmo request;
+# max de requests em qualquer janela de 10 s = 2 (o proprio burst). Sem retry storm.
+# O dobramento com teto de 30 min fica pinado no scheduler:
+#   errorBackoffDoublesWithThirtyMinuteCeilingAndSuccessResets (SchedulerTests).

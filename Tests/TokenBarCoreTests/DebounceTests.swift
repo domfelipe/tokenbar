@@ -2,61 +2,8 @@ import Foundation
 import Testing
 @testable import TokenBarCore
 
-/// Clock virtual: sleep registra waiter; advance(by:) desperta os vencidos.
-final class VirtualClock: Clock, @unchecked Sendable {
-    typealias Instant = ContinuousClock.Instant
-
-    private let lock = NSLock()
-    private var nowValue: Instant
-    private var waiters: [(deadline: Instant, continuation: CheckedContinuation<Void, Error>)] = []
-
-    init(start: Instant = .now) {
-        nowValue = start
-    }
-
-    var now: Instant {
-        lock.lock(); defer { lock.unlock() }
-        return nowValue
-    }
-
-    var minimumResolution: Instant.Duration { .zero }
-
-    /// Protocolo Clock (toolchain atual) exige sleep(until:tolerance:); o sleep(for:)
-    /// da extensão padrão usa este método + o `now` virtual.
-    func sleep(until deadline: Instant, tolerance: Instant.Duration? = nil) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            lock.lock()
-            waiters.append((deadline, continuation))
-            lock.unlock()
-        }
-    }
-
-    /// Avança o relógio virtual e desperta waiters cujo deadline passou.
-    func advance(by duration: Instant.Duration) {
-        lock.lock()
-        nowValue = nowValue.advanced(by: duration)
-        let due = waiters.filter { $0.deadline <= nowValue }
-        waiters.removeAll { $0.deadline <= nowValue }
-        lock.unlock()
-        for waiter in due { waiter.continuation.resume(returning: ()) }
-    }
-}
-
-/// Sonda de conclusão: substitui `task.isFinished` (inexistente em Task neste toolchain).
-final class CompletionFlag: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value = false
-
-    var isSet: Bool {
-        lock.lock(); defer { lock.unlock() }
-        return value
-    }
-
-    func set() {
-        lock.lock(); defer { lock.unlock() }
-        value = true
-    }
-}
+// VirtualClock e CompletionFlag vivem em TestSupport.swift (compartilhados
+// com SchedulerTests na F2; o clock ganhou sleep cancelável).
 
 @Suite
 struct DebounceTests {

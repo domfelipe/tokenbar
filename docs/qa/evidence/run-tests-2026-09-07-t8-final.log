@@ -1,0 +1,724 @@
+[0/1] Planning build
+Building for debugging...
+[0/7] Write swift-version--1AB21518FC5DEDBE.txt
+[2/25] Emitting module TokenBarCore
+[3/26] Compiling TokenBarCore TokenBarCore.swift
+[4/26] Compiling TokenBarCore UsageSnapshot.swift
+[5/26] Compiling TokenBarCore FileCursor.swift
+[6/26] Compiling TokenBarCore AccountID.swift
+[7/26] Compiling TokenBarCore ProviderID.swift
+[8/26] Compiling TokenBarCore FileOffsetStore.swift
+[9/26] Compiling TokenBarCore LedgerSnapshot.swift
+[10/26] Compiling genfixtures GenFixtures.swift
+[11/26] Emitting module genfixtures
+[12/25] Compiling TokenBarCore UsageProvider.swift
+[13/25] Compiling TokenBarCore UsageHTTPClient.swift
+[14/25] Compiling TokenBarCore ProviderRegistry.swift
+[15/25] Compiling TokenBarCore TokenSums.swift
+[16/25] Compiling TokenBarCore UsageEvent.swift
+[17/25] Compiling TokenBarCore AdaptiveScheduler.swift
+[18/25] Compiling TokenBarCore TokenLedger.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:122:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+120 |                     let tail = pending - idx - 1
+121 |                     if tail > 0 {
+122 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+123 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+124 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:143:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+141 |                     let tail = pending - idx - 1
+142 |                     if tail > 0 {
+143 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+144 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+145 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:216:9: warning: no calls to throwing functions occur within 'try' expression
+214 |     ) throws {
+215 |         var batch: [UsageEvent] = []
+216 |         try autoreleasepool {
+    |         `- warning: no calls to throwing functions occur within 'try' expression
+217 |             for lineData in segment.split(separator: UInt8(ascii: "\n")) {
+218 |                 let line = String(decoding: lineData, as: UTF8.self)
+[19/25] Compiling TokenBarCore TranscriptIngester.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:122:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+120 |                     let tail = pending - idx - 1
+121 |                     if tail > 0 {
+122 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+123 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+124 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:143:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+141 |                     let tail = pending - idx - 1
+142 |                     if tail > 0 {
+143 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+144 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+145 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:216:9: warning: no calls to throwing functions occur within 'try' expression
+214 |     ) throws {
+215 |         var batch: [UsageEvent] = []
+216 |         try autoreleasepool {
+    |         `- warning: no calls to throwing functions occur within 'try' expression
+217 |             for lineData in segment.split(separator: UInt8(ascii: "\n")) {
+218 |                 let line = String(decoding: lineData, as: UTF8.self)
+[20/25] Compiling TokenBarCore TranscriptWatcher.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarCore/Watcher/TranscriptWatcher.swift:81:9: warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+79 |         ) else { return }
+80 |         stream = streamRef
+81 |         FSEventStreamScheduleWithRunLoop(streamRef, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+   |         `- warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+82 |         FSEventStreamStart(streamRef)
+83 |     }
+
+[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+[21/37] Compiling TokenBarProviders ZaiCredentialReader.swift
+[21/38] Linking genfixtures
+[23/38] Compiling TokenBarProviders TokenBarProviders.swift
+[24/38] Compiling TokenBarProviders GeminiSessionIngester.swift
+[25/38] Compiling TokenBarProviders GeminiProvider.swift
+[26/38] Compiling TokenBarProviders CodexAuthReader.swift
+[26/38] Applying genfixtures
+[28/38] Compiling TokenBarProviders CodexSessionIngester.swift
+[29/38] Compiling TokenBarProviders ClaudeTranscriptLine.swift
+[30/38] Compiling TokenBarProviders ClaudeTranscriptLocator.swift
+[31/38] Emitting module TokenBarProviders
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarProviders/Claude/ClaudeLineParser.swift:20:13: warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 18 |     // Decoder reutilizado: criar um JSONDecoder por linha custa caro em corpus
+ 19 |     // grande (Red Team caso 2) — o uso é single-thread no ingest.
+ 20 |     private nonisolated(unsafe) static let decoder = JSONDecoder()
+    |             `- warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 21 | 
+ 22 |     /// ISO8601 "yyyy-MM-ddTHH:mm:ss[.frac][Z|±HH:MM]" parseado à mão: ~0,06 µs
+[32/38] Compiling TokenBarProviders CodexProvider.swift
+[33/38] Compiling TokenBarProviders ClaudeLineParser.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarProviders/Claude/ClaudeLineParser.swift:20:13: warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 18 |     // Decoder reutilizado: criar um JSONDecoder por linha custa caro em corpus
+ 19 |     // grande (Red Team caso 2) — o uso é single-thread no ingest.
+ 20 |     private nonisolated(unsafe) static let decoder = JSONDecoder()
+    |             `- warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 21 | 
+ 22 |     /// ISO8601 "yyyy-MM-ddTHH:mm:ss[.frac][Z|±HH:MM]" parseado à mão: ~0,06 µs
+[34/38] Compiling TokenBarProviders ClaudeProvider.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarProviders/Claude/ClaudeLineParser.swift:20:13: warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 18 |     // Decoder reutilizado: criar um JSONDecoder por linha custa caro em corpus
+ 19 |     // grande (Red Team caso 2) — o uso é single-thread no ingest.
+ 20 |     private nonisolated(unsafe) static let decoder = JSONDecoder()
+    |             `- warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 21 | 
+ 22 |     /// ISO8601 "yyyy-MM-ddTHH:mm:ss[.frac][Z|±HH:MM]" parseado à mão: ~0,06 µs
+[35/38] Compiling TokenBarProviders ZaiProvider.swift
+[36/44] Compiling TokenBarUI TokenBarUI.swift
+[37/44] Compiling TokenBarUI SnapshotStore.swift
+[38/44] Compiling TokenBarUI MenuBarContent.swift
+[39/44] Compiling TokenBarUI E2EHeartbeat.swift
+[40/44] Compiling TokenBarUI ProviderCoordinator.swift
+[41/44] Emitting module TokenBarUI
+[42/48] Compiling tokenbar SelfCheck.swift
+[43/48] Compiling tokenbar AppState.swift
+[44/48] Emitting module tokenbar
+[45/48] Compiling tokenbar TokenBarApp.swift
+[45/47] Linking tokenbar
+[46/47] Applying tokenbar
+Build complete! (7.51s)
+[0/1] Planning build
+Building for debugging...
+[0/8] Write swift-version--1AB21518FC5DEDBE.txt
+[2/26] Compiling TokenBarCore TokenBarCore.swift
+[3/27] Compiling TokenBarCore AdaptiveScheduler.swift
+[4/27] Compiling TokenBarCore UsageHTTPClient.swift
+[5/27] Compiling TokenBarCore ProviderRegistry.swift
+[6/27] Compiling TokenBarCore UsageSnapshot.swift
+[7/27] Compiling TokenBarCore FileCursor.swift
+[8/27] Emitting module TokenBarCore
+[9/27] Compiling TokenBarCore AccountID.swift
+[10/27] Compiling TokenBarCore ProviderID.swift
+[11/27] Compiling TokenBarCore FileOffsetStore.swift
+[12/27] Compiling TokenBarCore LedgerSnapshot.swift
+[13/27] Compiling TokenBarCore TranscriptWatcher.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarCore/Watcher/TranscriptWatcher.swift:81:9: warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+79 |         ) else { return }
+80 |         stream = streamRef
+81 |         FSEventStreamScheduleWithRunLoop(streamRef, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+   |         `- warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+82 |         FSEventStreamStart(streamRef)
+83 |     }
+
+[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+[14/27] Compiling genfixtures GenFixtures.swift
+[15/27] Emitting module genfixtures
+[16/26] Compiling TokenBarCore TokenSums.swift
+[17/26] Compiling TokenBarCore UsageEvent.swift
+[18/26] Compiling TokenBarCore TokenLedger.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:122:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+120 |                     let tail = pending - idx - 1
+121 |                     if tail > 0 {
+122 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+123 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+124 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:143:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+141 |                     let tail = pending - idx - 1
+142 |                     if tail > 0 {
+143 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+144 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+145 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:216:9: warning: no calls to throwing functions occur within 'try' expression
+214 |     ) throws {
+215 |         var batch: [UsageEvent] = []
+216 |         try autoreleasepool {
+    |         `- warning: no calls to throwing functions occur within 'try' expression
+217 |             for lineData in segment.split(separator: UInt8(ascii: "\n")) {
+218 |                 let line = String(decoding: lineData, as: UTF8.self)
+[19/26] Compiling TokenBarCore TranscriptIngester.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:122:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+120 |                     let tail = pending - idx - 1
+121 |                     if tail > 0 {
+122 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+123 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+124 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:143:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+141 |                     let tail = pending - idx - 1
+142 |                     if tail > 0 {
+143 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+144 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+145 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:216:9: warning: no calls to throwing functions occur within 'try' expression
+214 |     ) throws {
+215 |         var batch: [UsageEvent] = []
+216 |         try autoreleasepool {
+    |         `- warning: no calls to throwing functions occur within 'try' expression
+217 |             for lineData in segment.split(separator: UInt8(ascii: "\n")) {
+218 |                 let line = String(decoding: lineData, as: UTF8.self)
+[20/26] Compiling TokenBarCore UsageProvider.swift
+[20/38] Linking genfixtures
+[21/38] Applying genfixtures
+[23/38] Compiling TokenBarProviders ZaiCredentialReader.swift
+[24/39] Compiling TokenBarProviders TokenBarProviders.swift
+[25/39] Compiling TokenBarProviders CodexSessionIngester.swift
+[26/39] Compiling TokenBarProviders GeminiSessionIngester.swift
+[27/39] Compiling TokenBarProviders GeminiProvider.swift
+[28/39] Compiling TokenBarProviders CodexAuthReader.swift
+[29/39] Compiling TokenBarProviders ClaudeTranscriptLine.swift
+[30/39] Compiling TokenBarProviders ClaudeTranscriptLocator.swift
+[31/39] Compiling TokenBarProviders CodexProvider.swift
+[32/39] Emitting module TokenBarProviders
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarProviders/Claude/ClaudeLineParser.swift:20:13: warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 18 |     // Decoder reutilizado: criar um JSONDecoder por linha custa caro em corpus
+ 19 |     // grande (Red Team caso 2) — o uso é single-thread no ingest.
+ 20 |     private nonisolated(unsafe) static let decoder = JSONDecoder()
+    |             `- warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 21 | 
+ 22 |     /// ISO8601 "yyyy-MM-ddTHH:mm:ss[.frac][Z|±HH:MM]" parseado à mão: ~0,06 µs
+[33/39] Compiling TokenBarProviders ClaudeLineParser.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarProviders/Claude/ClaudeLineParser.swift:20:13: warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 18 |     // Decoder reutilizado: criar um JSONDecoder por linha custa caro em corpus
+ 19 |     // grande (Red Team caso 2) — o uso é single-thread no ingest.
+ 20 |     private nonisolated(unsafe) static let decoder = JSONDecoder()
+    |             `- warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 21 | 
+ 22 |     /// ISO8601 "yyyy-MM-ddTHH:mm:ss[.frac][Z|±HH:MM]" parseado à mão: ~0,06 µs
+[34/39] Compiling TokenBarProviders ClaudeProvider.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-redteam/Sources/TokenBarProviders/Claude/ClaudeLineParser.swift:20:13: warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 18 |     // Decoder reutilizado: criar um JSONDecoder por linha custa caro em corpus
+ 19 |     // grande (Red Team caso 2) — o uso é single-thread no ingest.
+ 20 |     private nonisolated(unsafe) static let decoder = JSONDecoder()
+    |             `- warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 21 | 
+ 22 |     /// ISO8601 "yyyy-MM-ddTHH:mm:ss[.frac][Z|±HH:MM]" parseado à mão: ~0,06 µs
+[35/39] Compiling TokenBarProviders ZaiProvider.swift
+[36/45] Compiling TokenBarUI SnapshotStore.swift
+[37/45] Compiling TokenBarUI TokenBarUI.swift
+[38/45] Compiling TokenBarUI E2EHeartbeat.swift
+[39/45] Emitting module TokenBarUI
+[40/45] Compiling TokenBarUI MenuBarContent.swift
+[41/45] Compiling TokenBarUI ProviderCoordinator.swift
+[42/48] Compiling tokenbar SelfCheck.swift
+[43/48] Compiling tokenbar AppState.swift
+[44/48] Emitting module tokenbar
+[45/48] Compiling tokenbar TokenBarApp.swift
+[45/47] Linking tokenbar
+[46/47] Applying tokenbar
+Build complete! (5.39s)
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite MenuBarContentTests started.
+◇ Suite ZaiCredentialReaderTests started.
+◇ Suite FileOffsetStoreTests started.
+◇ Suite ProviderCoordinatorTests started.
+◇ Suite ZaiUsageAPITests started.
+◇ Suite ClaudeUsageProviderConformanceTests started.
+◇ Suite TokenLedgerTests started.
+◇ Suite SchedulerTests started.
+◇ Suite GeminiProviderTests started.
+◇ Suite TranscriptIngesterTests started.
+◇ Suite HTTPClientTests started.
+◇ Suite DebounceTests started.
+◇ Suite ProviderProtocolTests started.
+◇ Suite DomainTests started.
+◇ Suite ZaiProviderTests started.
+◇ Suite CodexUsageAPITests started.
+◇ Suite CodexLineParserTests started.
+◇ Suite GeminiLineParserTests started.
+◇ Suite ClaudeProviderTests started.
+◇ Suite SmokeTests started.
+◇ Suite ClaudeLineParserTests started.
+◇ Suite ParserFuzzTests started.
+◇ Suite CodexProviderTests started.
+◇ Test resolveHonorsEnvOverridesAndDefaults() started.
+◇ Test testCorruptedFileStartsEmpty() started.
+◇ Test bigmodelEntryAloneYieldsCNRegion() started.
+◇ Test testRemoveWithNil() started.
+◇ Test "wiring degradado: 4 providers no heartbeat v2, sem crash, credencial não vaza" started.
+◇ Suite CodexAuthReaderTests started.
+◇ Test readParsesAPIKeyAndRegionFromConfig() started.
+◇ Test filesWithoutUsableKeysReturnNil() started.
+◇ Test unknownBaseHostGivesNoRegionHint() started.
+◇ Test "M1 por provider: ciclo concorrente do mesmo provider vira skip" started.
+◇ Test entryWithoutAPIKeyStillHintsRegionForOAuth() started.
+◇ Test testSetThenReloadRoundtrip() started.
+◇ Test zaiEntryPreferredOverBigmodel() started.
+◇ Test readFallsBackToOAuthTokenWithoutConfig() started.
+◇ Test testSeenIDsRoundtripAndLegacyCursorWithoutSeenIDs() started.
+◇ Test malformedFilesReturnNil() started.
+◇ Test readCollectsAPIKeyAndOAuthTogether() started.
+◇ Test testRolloverClearsTotalsAndFlagsRescan() started.
+◇ Test "provider degradado com throw no 1º ciclo permanece no heartbeat com erro" started.
+◇ Test testMissingFileStartsEmpty() started.
+◇ Test conformsToUsageProviderBasics() started.
+◇ Test testTruncationSelfCorrects() started.
+◇ Test testRestoreDayDoesNotClobberLiveEntries() started.
+◇ Test testMultiProviderBreakdown() started.
+◇ Test testYesterdayEventsDoNotCountForToday() started.
+◇ Test backoffGrowsFromCurrentIntervalEvenInMenuMode() started.
+◇ Test testRestoreDayRecoversSnapshotAfterRestart() started.
+◇ Test fetchUsageRejectsUnknownAccount() started.
+◇ Test testAccumulatesAcrossFilesAndCycles() started.
+◇ Test testTruncationAfterRestoreSelfCorrects() started.
+◇ Test jitterLowerBoundIsMinusTenPercent() started.
+◇ Test testRestoreDayIgnoresOtherDay() started.
+◇ Test jitterAppliesToMenuInterval() started.
+◇ Test testRestoreDayOnlyOncePerProcess() started.
+◇ Test ingestLocalMatchesIngestOnce() started.
+◇ Test providersAreIndependent() started.
+◇ Test testDaySnapshotNilOnEmptyDayAndAfterRollover() started.
+◇ Test jitterUpperBoundIsPlusTenPercent() started.
+◇ Test ingestLocalFromProtocolCursorCountsOnce() started.
+◇ Test noteResultForUnknownProviderDoesNotCrash() started.
+◇ Test pressureCadenceIsThirtySecondsWithBoundaryAtPointEight() started.
+◇ Test pressureBeatsMenuInterval() started.
+◇ Test errorBackoffDoublesWithThirtyMinuteCeilingAndSuccessResets() started.
+◇ Test menuOpenedSwitchesToSixtySecondCadenceAndDecaysBackToIdle() started.
+◇ Test rolloverViaProtocolKeepsNextCursorCoherent() started.
+◇ Test rolloverRescansFullFileOnDayChange() started.
+◇ Test testRenderGateSkipsEqualContent() started.
+◇ Test ingestLocalThroughExistentialUsesWallClock() started.
+◇ Test testTokensWhenNoWindow() started.
+◇ Test fetchUsageReturnsLocalOnlySnapshot() started.
+◇ Test testHeartbeatV2PayloadShape() started.
+◇ Test ingestLocalRejectsUnknownAccount() started.
+◇ Test testFixedOrderClaudeCodexGeminiZai() started.
+◇ Test reregisterReplacesHandlerWithoutDoubleFiring() started.
+◇ Test testDisplayFragmentAndMenuLines() started.
+◇ Test singleFlightNeverRunsTwoFiresForSameProvider() started.
+◇ Test testAbbrevTokens() started.
+◇ Test testProviderWithoutDataDisappears() started.
+◇ Test testMenuLinesExposePanelState() started.
+◇ Test testUnchangedFileIsNotReturned() started.
+◇ Test testStreamingCarriesPartialLineAcrossChunks() started.
+◇ Test testTouchResetsWindow() started.
+◇ Test testSiglasD5() started.
+◇ Test testCriticalWindowPicksHighestFraction() started.
+◇ Test oversizedAtEOFWithoutTrailingNewlineKeepsCursorExact() started.
+◇ Test testTruncateToZeroEmitsResetEvenWithoutNewLines() started.
+◇ Test testWaitReturnsOnlyAfterQuiesceWindow() started.
+◇ Test testPercentBeatsTokensWhenWindowKnown() started.
+◇ Test testFirstIngestReadsWholeFile() started.
+◇ Test fetchUsageMapsQuotaShapeAndSendsContractedHeaders() started.
+◇ Test testEmptyContentShowsPlaceholder() started.
+◇ Test testSubdirectoriesAreScanned() started.
+◇ Test testIncompleteTrailingLineIsNotConsumed() started.
+◇ Test testSecondIngestReadsOnlyAppend() started.
+◇ Test testResetSuffixBounds() started.
+◇ Test testSingleProviderTokens() started.
+◇ Test linesAfterOversizedLineAreStillCounted() started.
+◇ Test multipleLinesAfterOversizedLineSurvive() started.
+◇ Test testTenThousandEventsUnderOneSecond() started.
+◇ Test testProviderIDCodableRoundtrip() started.
+◇ Test testStreamingDeliversLargeFileInBoundedBatches() started.
+◇ Test getJSON200ReturnsBodyWithContractedHeaders() started.
+◇ Test ingestCursorWrapsFileOffsets() started.
+◇ Test testTokenSumsArithmetic() started.
+◇ Test testGarbageLinesAreSkippedButConsumed() started.
+◇ Test pauseStopsAllFiresAndResumeFiresImmediately() started.
+◇ Test testFirstCycleRecordsDayWithoutSpuriousRescan() started.
+◇ Test idleCadenceFiresEveryFiveMinutes() started.
+◇ Test fetchUsageReturnsLocalOnlySnapshot() started.
+◇ Test testUsageEventCodableRoundtrip() started.
+◇ Test enumRawValues() started.
+◇ Test registryDuplicateRegistrationReplaces() started.
+◇ Test capabilityMath() started.
+◇ Test testAccountIDHashAndEquality() started.
+◇ Test protocolDispatchThroughExistential() started.
+◇ Test snapshotCodableRoundtripFull() started.
+◇ Test testTokenSumsCodableRoundtrip() started.
+◇ Test conformsToUsageProviderBasics() started.
+◇ Test testStreamingResetFlagOnlyOnFirstBatchOfShrunkFile() started.
+◇ Test registryRegisterAndResolve() started.
+◇ Test missingSessionsDirectoryYieldsZero() started.
+◇ Test registryResolveUnknownReturnsNil() started.
+◇ Test snapshotCodableRoundtripLocalModeWithNils() started.
+◇ Test registryAllSortedByID() started.
+◇ Test accountRefCodableRoundtrip() started.
+◇ Test staleTotalsWithSurvivingCursorsAreNotRestored() started.
+◇ Test deduplicatesSameIdWithinSameFile() started.
+◇ Test restartMidDayRestoresTodayTotals() started.
+◇ Test ingestLocalRejectsUnknownAccount() started.
+◇ Test rolloverRescansFullFileOnDayChangeWithoutDoubleCounting() started.
+◇ Test discoverAccountsRequiresDotGeminiDirectory() started.
+◇ Test deduplicatesReattachedIdAcrossCycles() started.
+◇ Test resolveGeminiDirectoryOverrideAndDefault() started.
+◇ Test lostCursorsInvalidateSnapshotNoDoubleCount() started.
+◇ Test ingestCountsOnlyGeminiRootLinesWithRealTokens() started.
+◇ Test testTokenSumsSaturatesInsteadOfTrapping() started.
+◇ Test fetchUsageRejectsUnknownAccount() started.
+◇ Test resolveFallsBackToHomeClaude() started.
+◇ Test ingestTwiceDoesNotDuplicate() started.
+◇ Test discoverAccountsRequiresAuthFile() started.
+◇ Test incrementalAppendCountsOnlyNewRootLine() started.
+◇ Test creditsUnlimitedCodableRoundtrip() started.
+◇ Test staleTotalsWithSurvivingCursorsAreNotRestored() started.
+◇ Test ingestOnceCountsTokensFromRealFormatFixture() started.
+◇ Test missingTimestampFallsBackToMtime() started.
+◇ Test missingDirectoryYieldsZero() started.
+◇ Test staleSnapshotPathsAreNotRestored() started.
+◇ Test truncationAfterRestoreSelfCorrectsPerFile() started.
+◇ Test mismatchedTotalChecksumStillParsesComponents() started.
+◇ Test skipsUserAndInfoRootLinesMetaAndSetDeltas() started.
+◇ Test cachedMapsToCacheReadAndToolSumsIntoOutput() started.
+◇ Test invalidTimestampYieldsNoEvent() started.
+◇ Test geminiLineWithoutTokensYieldsNoEvent() started.
+◇ Test nearInt64MaxComponentSumIsRejectedNotCrash() started.
+◇ Test parsesGeminiRootLineWithRealTokens() started.
+◇ Test parsesTokenCountDeltasWithAllFields() started.
+◇ Test invalidTimestampYieldsNoEvent() started.
+◇ Test firstEventOfNewFileWithoutTurnContextHasNoModel() started.
+◇ Test modelComesFromLastTurnContext() started.
+◇ Test skipsNonUsageLines() started.
+◇ Test tokenCountWithoutInfoYieldsNoEvent() started.
+◇ Test zeroTotalUsageYieldsNoEvent() started.
+◇ Test usageFieldsAtSanityCapBoundaryStillCounted() started.
+◇ Test truncatedJSONIsSkippedNotFatal() started.
+◇ Test binaryGarbageIsSkippedNotFatal() started.
+◇ Test assistantWithoutUsageIsSkipped() started.
+◇ Test corruptLedgerSnapshotIsIgnoredNotFatal() started.
+◇ Test rolloverDropsInFileDuplicateDuringRescan() started.
+◇ Test resolvePrefersEnvironmentOverride() started.
+◇ Test negativeTokensAreClampedToZero() started.
+◇ Test allZeroUsageIsSkipped() started.
+◇ Test hugeLineDoesNotCrash() started.
+◇ Test coreVersionIsSet() started.
+◇ Test fastISO8601MatchesFormatterOnAcceptedForms() started.
+◇ Test fetchUsageWithoutCredentialReportsMissing() started.
+◇ Test missingSessionsDirectoryYieldsZero() started.
+◇ Test restartMidDayRestoresTodayTotals() started.
+◇ Test missingFilesReturnNil() started.
+◇ Test ingestTwiceDoesNotDuplicate() started.
+◇ Test zeroTotalYieldsNoEvent() started.
+◇ Test resolveSessionsDirectoryOverrideAndDefault() started.
+◇ Test ingestCountsOnlyLastTokenUsageDeltas() started.
+◇ Test staleTotalsWithSurvivingCursorsAreNotRestored() started.
+◇ Test testTruncatedFileResetsToZero() started.
+◇ Test fastISO8601MatchesFormatterOnCorpusTimestamps() started.
+◇ Test resolveBaseURLOverrideAndDefault() started.
+◇ Test rolloverRescansFullFileOnDayChange() started.
+◇ Test assistantLineWithUsageProducesEvent() started.
+◇ Test usageFieldsNearInt64MaxAreRejectedNotCrash() started.
+◇ Test restartMidDayRestoresTodayTotals() started.
+◇ Test conformsToUsageProviderBasics() started.
+◇ Test ingestLocalRejectsUnknownAccount() started.
+◇ Test userLineIsSkipped() started.
+◇ Test invalidTimestampIsSkipped() started.
+◇ Test fetchUsageRejectsUnknownAccount() started.
+◇ Test conformsToUsageProviderBasics() started.
+◇ Test discoverAccountsRequiresCredential() started.
+◇ Test resolveBaseURLPrefersEnvThenRegionHintThenDefault() started.
+◇ Test controlLinesParseBeforeAndAfterBattery() started.
+◇ Test resolvePrefersEnvironmentOverride() started.
+◇ Test malformedFileReturnsNil() started.
+◇ Test readParsesAccessTokenAndAccount() started.
+◇ Test accountIDFallsBackToJWTClaim() started.
+◇ Test missingFileReturnsNil() started.
+◇ Test apikeyModeHasNoOAuth() started.
+◇ Test resolveDefaultsToHomeDotCodex() started.
+✔ Test testCorruptedFileStartsEmpty() passed after 0.139 seconds.
+✔ Test zaiEntryPreferredOverBigmodel() passed after 0.139 seconds.
+✔ Test unknownBaseHostGivesNoRegionHint() passed after 0.139 seconds.
+✔ Test readFallsBackToOAuthTokenWithoutConfig() passed after 0.139 seconds.
+✔ Test readParsesAPIKeyAndRegionFromConfig() passed after 0.139 seconds.
+✔ Test testSetThenReloadRoundtrip() passed after 0.139 seconds.
+✔ Test testRemoveWithNil() passed after 0.139 seconds.
+✔ Test testMissingFileStartsEmpty() passed after 0.139 seconds.
+✔ Test filesWithoutUsableKeysReturnNil() passed after 0.139 seconds.
+✔ Test bigmodelEntryAloneYieldsCNRegion() passed after 0.140 seconds.
+✔ Test testSeenIDsRoundtripAndLegacyCursorWithoutSeenIDs() passed after 0.139 seconds.
+✔ Test entryWithoutAPIKeyStillHintsRegionForOAuth() passed after 0.140 seconds.
+✔ Test testRolloverClearsTotalsAndFlagsRescan() passed after 0.139 seconds.
+✔ Test testTruncationSelfCorrects() passed after 0.139 seconds.
+✔ Test testMultiProviderBreakdown() passed after 0.139 seconds.
+✔ Test testYesterdayEventsDoNotCountForToday() passed after 0.139 seconds.
+✔ Test resolveHonorsEnvOverridesAndDefaults() passed after 0.139 seconds.
+✔ Test conformsToUsageProviderBasics() passed after 0.140 seconds.
+✔ Test testAccumulatesAcrossFilesAndCycles() passed after 0.140 seconds.
+✔ Test testRestoreDayDoesNotClobberLiveEntries() passed after 0.140 seconds.
+✔ Test testTruncationAfterRestoreSelfCorrects() passed after 0.140 seconds.
+✔ Test testRestoreDayRecoversSnapshotAfterRestart() passed after 0.140 seconds.
+✔ Test testDaySnapshotNilOnEmptyDayAndAfterRollover() passed after 0.140 seconds.
+✔ Test noteResultForUnknownProviderDoesNotCrash() passed after 0.140 seconds.
+✔ Test testRestoreDayIgnoresOtherDay() passed after 0.140 seconds.
+✔ Test malformedFilesReturnNil() passed after 0.140 seconds.
+✔ Test testTokensWhenNoWindow() passed after 0.140 seconds.
+✔ Test fetchUsageRejectsUnknownAccount() passed after 0.140 seconds.
+✔ Test testRestoreDayOnlyOncePerProcess() passed after 0.140 seconds.
+✔ Test testFixedOrderClaudeCodexGeminiZai() passed after 0.140 seconds.
+✔ Test testAbbrevTokens() passed after 0.140 seconds.
+✔ Test readCollectsAPIKeyAndOAuthTogether() passed after 0.140 seconds.
+✔ Test testProviderWithoutDataDisappears() passed after 0.140 seconds.
+✔ Test fetchUsageReturnsLocalOnlySnapshot() passed after 0.140 seconds.
+✔ Test testSiglasD5() passed after 0.140 seconds.
+✔ Test ingestLocalRejectsUnknownAccount() passed after 0.140 seconds.
+✔ Test testCriticalWindowPicksHighestFraction() passed after 0.140 seconds.
+✔ Test testDisplayFragmentAndMenuLines() passed after 0.140 seconds.
+✔ Test testHeartbeatV2PayloadShape() passed after 0.140 seconds.
+✔ Test testUnchangedFileIsNotReturned() passed after 0.140 seconds.
+✔ Test ingestLocalThroughExistentialUsesWallClock() passed after 0.140 seconds.
+✔ Test testPercentBeatsTokensWhenWindowKnown() passed after 0.140 seconds.
+✔ Test testEmptyContentShowsPlaceholder() passed after 0.140 seconds.
+✔ Test ingestLocalFromProtocolCursorCountsOnce() passed after 0.140 seconds.
+✔ Test rolloverRescansFullFileOnDayChange() passed after 0.140 seconds.
+✔ Test testTruncateToZeroEmitsResetEvenWithoutNewLines() passed after 0.140 seconds.
+✔ Test testFirstIngestReadsWholeFile() passed after 0.140 seconds.
+✔ Test rolloverViaProtocolKeepsNextCursorCoherent() passed after 0.140 seconds.
+✔ Test testResetSuffixBounds() passed after 0.140 seconds.
+✔ Test testSingleProviderTokens() passed after 0.140 seconds.
+✔ Test testProviderIDCodableRoundtrip() passed after 0.140 seconds.
+✔ Test ingestLocalMatchesIngestOnce() passed after 0.140 seconds.
+✔ Test testIncompleteTrailingLineIsNotConsumed() passed after 0.140 seconds.
+✔ Test testTokenSumsArithmetic() passed after 0.140 seconds.
+✔ Test testSubdirectoriesAreScanned() passed after 0.140 seconds.
+✔ Test ingestCursorWrapsFileOffsets() passed after 0.140 seconds.
+✔ Test testSecondIngestReadsOnlyAppend() passed after 0.140 seconds.
+✔ Test testFirstCycleRecordsDayWithoutSpuriousRescan() passed after 0.141 seconds.
+✔ Test enumRawValues() passed after 0.140 seconds.
+✔ Test registryDuplicateRegistrationReplaces() passed after 0.140 seconds.
+✔ Test fetchUsageReturnsLocalOnlySnapshot() passed after 0.140 seconds.
+✔ Test testUsageEventCodableRoundtrip() passed after 0.140 seconds.
+✔ Test protocolDispatchThroughExistential() passed after 0.140 seconds.
+✔ Test testAccountIDHashAndEquality() passed after 0.140 seconds.
+✔ Test snapshotCodableRoundtripFull() passed after 0.140 seconds.
+✔ Test conformsToUsageProviderBasics() passed after 0.140 seconds.
+✔ Test testTokenSumsCodableRoundtrip() passed after 0.140 seconds.
+✔ Test registryRegisterAndResolve() passed after 0.140 seconds.
+✔ Test capabilityMath() passed after 0.140 seconds.
+✔ Test snapshotCodableRoundtripLocalModeWithNils() passed after 0.140 seconds.
+✔ Test registryAllSortedByID() passed after 0.140 seconds.
+✔ Test registryResolveUnknownReturnsNil() passed after 0.140 seconds.
+✔ Test testStreamingCarriesPartialLineAcrossChunks() passed after 0.141 seconds.
+✔ Test accountRefCodableRoundtrip() passed after 0.140 seconds.
+✔ Test missingSessionsDirectoryYieldsZero() passed after 0.140 seconds.
+✔ Test testGarbageLinesAreSkippedButConsumed() passed after 0.140 seconds.
+✔ Test testStreamingResetFlagOnlyOnFirstBatchOfShrunkFile() passed after 0.140 seconds.
+✔ Test discoverAccountsRequiresDotGeminiDirectory() passed after 0.140 seconds.
+✔ Test deduplicatesSameIdWithinSameFile() passed after 0.140 seconds.
+✔ Test ingestLocalRejectsUnknownAccount() passed after 0.140 seconds.
+✔ Test staleTotalsWithSurvivingCursorsAreNotRestored() passed after 0.140 seconds.
+✔ Test testTenThousandEventsUnderOneSecond() passed after 0.141 seconds.
+✔ Test rolloverRescansFullFileOnDayChangeWithoutDoubleCounting() passed after 0.140 seconds.
+✔ Test fetchUsageRejectsUnknownAccount() passed after 0.140 seconds.
+✔ Test creditsUnlimitedCodableRoundtrip() passed after 0.140 seconds.
+✔ Test discoverAccountsRequiresAuthFile() passed after 0.140 seconds.
+✔ Test lostCursorsInvalidateSnapshotNoDoubleCount() passed after 0.140 seconds.
+✔ Test missingTimestampFallsBackToMtime() passed after 0.140 seconds.
+✔ Test missingDirectoryYieldsZero() passed after 0.140 seconds.
+✔ Test deduplicatesReattachedIdAcrossCycles() passed after 0.140 seconds.
+✔ Test restartMidDayRestoresTodayTotals() passed after 0.141 seconds.
+✔ Test ingestOnceCountsTokensFromRealFormatFixture() passed after 0.140 seconds.
+✔ Test oversizedAtEOFWithoutTrailingNewlineKeepsCursorExact() passed after 0.141 seconds.
+✔ Test resolveGeminiDirectoryOverrideAndDefault() passed after 0.141 seconds.
+✔ Test mismatchedTotalChecksumStillParsesComponents() passed after 0.140 seconds.
+✔ Test staleTotalsWithSurvivingCursorsAreNotRestored() passed after 0.140 seconds.
+✔ Test incrementalAppendCountsOnlyNewRootLine() passed after 0.140 seconds.
+✔ Test geminiLineWithoutTokensYieldsNoEvent() passed after 0.140 seconds.
+✔ Test parsesGeminiRootLineWithRealTokens() passed after 0.140 seconds.
+✔ Test nearInt64MaxComponentSumIsRejectedNotCrash() passed after 0.140 seconds.
+✔ Test parsesTokenCountDeltasWithAllFields() passed after 0.140 seconds.
+✔ Test staleSnapshotPathsAreNotRestored() passed after 0.140 seconds.
+✔ Test modelComesFromLastTurnContext() passed after 0.140 seconds.
+✔ Test invalidTimestampYieldsNoEvent() passed after 0.140 seconds.
+✔ Test tokenCountWithoutInfoYieldsNoEvent() passed after 0.140 seconds.
+✔ Test firstEventOfNewFileWithoutTurnContextHasNoModel() passed after 0.141 seconds.
+✔ Test testTokenSumsSaturatesInsteadOfTrapping() passed after 0.142 seconds.
+✔ Test ingestCountsOnlyGeminiRootLinesWithRealTokens() passed after 0.142 seconds.
+✔ Test skipsNonUsageLines() passed after 0.141 seconds.
+✔ Test binaryGarbageIsSkippedNotFatal() passed after 0.141 seconds.
+✔ Test truncatedJSONIsSkippedNotFatal() passed after 0.141 seconds.
+✔ Test zeroTotalUsageYieldsNoEvent() passed after 0.141 seconds.
+✔ Test resolveFallsBackToHomeClaude() passed after 0.142 seconds.
+✔ Test assistantWithoutUsageIsSkipped() passed after 0.141 seconds.
+✔ Test negativeTokensAreClampedToZero() passed after 0.141 seconds.
+✔ Test allZeroUsageIsSkipped() passed after 0.141 seconds.
+✔ Test resolvePrefersEnvironmentOverride() passed after 0.141 seconds.
+✔ Test coreVersionIsSet() passed after 0.141 seconds.
+✔ Test skipsUserAndInfoRootLinesMetaAndSetDeltas() passed after 0.142 seconds.
+✔ Test fetchUsageWithoutCredentialReportsMissing() passed after 0.141 seconds.
+✔ Test missingSessionsDirectoryYieldsZero() passed after 0.141 seconds.
+✔ Test fastISO8601MatchesFormatterOnAcceptedForms() passed after 0.141 seconds.
+✔ Test missingFilesReturnNil() passed after 0.141 seconds.
+✔ Test linesAfterOversizedLineAreStillCounted() passed after 0.143 seconds.
+✔ Test zeroTotalYieldsNoEvent() passed after 0.141 seconds.
+✔ Test resolveSessionsDirectoryOverrideAndDefault() passed after 0.141 seconds.
+✔ Test ingestTwiceDoesNotDuplicate() passed after 0.141 seconds.
+✔ Test ingestTwiceDoesNotDuplicate() passed after 0.142 seconds.
+✔ Test restartMidDayRestoresTodayTotals() passed after 0.142 seconds.
+✔ Test truncationAfterRestoreSelfCorrectsPerFile() passed after 0.142 seconds.
+✔ Test fastISO8601MatchesFormatterOnCorpusTimestamps() passed after 0.141 seconds.
+✔ Test testStreamingDeliversLargeFileInBoundedBatches() passed after 0.143 seconds.
+✔ Test cachedMapsToCacheReadAndToolSumsIntoOutput() passed after 0.142 seconds.
+✔ Test assistantLineWithUsageProducesEvent() passed after 0.141 seconds.
+✔ Test usageFieldsNearInt64MaxAreRejectedNotCrash() passed after 0.141 seconds.
+✔ Test invalidTimestampYieldsNoEvent() passed after 0.141 seconds.
+✔ Test ingestCountsOnlyLastTokenUsageDeltas() passed after 0.145 seconds.
+✔ Test staleTotalsWithSurvivingCursorsAreNotRestored() passed after 0.146 seconds.
+✔ Test usageFieldsAtSanityCapBoundaryStillCounted() passed after 0.140 seconds.
+✔ Test conformsToUsageProviderBasics() passed after 0.148 seconds.
+✔ Test userLineIsSkipped() passed after 0.148 seconds.
+✔ Test resolveBaseURLOverrideAndDefault() passed after 0.149 seconds.
+✔ Test multipleLinesAfterOversizedLineSurvive() passed after 0.151 seconds.
+✔ Test rolloverDropsInFileDuplicateDuringRescan() passed after 0.151 seconds.
+✔ Test invalidTimestampIsSkipped() passed after 0.149 seconds.
+✔ Test testTruncatedFileResetsToZero() passed after 0.149 seconds.
+✔ Test corruptLedgerSnapshotIsIgnoredNotFatal() passed after 0.151 seconds.
+✔ Test ingestLocalRejectsUnknownAccount() passed after 0.149 seconds.
+✔ Test testRenderGateSkipsEqualContent() passed after 0.152 seconds.
+✔ Test testMenuLinesExposePanelState() passed after 0.152 seconds.
+✔ Test getJSON200ReturnsBodyWithContractedHeaders() passed after 0.152 seconds.
+✔ Test discoverAccountsRequiresCredential() passed after 0.142 seconds.
+✔ Test fetchUsageMapsQuotaShapeAndSendsContractedHeaders() passed after 0.153 seconds.
+✔ Test conformsToUsageProviderBasics() passed after 0.143 seconds.
+✔ Test resolvePrefersEnvironmentOverride() passed after 0.026 seconds.
+✔ Test accountIDFallsBackToJWTClaim() passed after 0.016 seconds.
+✔ Test missingFileReturnsNil() passed after 0.016 seconds.
+✔ Suite FileOffsetStoreTests passed after 0.155 seconds.
+✔ Suite ZaiCredentialReaderTests passed after 0.155 seconds.
+✔ Test resolveDefaultsToHomeDotCodex() passed after 0.016 seconds.
+✔ Test resolveBaseURLPrefersEnvThenRegionHintThenDefault() passed after 0.143 seconds.
+✔ Suite TokenLedgerTests passed after 0.155 seconds.
+✔ Suite ClaudeUsageProviderConformanceTests passed after 0.155 seconds.
+✔ Suite TranscriptIngesterTests passed after 0.155 seconds.
+✔ Suite DomainTests passed after 0.155 seconds.
+✔ Suite ProviderProtocolTests passed after 0.156 seconds.
+✔ Test malformedFileReturnsNil() passed after 0.020 seconds.
+✔ Suite GeminiProviderTests passed after 0.156 seconds.
+✔ Test fetchUsageRejectsUnknownAccount() passed after 0.144 seconds.
+✔ Suite ClaudeProviderTests passed after 0.156 seconds.
+✔ Suite GeminiLineParserTests passed after 0.156 seconds.
+✔ Suite CodexLineParserTests passed after 0.156 seconds.
+✔ Suite SmokeTests passed after 0.156 seconds.
+✔ Test restartMidDayRestoresTodayTotals() passed after 0.152 seconds.
+✔ Suite MenuBarContentTests passed after 0.157 seconds.
+✔ Suite ZaiProviderTests passed after 0.156 seconds.
+◇ Test fetchUsageMapsWhamShapeAndSendsContractedHeaders() started.
+◇ Test getJSONJoinsNestedPath() started.
+◇ Test fetchUsageFallsBackToOAuthWhenAPIKeyRejected() started.
+✔ Test apikeyModeHasNoOAuth() passed after 0.018 seconds.
+✔ Test readParsesAccessTokenAndAccount() passed after 0.019 seconds.
+✔ Suite CodexAuthReaderTests passed after 0.158 seconds.
+✔ Test rolloverRescansFullFileOnDayChange() passed after 0.155 seconds.
+✔ Suite CodexProviderTests passed after 0.158 seconds.
+✔ Test getJSONJoinsNestedPath() passed after 0.006 seconds.
+◇ Test customTimeoutIsAppliedToRequest() started.
+✔ Test customTimeoutIsAppliedToRequest() passed after 0.004 seconds.
+✔ Test fetchUsageMapsWhamShapeAndSendsContractedHeaders() passed after 0.010 seconds.
+◇ Test unauthorizedOn401And403() started.
+◇ Test fetchUsageToleratesAliasesAndStringNumbers() started.
+✔ Test fetchUsageFallsBackToOAuthWhenAPIKeyRejected() passed after 0.013 seconds.
+◇ Test oauthOnlyCredentialMakesSingleRequest() started.
+✔ Test fetchUsageToleratesAliasesAndStringNumbers() passed after 0.004 seconds.
+◇ Test fetchUsageDegradesOn401And403() started.
+✔ Test unauthorizedOn401And403() passed after 0.011 seconds.
+◇ Test otherErrorStatusesMapToHTTP() started.
+✔ Test oauthOnlyCredentialMakesSingleRequest() passed after 0.009 seconds.
+◇ Test fetchUsageDegradesOn401And403() started.
+✔ Test fetchUsageDegradesOn401And403() passed after 0.012 seconds.
+✔ Test otherErrorStatusesMapToHTTP() passed after 0.006 seconds.
+◇ Test missingCredentialReportsMissingAndLocalOnly() started.
+✔ Test missingCredentialReportsMissingAndLocalOnly() passed after 0.001 seconds.
+◇ Test apikeyModeHasAccountButNoAPIUsage() started.
+◇ Test networkErrorMapsToNetworkAndNeverRetries() started.
+✔ Test apikeyModeHasAccountButNoAPIUsage() passed after 0.007 seconds.
+◇ Test networkErrorRethrows() started.
+✔ Test testTouchResetsWindow() passed after 0.204 seconds.
+✔ Test testWaitReturnsOnlyAfterQuiesceWindow() passed after 0.204 seconds.
+✔ Suite DebounceTests passed after 0.206 seconds.
+✔ Test networkErrorMapsToNetworkAndNeverRetries() passed after 0.029 seconds.
+◇ Test malformedJSONOn200MapsToDecode() started.
+✔ Test networkErrorRethrows() passed after 0.029 seconds.
+◇ Test fetchUsageRejectsUnknownAccount() started.
+✔ Test fetchUsageRejectsUnknownAccount() passed after 0.002 seconds.
+✔ Suite CodexUsageAPITests passed after 0.226 seconds.
+✔ Test malformedJSONOn200MapsToDecode() passed after 0.006 seconds.
+◇ Test noAuthorizationHeaderWhenBearerIsNil() started.
+✔ Test noAuthorizationHeaderWhenBearerIsNil() passed after 0.006 seconds.
+✔ Suite HTTPClientTests passed after 0.236 seconds.
+✔ Test fetchUsageDegradesOn401And403() passed after 0.061 seconds.
+◇ Test successFalseThrowsTypedError() started.
+✔ Test successFalseThrowsTypedError() passed after 0.008 seconds.
+◇ Test successTrueWithNon200CodeThrowsTypedError() started.
+✔ Test jitterLowerBoundIsMinusTenPercent() passed after 0.257 seconds.
+✔ Test reregisterReplacesHandlerWithoutDoubleFiring() passed after 0.257 seconds.
+✔ Test successTrueWithNon200CodeThrowsTypedError() passed after 0.013 seconds.
+◇ Test networkErrorRethrows() started.
+✔ Test jitterUpperBoundIsPlusTenPercent() passed after 0.263 seconds.
+✔ Test networkErrorRethrows() passed after 0.006 seconds.
+◇ Test serverErrorRethrowsWithoutCredentialFallback() started.
+✔ Test "M1 por provider: ciclo concorrente do mesmo provider vira skip" passed after 0.283 seconds.
+✔ Test serverErrorRethrowsWithoutCredentialFallback() passed after 0.019 seconds.
+◇ Test fetchUsageToleratesNewTypesStringNumbersAndLossyEntries() started.
+✔ Test "provider degradado com throw no 1º ciclo permanece no heartbeat com erro" passed after 0.298 seconds.
+✔ Test fetchUsageToleratesNewTypesStringNumbersAndLossyEntries() passed after 0.014 seconds.
+✔ Suite ZaiUsageAPITests passed after 0.305 seconds.
+✔ Test pauseStopsAllFiresAndResumeFiresImmediately() passed after 0.307 seconds.
+✔ Test "wiring degradado: 4 providers no heartbeat v2, sem crash, credencial não vaza" passed after 0.325 seconds.
+✔ Suite ProviderCoordinatorTests passed after 0.326 seconds.
+✔ Test jitterAppliesToMenuInterval() passed after 0.361 seconds.
+✔ Test idleCadenceFiresEveryFiveMinutes() passed after 0.361 seconds.
+✔ Test singleFlightNeverRunsTwoFiresForSameProvider() passed after 0.362 seconds.
+✔ Test pressureBeatsMenuInterval() passed after 0.412 seconds.
+✔ Test pressureCadenceIsThirtySecondsWithBoundaryAtPointEight() passed after 0.412 seconds.
+✔ Test providersAreIndependent() passed after 0.412 seconds.
+✔ Test backoffGrowsFromCurrentIntervalEvenInMenuMode() passed after 0.463 seconds.
+✔ Test controlLinesParseBeforeAndAfterBattery() passed after 0.525 seconds.
+◇ Test finiteHugeDoublesDoNotTrapIntConversions() started.
+✔ Test finiteHugeDoublesDoNotTrapIntConversions() passed after 0.001 seconds.
+◇ Test codexAPIDecoderSurvivesHostilePayloads() started.
+✔ Test menuOpenedSwitchesToSixtySecondCadenceAndDecaysBackToIdle() passed after 0.566 seconds.
+✔ Test codexAPIDecoderSurvivesHostilePayloads() passed after 0.079 seconds.
+◇ Test zaiAPIDecoderSurvivesHostilePayloads() started.
+✔ Test hugeLineDoesNotCrash() passed after 0.683 seconds.
+✔ Suite ClaudeLineParserTests passed after 0.687 seconds.
+✔ Test zaiAPIDecoderSurvivesHostilePayloads() passed after 0.069 seconds.
+✔ Suite ParserFuzzTests passed after 0.703 seconds.
+✔ Test errorBackoffDoublesWithThirtyMinuteCeilingAndSuccessResets() passed after 0.995 seconds.
+✔ Suite SchedulerTests passed after 0.997 seconds.
+✔ Test run with 210 tests in 24 suites passed after 0.997 seconds.

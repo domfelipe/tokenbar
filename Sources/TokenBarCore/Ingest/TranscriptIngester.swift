@@ -168,6 +168,24 @@ public struct TranscriptIngester: Sendable {
                 pending += n
             }
             try drainOnce()  // conteúdo da última leitura
+            // Red Team T8 (P1, subconta silenciosa): o drainOnce acima pode
+            // ter só SAÍDO do modo skip (achou o \n que encerra a linha
+            // oversized) sem parsear a cauda — o fim do arquivo coincide com a
+            // saída do skip e as linhas seguintes se perdiam para sempre (o
+            // cursor já as consumia). Drena até esvaziar a janela. Sem \n à
+            // frente: skip consome o restante (cursor exato); linha
+            // incompleta em modo normal fica fora do cursor (semântica F1 —
+            // só \n-terminado é consumido).
+            while pending > 0 {
+                guard window[0..<pending].contains(UInt8(ascii: "\n")) else {
+                    if skipping {
+                        consumed += UInt64(pending)
+                        pending = 0
+                    }
+                    break
+                }
+                try drainOnce()
+            }
             // Encolheu sem nenhuma linha completa (ex.: truncado a 0): ainda
             // sinaliza o reset para o ledger zerar a soma daquele arquivo.
             if reset && !resetSignaled {

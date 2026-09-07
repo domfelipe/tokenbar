@@ -25,8 +25,24 @@ struct TokenBarApp: App {
     }
 
     var body: some Scene {
+        // Estilo .window: dá onAppear/onDisappear do painel — é assim que o
+        // wiring cumpre a spec §7 (fire imediato ao abrir, reafirmar enquanto
+        // aberto). Uma linha por provider ativo + Refresh + Quit.
         MenuBarExtra {
-            Text("TokenBar F1 — local mode")
+            VStack(alignment: .leading, spacing: 4) {
+                let lines = appState.store.menuLines
+                if lines.isEmpty {
+                    Text("TokenBar — sem dados ainda")
+                } else {
+                    ForEach(lines.indices, id: \.self) { index in
+                        Text(lines[index])
+                    }
+                }
+            }
+            .padding(10)
+            .frame(minWidth: 200, alignment: .leading)
+            .onAppear { appState.menuDidOpen() }
+            .onDisappear { appState.menuDidClose() }
             Divider()
             Button("Refresh now") {
                 Task { await appState.forceIngest() }
@@ -40,5 +56,6 @@ struct TokenBarApp: App {
         } label: {
             Text(appState.store.menuBarText)
         }
+        .menuBarExtraStyle(.window)
     }
 }

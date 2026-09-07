@@ -137,6 +137,47 @@ final class TranscriptIngesterTests: Sendable {
         #expect(elapsed < 1.0, "ingest de 10k levou \(elapsed)s")
     }
 
+    /// Red Team T8 (P1 NOVO, subconta silenciosa): linha maior que a janela de
+    /// streaming (262 KB) ativa o modo skip; quando o ARQUIVO TERMINA perto da
+    /// saída do skip, o drainOnce final só religa o modo normal e deixava a
+    /// cauda pendente SEM parsear — e o cursor consumiu os bytes: as linhas
+    /// seguintes se perdiam PARA SEMPRE (repro real: corpus com linha de 5 MB
+    /// zerava o total do arquivo; transcript com paste gigante subcontava).
+    @Test
+    func linesAfterOversizedLineAreStillCounted() throws {
+        let oversized = String(repeating: "a", count: 300_000)  // > windowSize (262_144)
+        try (oversized + "\nT42\nT43\n").write(to: dir.appendingPathComponent("ov.jsonl"), atomically: true, encoding: .utf8)
+        let ingester = TranscriptIngester(parseLine: countingParser)
+        let results = try ingester.ingestChangedFiles(under: dir, cursors: [:], makeEvent: identityTag)
+        #expect(results.count == 1)
+        #expect(results[0].newEvents.map(\.outputTokens) == [42, 43], "cauda após linha oversized é perdida")
+        let size = try FileManager.default.attributesOfItem(atPath: path("ov.jsonl"))[.size] as! Int64
+        #expect(Int(results[0].cursor.offset) == Int(size), "cursor cobre o arquivo inteiro")
+    }
+
+    /// Mesma família: múltiplas linhas na cauda pós-oversized dentro da MESMA
+    /// leitura final — todas têm de sobreviver.
+    @Test
+    func multipleLinesAfterOversizedLineSurvive() throws {
+        let oversized = String(repeating: "x", count: 500_000)
+        try (oversized + "\nT1\nT2\nT3\n").write(to: dir.appendingPathComponent("ov2.jsonl"), atomically: true, encoding: .utf8)
+        let ingester = TranscriptIngester(parseLine: countingParser)
+        let results = try ingester.ingestChangedFiles(under: dir, cursors: [:], makeEvent: identityTag)
+        #expect(results[0].newEvents.map(\.outputTokens) == [1, 2, 3])
+    }
+
+    /// Skip no fim do arquivo SEM \n depois da linha oversized: cursor exato,
+    /// sem loop e sem contar lixo.
+    @Test
+    func oversizedAtEOFWithoutTrailingNewlineKeepsCursorExact() throws {
+        let oversized = String(repeating: "y", count: 300_000)  // sem \n final
+        try oversized.write(to: dir.appendingPathComponent("ov3.jsonl"), atomically: true, encoding: .utf8)
+        let ingester = TranscriptIngester(parseLine: countingParser)
+        let results = try ingester.ingestChangedFiles(under: dir, cursors: [:], makeEvent: identityTag)
+        #expect(results[0].newEvents.isEmpty)
+        #expect(Int(results[0].cursor.offset) == 300_000, "cursor consome exatamente a linha descartada")
+    }
+
     // MARK: - Red Team caso 2: núcleo streaming (memória limitada por lote)
 
     /// Aceita "T<n>,<padding qualquer>" — permite linhas longas (arquivo > chunk)

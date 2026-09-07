@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import Observation
 import TokenBarCore
@@ -9,8 +10,8 @@ private final class ChangeCounter: @unchecked Sendable {
     var count = 0
 }
 
-// Tradução mecânica (RULING SDD-1) do brief XCTest → Swift Testing:
-// `import Testing`, @Test, #expect; render gate com @MainActor na função.
+// T7: display multi-provider (siglas D5, % vs tokens, ordem fixa, provider sem
+// dado some) + render gate por-provider do SnapshotStore + heartbeat v2.
 struct MenuBarContentTests {
     @Test
     func testAbbrevTokens() {
@@ -23,31 +24,132 @@ struct MenuBarContentTests {
         #expect(abbrevTokens(1_200_000_000) == "1.2G")
     }
 
+    // MARK: - Siglas D5
+
+    @Test
+    func testSiglasD5() {
+        #expect(MenuBarContent.sigla(for: .claude) == "C")
+        #expect(MenuBarContent.sigla(for: .codex) == "X")
+        #expect(MenuBarContent.sigla(for: .gemini) == "G")
+        #expect(MenuBarContent.sigla(for: .zai) == "Z")
+        // Fora da tabela: fallback prefix(1) maiúsculo (herança F1).
+        #expect(MenuBarContent.sigla(for: .openrouter) == "O")
+    }
+
+    // MARK: - String do menu bar
+
     @Test
     func testEmptyContentShowsPlaceholder() {
         #expect(MenuBarContent.empty.displayString() == "TB")
     }
 
     @Test
-    func testSingleProviderFormat() {
-        #expect(MenuBarContent(todayTokens: [.claude: 12_400]).displayString() == "C:12.4k")
+    func testSingleProviderTokens() {
+        let content = MenuBarContent(providers: [
+            .claude: ProviderDisplay(todayTokens: 12_400),
+        ])
+        #expect(content.displayString() == "C:12.4k")
     }
 
     @Test
-    func testMultipleProvidersFormat() {
-        // Brief original usava .codex, mas codex → "C" pela interface acordada
-        // (rawValue.prefix(1).uppercased()) — colidiria com claude. .openrouter
-        // preserva a string esperada do brief ("C:12.4k O:999").
-        let content = MenuBarContent(todayTokens: [.claude: 12_400, .openrouter: 999])
-        #expect(content.displayString() == "C:12.4k O:999")
+    func testPercentBeatsTokensWhenWindowKnown() {
+        // Provider com janela conhecida mostra % (D5), mesmo com tokens locais.
+        let content = MenuBarContent(providers: [
+            .codex: ProviderDisplay(percent: 62.4, todayTokens: 999),
+        ])
+        #expect(content.displayString() == "X:62%")
     }
+
+    @Test
+    func testTokensWhenNoWindow() {
+        let content = MenuBarContent(providers: [
+            .claude: ProviderDisplay(todayTokens: 12_400, source: .localOnly),
+            .gemini: ProviderDisplay(todayTokens: 3_100, source: .localOnly),
+        ])
+        #expect(content.displayString() == "C:12.4k G:3.1k")
+    }
+
+    @Test
+    func testFixedOrderClaudeCodexGeminiZai() {
+        // Ordem fixa C, X, G, Z — independe da ordem de inserção no dicionário.
+        let content = MenuBarContent(providers: [
+            .zai: ProviderDisplay(percent: 81),
+            .gemini: ProviderDisplay(todayTokens: 3_100),
+            .codex: ProviderDisplay(percent: 62),
+            .claude: ProviderDisplay(todayTokens: 12_400),
+        ])
+        #expect(content.displayString() == "C:12.4k X:62% G:3.1k Z:81%")
+    }
+
+    @Test
+    func testProviderWithoutDataDisappears() {
+        // Sem % e sem tokens → some da string (não vira "Z:0").
+        let content = MenuBarContent(providers: [
+            .claude: ProviderDisplay(todayTokens: 12_400),
+            .zai: ProviderDisplay(),  // sem dado nenhum (degradado)
+        ])
+        #expect(content.displayString() == "C:12.4k")
+        #expect(content.displayFragment(for: .zai) == nil)
+    }
+
+    @Test
+    func testCriticalWindowPicksHighestFraction() {
+        // Regra D5: janela com usedFraction mais próximo de 1 = mais crítica.
+        let windows = [
+            UsageWindow(kind: .weekly, usedFraction: 0.40, resetsAt: nil, label: "Semanal"),
+            UsageWindow(kind: .session, usedFraction: 0.62, resetsAt: nil, label: "5h"),
+        ]
+        let critical = criticalWindow(in: windows)
+        #expect(critical?.label == "5h")
+        #expect(criticalWindow(in: [UsageWindow(kind: .daily, usedFraction: nil, resetsAt: nil, label: "Hoje")]) == nil)
+        #expect(criticalWindow(in: []) == nil)
+    }
+
+    @Test
+    func testDisplayFragmentAndMenuLines() {
+        let content = MenuBarContent(providers: [
+            .codex: ProviderDisplay(
+                percent: 62, todayTokens: 0, authState: .ok, source: .api,
+                resetsAt: Date(timeIntervalSince1970: 7_200),  // "2h" a partir de 0
+                fetchedAt: Date(timeIntervalSince1970: 0)
+            ),
+            .claude: ProviderDisplay(
+                percent: nil, todayTokens: 12_400, authState: .ok, source: .localOnly,
+                resetsAt: Date(timeIntervalSince1970: 46_800),  // 13h
+                fetchedAt: Date(timeIntervalSince1970: 0)
+            ),
+            .zai: ProviderDisplay(),  // sem dado → sem linha
+        ])
+        let now = Date(timeIntervalSince1970: 0)
+        #expect(content.displayFragment(for: .codex) == "X:62%")
+        #expect(content.displayFragment(for: .claude) == "C:12.4k")
+        #expect(content.menuLines(now: now) == [
+            "C Claude: 12.4k hoje — reseta em 13h (local)",
+            "X Codex: 62% — reseta em 2h",
+        ])
+    }
+
+    @Test
+    func testResetSuffixBounds() {
+        let now = Date(timeIntervalSince1970: 0)
+        #expect(MenuBarContent.resetSuffix(from: now, to: now.addingTimeInterval(59)) == "reseta em 1min")
+        #expect(MenuBarContent.resetSuffix(from: now, to: now.addingTimeInterval(3_600)) == "reseta em 1h")
+        #expect(MenuBarContent.resetSuffix(from: now, to: now.addingTimeInterval(432_000)) == "reseta em 5d")
+        // Janela vencida → sem sufixo (nada a prometer).
+        #expect(MenuBarContent.resetSuffix(from: now, to: now.addingTimeInterval(-1)) == nil)
+    }
+
+    // MARK: - Render gate (SnapshotStore per-provider)
 
     @Test
     @MainActor
     func testRenderGateSkipsEqualContent() {
         let store = SnapshotStore()
-        let content = MenuBarContent(todayTokens: [.claude: 12_400])
+        let content = MenuBarContent(providers: [
+            .claude: ProviderDisplay(todayTokens: 12_400),
+        ])
         store.apply(content)
+        #expect(store.providers[.claude]?.todayTokens == 12_400)
 
         let counter = ChangeCounter()
         withObservationTracking {
@@ -59,14 +161,77 @@ struct MenuBarContentTests {
         #expect(store.menuBarText == "C:12.4k")
 
         // Conteúdo diferente mas mesma string renderizada (12_401 → "C:12.4k"):
-        // o runtime de Observation (darwin 25) suprime escrita de mesmo valor.
-        store.apply(MenuBarContent(todayTokens: [.claude: 12_401]))
+        // o gate compara a string — label não re-renderiza, estado atualiza.
+        let changedTokens = MenuBarContent(providers: [
+            .claude: ProviderDisplay(todayTokens: 12_401),
+        ])
+        store.apply(changedTokens)
         #expect(counter.count == 0)
         #expect(store.menuBarText == "C:12.4k")
+        #expect(store.providers[.claude]?.todayTokens == 12_401)
 
         // String exibida diferente → marca exatamente 1×.
-        store.apply(MenuBarContent(todayTokens: [.claude: 12_500]))
+        store.apply(MenuBarContent(providers: [
+            .claude: ProviderDisplay(todayTokens: 12_500),
+        ]))
         #expect(counter.count == 1)
         #expect(store.menuBarText == "C:12.5k")
+    }
+
+    @Test
+    @MainActor
+    func testMenuLinesExposePanelState() {
+        let store = SnapshotStore()
+        #expect(store.menuLines.isEmpty)
+        store.apply(MenuBarContent(providers: [
+            .zai: ProviderDisplay(percent: 81, authState: .ok, source: .api),
+        ]))
+        #expect(store.menuLines == ["Z Z.ai: 81%"])
+    }
+
+    // MARK: - Heartbeat v2
+
+    @Test
+    func testHeartbeatV2PayloadShape() throws {
+        let providers: [ProviderID: ProviderDisplay] = [
+            .claude: ProviderDisplay(todayTokens: 12_400, authState: .ok, fetchedAt: Date(timeIntervalSince1970: 1_700_000_000)),
+            .codex: ProviderDisplay(percent: 62, todayTokens: 0, authState: .ok, source: .api, fetchedAt: Date(timeIntervalSince1970: 1_700_000_000)),
+            .gemini: ProviderDisplay(),
+            .zai: ProviderDisplay(authState: .invalid),
+        ]
+        let payload = E2EHeartbeat.payload(
+            menuBarText: "C:12.4k X:62%",
+            providers: providers,
+            errors: [.zai: "unauthorized"],
+            now: Date(timeIntervalSince1970: 1_700_000_100)
+        )
+        let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+        let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+
+        #expect(json["menuBarText"] as? String == "C:12.4k X:62%")
+        #expect(json["updatedAt"] as? String == "2023-11-14T22:15:00Z")  // 1_700_000_100
+
+        let providersJSON = try #require(json["providers"] as? [String: Any])
+        #expect(Set(providersJSON.keys) == ["claude", "codex", "gemini", "zai"])
+
+        let claude = try #require(providersJSON["claude"] as? [String: Any])
+        #expect(claude["menuBar"] as? String == "C:12.4k")
+        #expect(claude["percent"] is NSNull)
+        #expect(claude["todayTokens"] as? Int64 == 12_400)
+        #expect(claude["authState"] as? String == "ok")
+
+        let codex = try #require(providersJSON["codex"] as? [String: Any])
+        #expect(codex["menuBar"] as? String == "X:62%")
+        #expect(codex["percent"] as? Int == 62)
+
+        let gemini = try #require(providersJSON["gemini"] as? [String: Any])
+        #expect(gemini["menuBar"] is NSNull)  // sem dado → null (degradado visível)
+        #expect(gemini["percent"] is NSNull)
+
+        let zai = try #require(providersJSON["zai"] as? [String: Any])
+        #expect(zai["authState"] as? String == "invalid")
+        #expect(zai["error"] as? String == "unauthorized")
+        // Chaves fixas por provider (contrato v2) + error opcional.
+        #expect(Set(zai.keys) == ["menuBar", "percent", "todayTokens", "authState", "fetchedAt", "error"])
     }
 }

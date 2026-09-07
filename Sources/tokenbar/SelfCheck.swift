@@ -3,27 +3,39 @@ import TokenBarCore
 import TokenBarProviders
 import TokenBarUI
 
+/// Selfcheck v2 (F2): um ciclo de CADA provider + snapshot das APIs —
+/// `{"menuBarText", "providers": {id: {menuBar, percent, todayTokens,
+/// authState, fetchedAt, error?}}, "updatedAt"}`.
+///
+/// - Bases de API honram `TOKENBAR_CODEX_API`/`TOKENBAR_ZAI_API`; SEM
+///   credencial não há request nenhum (degrada `.missing`, spec §5).
+/// - Stores de cursor em memória: o selfcheck nunca consome os arquivos do app
+///   (re-scan completo do dia, sem interferir nos cursores reais).
+/// - Erro de ciclo vira token curto por provider (`network`, `http`...) —
+///   nunca mensagem crua com URL/shape (spec §9).
 enum SelfCheck {
+    @MainActor
     static func run(arguments: [String]) async throws {
-        let dir = arguments.count > 1 ? arguments[1] : nil
-        let locator = dir.map { ClaudeTranscriptLocator(projectsDirectory: URL(filePath: $0)) }
-            ?? ClaudeTranscriptLocator.resolve()
-        let provider = ClaudeProvider(
-            projectsDirectory: locator.projectsDirectory,
-            offsetStore: SelfCheckOffsetStore(),
-            calendar: .current
-        )
-        let outcome = try await provider.ingestOnce(now: Date())
-        let content = MenuBarContent(todayTokens: outcome.providerTotals)
-        // ProviderID não faz bridge para NSString: JSONSerialization exige chaves String.
-        let todayTokens = [String: Int64](
-            uniqueKeysWithValues: outcome.providerTotals.map { ($0.key.rawValue, $0.value) }
-        )
-        let payload: [String: Any] = [
-            "menuBarText": content.displayString(),
-            "todayTokens": todayTokens,
-            "eventsApplied": outcome.eventsApplied,
-        ]
+        var environment = ProcessInfo.processInfo.environment
+        // Override clássico do selfcheck F1: dir de projects do Claude via argv.
+        // `arguments` já vem sem o nome do programa (dropFirst no main), então o
+        // token "selfcheck" em si é filtrado — usá-lo como caminho zera o scan.
+        if let dir = arguments.first(where: { $0 != "selfcheck" }) {
+            environment["TOKENBAR_CLAUDE_DIR"] = dir
+        }
+        let coordinator = ProviderCoordinator(config: ProviderCoordinatorConfig(
+            environment: environment,
+            home: URL(filePath: NSHomeDirectory()),
+            supportDirectory: FileManager.default.temporaryDirectory
+                .appendingPathComponent("tokenbar-selfcheck", isDirectory: true),
+            e2eDirectory: nil,
+            makeOffsetStore: { _ in SelfCheckOffsetStore() },
+            // Sem snapshot de ledger: o selfcheck é somente-leitura sobre o
+            // mundo real — nunca toca os arquivos do app (padrão dos cursores).
+            makeLedgerSnapshotStore: { _ in nil }
+        ))
+        await coordinator.refreshAllNow()
+        let payload = coordinator.diagnosticPayload()
         let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
         print(String(decoding: data, as: UTF8.self))
     }
