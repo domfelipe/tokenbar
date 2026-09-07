@@ -1,8 +1,10 @@
 # F2 — Relatório Red Team (Task 8, protocolo Simulador DomHubs)
 
-**Data:** 2026-09-03 · **Alvo:** branch `f2-codex-gemini-zai` · **Baseline antes da bateria:** 184 testes verdes (`./run-tests.sh`), E2E v2 15 PASS.
+**Data:** 2026-09-03 (bateria original) · **Revisado e completado:** 2026-09-07 (stream T8 retomado; worktree `t8-redteam`, branch `t8-redteam`)
 
 **Escopo:** bateria adversarial de 7 casos sobre os 3 parsers locais (Claude/Codex/Gemini), os 2 decoders de API (Codex/Z.ai), o transporte de credenciais, o scheduler com backoff, os stores de cursor/ledger e o orçamento de recursos multi-provider, conforme brief da T8 e spec `docs/specs/f2-data-sources.md` (§5 tolerância, §7 orçamento, §9 segurança).
+
+**Nota de continuidade:** este stream foi interrompido e retomado. O trabalho anterior (commits `34cd627`–`42d42e9` + WIP `0ea655e`) foi AUDITADO requisito por requisito: o que sobreviveu à auditoria está listado como PASS mantido; o que não sobreviveu foi corrigido com repro determinística. O commit `42d42e9` (sem review) recebeu veredicto próprio — ver Caso 7.
 
 ---
 
@@ -10,118 +12,136 @@
 
 | # | Caso | Resultado | Severidade | Fix | Teste de regressão |
 |---|------|-----------|------------|-----|--------------------|
-| 1 | Fuzz dos 3 parsers + decoders de API | **FIXED** | **P1** | `fa0ea40` | `nearInt64MaxComponentSumIsRejectedNotCrash` |
+| 1 | Fuzz dos 3 parsers + decoders de API | **FIXED ×3** | **P1 ×2 + P3** | `fa0ea40` (mantido), `0170edc`, `17001fa` | `nearInt64MaxComponentSum…`, `finiteHugeDoublesDoNotTrapIntConversions`, `linesAfterOversizedLineAreStillCounted` + 2 |
 | 2 | Credenciais: grep total, read-only, log stream | PASS | — | — | — |
-| 3 | 401/403/500 storm → backoff visível, sem retry storm | PASS (medido) | — | — | (coberto por `errorBackoffDoubles…` do scheduler) |
-| 4 | Mock cai no meio do ciclo → recupera quando volta | PASS | — | — | (e2e: degradação + selfcheck `network`) |
-| 5 | Offsets corrompidos nos 3 cursor files | **PASS + achado** | **P2** | `2dca544` | `lostCursorsInvalidateSnapshotNoDoubleCount` |
-| 6 | Corpus gigante multi-provider dentro do orçamento | PASS | — | — | — |
-| 7 | Restart mid-day subconta (pendência da T7) | **FIXED** | **P1 (UX/correção)** | `66558c7` + `2dca544` | 11 testes novos de snapshot/ledger |
+| 3 | 500-storm → backoff crescente, sem retry storm | PASS (refeito com contador) | — | — | `errorBackoffDoublesWithThirtyMinuteCeiling…` |
+| 4 | Mock cai no meio do ciclo → recupera quando volta | PASS | — | — | (e2e degradação + selfcheck `network`) |
+| 5 | Offsets corrompidos nos 3 cursor files | **PASS + achado** | **P2** | `2dca544` (mantido) | `lostCursorsInvalidateSnapshotNoDoubleCount` |
+| 6 | Corpus gigante multi-provider dentro do orçamento | PASS (refeito completo) | — | — | — |
+| 7 | Restart mid-day + validação do `42d42e9` | **FIXED** (42d42e9 parcial) | **P1** | `fbe82cb` | `staleTotalsWithSurvivingCursorsAreNotRestored` ×3 providers |
 
-**Suíte final: 199 testes verdes** (184 base + 15 regressões). E2E v2: 15 PASS, exit 0.
+**Achados novos da auditoria (fora dos 7 casos):**
+
+| Achado | Severidade | Fix |
+|---|---|---|
+| WIP `0ea655e` não compilava (`URL(filePath:isDirectory:)` não existe) | build quebrado | `03e845c` |
+| `42d42e9` não fechava o buraco que descrevia (stores acumulam cursores; stamp batia e o total morto voltava) — repro nos 3 providers | **P1** | `fbe82cb` |
+| Linha >262 KB (janela de streaming) no fim do arquivo → TODAS as linhas seguintes perdidas para sempre (subconta silenciosa; cursor consumia os bytes) | **P1** | `17001fa` |
+| `Int(Double)` com payload hostil (`number: 1e300`, `limit_window_seconds: ±1e300`) TRAPAVA (SIGTRAP) no Z.ai/Codex | **P1** | `0170edc` |
+| `FlexibleJSON.double` aceitava não-finito (`1e999`/`NaN`) → `nextResetTime` vazava `inf` como Date | P3 | `0170edc` |
+
+**Suíte final: 210 testes verdes** (184 base + 26 de F2, incl. 10 regressões novas desta auditoria). E2E v2: 15 PASS (log `e2e-2026-09-03.log`, 1 FAIL pré-fix documentado abaixo).
 
 ---
 
-## Caso 1 — Fuzz dos 3 parsers: FIXED (P1, crash)
+## Caso 1 — Fuzz dos 3 parsers + decoders: FIXED (P1 crash) + 2 achados novos
 
-**Ataque:** 3 corpora hostis (um por formato) com ~40 linhas venenosas cada — `Int64.max` em todos os campos de usage, negativos, `1e999`, strings no lugar de número, nulls, timestamps hostis (`not-a-date`, `9999-99-99`, mês 13), tipos errados no envelope, JSON de 200k níveis, unicode hostil (RTL/combining/emoji), JSON truncado, chaves duplicadas, linhas de 5–6 MB, bytes binários 0x00–0xFF — rodados via selfcheck, 3 rodadas. Em paralelo, os **decoders de API** (Codex `wham/usage`, Z.ai `quota/limit`) sob 3 shapes hostis rotativos via mock (tipos errados, `used_percent: "9e999"`, `reset_at` negativo, limits com elementos não-objeto e tipo desconhecido, payload de 3 MB).
+**Ataque (agora pino permanente):** suíte `ParserFuzzTests` — bytes 0x00–0xFF isolados e embutidos em JSON válido, JSON de 50k níveis, linha de ~5 MB nos prefilters dos 3 parsers, `1e999`/`Int64.max`/`min`/negativos/string/bool/null/`9e999` em cada campo numérico, envelopes com tipos errados, JSON truncado, chaves duplicadas, unicode hostil (RTL/combining/emoji/NUL), timestamps inválidos — nos 3 parsers de linha + 2 decoders de API, com linhas de controle legítimas antes/depois da bateria (parser corrompido deixa de contar). Rodada runtime: selfcheck real contra corpora hostis por provider (200k níveis, 5 MB, bytes crus) — 3 rodadas, exit 0, JSON válido, totais determinísticos.
 
-**Achado (pré-fix):** o app **crashava com SIGTRAP (exit 133)** nas 3 rodadas. Bisect: só o corpus Gemini crasha (Claude e Codex passam). Causa-raiz: `GeminiLineParser` compõe `output = output + thoughts + tool` com `+` comum **antes** do saneamento — três campos ~`Int64.max` estouram antes de chegar ao cap de 10^15 herdado da F1. O Codex não soma antes do cap; o Claude já tinha aritmética saturante da F1.
+**Achados:**
 
-**Fix (`fa0ea40`):** `TokenSums.saturatingSum` público; a composição do output Gemini usa soma saturante — linha hostil vira lixo rejeitado pelo cap, não trap.
+1. **P1 (pré-`fa0ea40`, mantido):** composição do output Gemini com `+` comum trapava com campos ~`Int64.max` (SIGTRAP, exit 133). Fix original revisado e correto (`TokenSums.saturatingSum` antes do saneamento).
+2. **P1 NOVO (`0170edc`):** `Int(Double)` TRAPA fora do range de Int — verificado isoladamente ("Fatal error: Double value cannot be converted to Int…"). Vetores: Z.ai `number: 1e300` com `percentage` válida (janela criada → label calculado → trap) e Codex `limit_window_seconds: ±1e300` (ambos os branches). A bateria anterior não cobriu valores FINITOS gigantes — `1e999` sozinho não revela (é não-finito e já era rejeitado).
+3. **P1 NOVO (`17001fa`):** linha maior que a janela de streaming (262 KB) + fim de arquivo = **todas as linhas seguintes do arquivo perdidas para sempre** — o `drainOnce` final saía do modo skip sem parsear a cauda e o cursor já havia consumido os bytes. Repro real: corpus Claude com linha de 5 MB → total 0; Codex 587→437. Segundo defeito da mesma família: skip no EOF sem `\n` à frente não consumia o restante (cursor preso atrás, trecho relido a cada ciclo).
+4. **P3 (`0170edc`):** `FlexibleJSON.double` aceitava não-finito; `nextResetTime: 1e999` vazava `Date(inf)` no snapshot (não crasha; lixo de diagnóstico). Corrigido junto (1 linha, mesmo helper).
 
-**Pós-fix:** 3 rodadas → `EXIT=0`, JSON válido, stderr vazio, totais determinísticos (só as linhas legítimas contam). Decoders de API: nenhum crash; respostas fora do contrato (`success ≠ true`) viram erro tokenizado (`ZaiAPIStatusError` → transiente); percentuais absurdos saturam no clamp 0–100 já especificado.
+**Fix:** `fa0ea40` (saturação Gemini, mantido); `0170edc` (FlexibleJSON finito + saturação antes de toda conversão `Int(Double)`); `17001fa` (drena a janela até esvaziar pós-leitura; linha incompleta em modo normal continua fora do cursor — semântica F1 preservada).
 
-**Regressão:** `nearInt64MaxComponentSumIsRejectedNotCrash` (vermelho antes do fix: a suíte morria com signal 5).
+**Regressões:** `nearInt64MaxComponentSumIsRejectedNotCrash` (pré-existente), `finiteHugeDoublesDoNotTrapIntConversions`, `linesAfterOversizedLineAreStillCounted`, `multipleLinesAfterOversizedLineSurvive`, `oversizedAtEOFWithoutTrailingNewlineKeepsCursorExact` — as três últimas vermelhas antes do fix.
+
+**Pós-fix (runtime):** 3 rodadas selfcheck → exit 0, JSON válido, **Codex 587 exato** (cauda sobrevive), Gemini 133 (linha com `"` embutida em byte cru rejeitada — correto), Claude 6.177.399 determinístico.
 
 ---
 
 ## Caso 2 — Credenciais: PASS
 
-- `grep -rniE` (padrões JWT `eyJ…`, `sk-…`, `Bearer <20+>`, `api_key/access_token` com valores longos, `ghp_`, `AKIA`) sobre `Sources/` + `scripts/` + `docs/` → **zero match real**; únicos valores presentes são `fake-token`/`fake-api-key` de fixtures.
-- **Read-only:** `CodexAuthReader` e `ZaiCredentialReader` não contêm nenhuma escrita (nenhum `Data.write`/`removeItem`); nenhum `print`/`NSLog`/`Logger` em `TokenBarProviders` nem no `UsageHTTPClient`.
-- **Log stream** (`log stream --predicate 'process == "tokenbar"'`, 45 s) durante app real com marcador único embutido no nome de transcript E nos valores das credenciais fake: 299 linhas capturadas (todas de frameworks), **0 ocorrências do marcador**, 0 ocorrências de `fake-token`/`fake-api-key`.
-- **Mock captura headers:** o mock do E2E loga o `Authorization` de cada request — só `Bearer fake-*` (fixtures fake, nada real p/ vazar).
-- **Heartbeat/selfcheck:** chaves por provider ⊆ `{menuBar, percent, todayTokens, authState, fetchedAt, error}` — sem paths, sem conteúdo, sem credencial; o `error` é token curto (`network`/`http`/`decode`), nunca mensagem crua com URL.
+- `grep -rniE` sobre `Sources/`+`Tests/`+`scripts/`+`docs/`: JWT (`eyJ…`), `sk-…`, `Bearer <20+>`, `ghp_`/`github_pat_`/`AKIA`/`xox[bpm]-`, e `access_token/apiKey/refresh_token` com literal longo → **zero match real**. Únicos literais: `fake-*` de fixtures (inventário no log de evidência).
+- **Read-only:** `CodexAuthReader`/`ZaiCredentialReader`/`UsageHTTPClient` — nenhuma escrita (`Data.write`/`removeItem`/`createFile`), nenhum `print`/`NSLog`/`Logger`; única entrada é `Data(contentsOf:)`.
+- **Heartbeat/selfcheck:** chaves por provider ⊆ `{menuBar, percent, todayTokens, authState, fetchedAt, error}`; `error` é token curto (`network`/`http`/`decode`/`unauthorized`) — sem paths, sem conteúdo, sem credencial.
+- E2E: mock loga o `Authorization` de cada request — só `Bearer fake-*` circula.
 
 ---
 
-## Caso 3 — 500 storm: PASS (backoff medido, sem retry storm)
+## Caso 3 — 500 storm: PASS (refeito com contador)
 
-**Ataque:** app real contra mock que responde **500 sempre** (mesma rota sintética), janela de observação de 780 s com log de timestamps por request (`docs/qa/evidence/f2-rt3-500storm-requests.log`).
+**Ataque:** app real contra mock `python3` respondendo **500 sempre** nas 2 rotas, com log por request (o log parcial de 4 linhas do stream interrompido foi refeito com contador e gaps — `docs/qa/evidence/f2-rt3-500storm-requests.log`).
 
-**Medição:**
+**Medição (janela de 31,6 min):**
 
-| Métrica | Valor |
+| Request do provider | Gap desde o anterior |
 |---|---|
-| Requests totais em 13 min | **4** (2 codex + 2 z.ai) — 1 por provider no burst inicial + 1 retry |
-| Gap inicial → 2º request | **673 s** (nominal 600 s = backoff ×2 do ocioso 300 s; +13 s de overshoot do harness sob carga) |
-| Max requests em janela de 10 s | 2 (o próprio burst inicial) |
+| #1 (burst inicial, C+Z) | — |
+| #2 | **+642 s** (nominal 600 = idle 300 ×2) |
+| #3 | **+1253 s** (nominal 1200 = 600 ×2) |
 
-**Conclusão:** sob erro persistente a cadência é ~1 request/11 min e decrescente (300→600→1200…, teto 30 min), nunca retry storm. O dobramento está pinado nos testes do scheduler (`errorBackoffDoublesWithThirtyMinuteCeilingAndSuccessResets`). 401/403 entram no mesmo caminho (`noteResult(ok: false)`; 401/403 com credencial dupla Z.ai tenta a 2ª credencial — no máximo 2 requests por ciclo, sem retry do mesmo request).
-
----
-
-## Caso 4 — Mock cai no meio do ciclo: PASS
-
-**Ataque (3 fases, app real + AX):**
-
-1. Mock no ar (X:42%, Z:81%) → heartbeat correto.
-2. `kill -9` no mock + Refresh via menu (AX) → **app vivo**, display mantém último estado bom (último-estado, nunca dado errado); o diagnóstico da degradação fica no selfcheck v2 (erro tokenizado `network` — mesmo instrumento do E2E).
-3. Mock de volta na MESMA porta com valores novos (55%/91%) + Refresh via menu → heartbeat **X:55% Z:91%** — recuperação provada por ciclo real (valores novos, não resíduo).
-
-Complemento do E2E: com o mock morto e SEM interação, o app segue vivo >60 s, heartbeat continua avançando via providers locais (Δ=+222 observado) e **0 requests** na janela (sem storm de reconexão).
+Backoff **crescente** visível (~1 request/provider a cada ~11–21 min), 0 retries do mesmo request, máximo de 2 requests em qualquer janela de 10 s (o próprio burst) — **sem retry storm**. O dobramento com teto de 30 min fica pinado no scheduler (`errorBackoffDoublesWithThirtyMinuteCeilingAndSuccessResets`). 401/403 entram no mesmo caminho (`noteResult(ok: false)`); Z.ai com credencial dupla tenta a 2ª (no máximo 2 requests por ciclo, sem retry do mesmo request).
 
 ---
 
-## Caso 5 — Offsets corrompidos nos 3 cursor files: PASS + achado (P2)
+## Caso 4 — Mock morre no meio do ciclo: PASS
 
-**Ataque:** com o app parado, corrupção direcionada dos 3 arquivos no App Support (entradas de paths de teste): Claude `offset = 18446744073709551615` (UInt64.max), Codex `offset = -1` (inválido p/ UInt64 → decode do arquivo inteiro falha → estado vazio), Gemini **arquivo inteiro como JSON lixo**. Relançamento e observação de 2 ciclos.
+**Ataque (app real, porta fixa, valores sintéticos):**
 
-**Resultado:** sem crash, sem loop; todos os providers re-ingestam e reproduzem os totais exatos (`C:1.8k X:260 G:193`); cursores regravados sãos (offset == tamanho real dos arquivos); 2º ciclo estável (caminho "inalterado").
+1. Mock no ar → heartbeat `C:2.2k X:42% Z:81%`.
+2. `kill -9` no mock + append de +222 no transcript Claude → **app vivo**, heartbeat avança via ciclo local (`C:2.4k`), **0 requests** na janela pós-morte (sem storm de reconexão), display mantém último estado bom.
+3. Mock de volta na **mesma porta** com valores NOVOS (55/91) → Z.ai recuperou no 1º ciclo (`Z:91%` — valor novo, não resíduo) e o Codex no próximo fire do cadenciamento normal (`X:55%` observado no poll de ~5 min).
 
-**Achado (P2, fix `2dca544`):** cursores perdidos + snapshot do ledger (fix do caso 7) = **dia contado em dobro** — o re-ingest completo re-aplicaria eventos sobre o total restaurado. Fix: o snapshot carrega um **stamp FNV-1a do estado dos cursores** no save; a restauração só vale se o stamp bater — store perdido/corrompido invalida o snapshot e o re-ingest reconstrói honestamente. Regressão: `lostCursorsInvalidateSnapshotNoDoubleCount`.
+O E2E cobre o mesmo cenário com degradação visível: erro tokenizado `network` no selfcheck v2 (mock morto), app vivo >60 s, heartbeat avançando via providers locais.
 
 ---
 
-## Caso 6 — Corpus gigante multi-provider: PASS (orçamento)
+## Caso 5 — Offsets corrompidos nos 3 cursor files: PASS + achado (P2, fix mantido)
 
-**Ataque:** ingest frio no app real de **119 MB** (Claude: 6 sessões × 60k linhas = 369k linhas com poison; Codex: 3 rollouts sintéticos × 50k linhas com 10k `token_count` cada; Gemini sintético), com `phys_footprint` amostrado por ~1 s durante o ingest.
+**Ataque (app real, stores isolados):** com o app parado — Claude `offset = 18446744073709551615` (UInt64.max), Codex `offset = -1` (inválido p/ UInt64 → decode do arquivo inteiro falha → estado vazio), Gemini **arquivo inteiro como JSON lixo**. Relançamento + 2 ciclos.
+
+**Resultado:** sem crash, sem loop; re-ingest completa reproduziu os totais exatos (`C=5045 X=800 G=238`); cursores regravados sãos — **offset == tamanho real dos 3 arquivos** (363/277/235 bytes), Gemini com `seenIDs` íntegro; 2º ciclo estável com os mesmos totais.
+
+**Achado (P2, fix `2dca544`, revisado e mantido):** cursores perdidos + snapshot do ledger = dia contado em dobro — o stamp FNV-1a do estado dos cursores no save invalida o snapshot quando o store muda, e o re-ingest reconstrói honestamente.
+
+---
+
+## Caso 6 — Corpus gigante multi-provider: PASS (orçamento, redo completo)
+
+**Ataque:** ingest frio no app real de **~107 MB / ~463k eventos** (Claude: genfixtures 6×60k linhas com poison = 342.729 eventos; Codex: 3 rollouts sintéticos ×10k `token_count`; Gemini: 3 sessões ×30k linhas-raiz), `phys_footprint` (vmmap) amostrado a cada ~0,7 s durante o ingest — log completo em `docs/qa/evidence/f2-rt6-footprint.log` (substitui o log parcial de 2 amostras do stream interrompido).
 
 | Métrica | Orçamento | Medido |
 |---|---|---|
-| Cold ingest até 1º heartbeat | — | **9,1 s** |
-| Footprint máximo durante ingest (amostrado) | ≤ 40 MB | **17,5 MB** |
-| Total do Codex vs verdade do gerador | exato | **186.000.000 == 186.000.000** (só `last_token_usage` — F2-CODEX-DELTA) |
-| Extrapolação linear p/ corpus real ~10 GB | — | **~13 min** (coerente com os ~11,5 min medidos na T7 sobre dados reais) |
+| Footprint máximo durante o ingest frio | ≤ 40 MB | **27,8 MB** (16,6 no launch → 27,8 com 3 ingests no mesmo processo; não escala com o arquivo) |
+| Cold ingest até o 1º heartbeat | — | **~10–11 s** (~10 MB/s) |
+| Codex vs verdade do gerador | exato | **152.058.268 == 152.058.268** (só `last_token_usage`, F2-CODEX-DELTA) |
+| Gemini vs verdade do gerador | exato | **241.670.003 == 241.670.003** |
+| Extrapolação linear p/ ~10 GB | — | **~17 min** (coerente com os ~11,5 min medidos na T7 sobre dados reais — o real é mais rápido por byte: linhas maiores, menos overhead de parse) |
 
-Memória bounded durante ingest frio confirmada (o streaming entrega lotes e descarta; o pico não escala com o arquivo — mesma conclusão da F1, agora com API + 3 providers no mesmo processo). Amostras: `docs/qa/evidence/f2-rt6-footprint.log`.
+Streaming bounded confirmado com API + 3 providers no mesmo processo: o pico de memória não cresce com o corpus (janela de 262 KB + eventos aplicados por lote e descartados) — o orçamento de 40 MB vale para 10 GB também.
 
 ---
 
-## Caso 7 — Restart mid-day subconta: FIXED (P1 de correção, pendência da T7)
+## Caso 7 — Restart mid-day + VEREDICTO sobre o `42d42e9`: FIXED
 
-**Reprodução (pré-fix, app real):** corpus com eventos de hoje → app ingere (`C:5.0k`, 4998) → kill → relança (mesmos cursores, nenhum evento novo) → heartbeat `C:0` — os totais de hoje só voltariam no rollover de meia-noite. Causa: cursores persistem, ledger é volátil.
+**Restart mid-day (app real, pós-auditoria):** corpus com verdade exata → run 1 `C=4998 X=800 G=238` → kill → relança → **`C=4998 X=800 G=238` imediatamente** (snapshot restaurado, cursores intactos) → evento novo +47 → `C=5045` (soma em cima, sem dobrar). O mecanismo do `66558c7`/`2dca544` (snapshot por arquivo, stamp de cursores, restore 1×/processo) está correto e pinado por 11 testes.
 
-**Fix (`66558c7`):** cada provider com ingest persiste um **snapshot do ledger do dia** (`<provider>-ledger.json`, por ARQUIVO com componentes de `TokenSums`), gravado **depois** dos cursores (ordem que evita dupla contagem em crash entre escritas), e o restaura **1× por processo** se o dia bater. Granularidade por arquivo preserva a auto-correção F1 contra truncamento. O selfcheck fica read-only (snapshot desativado).
+### Veredicto sobre `42d42e9` ("restauração de snapshot restrita aos paths do store de cursores"): **PARCIAL — o código é seguro, mas não faz o que a mensagem diz**
 
-**Achados colaterais corrigidos no mesmo pacote:**
-- `TokenLedger.currentDay` nascia do relógio real no init — 1º ciclo com `now` divergente do launch disparava `needsFullRescan` espúrio (re-scan completo; dobraria com o snapshot). Agora `currentDay` nasce `nil` e o 1º ciclo só registra o dia (`testFirstCycleRecordsDayWithoutSpuriousRescan`).
-- O stamp de cursores do caso 5 (`2dca544`) fecha o ciclo de integridade snapshot↔cursores.
-
-**Prova pós-fix (app real):** 1º run `C:5.0k` (4998) → kill → relança → `C:5.0k` (4998) imediatamente. Regressões: 6 testes de semântica do ledger + restart nos 3 providers + truncamento-pós-restore + snapshot corrompido + cursores perdidos.
+- **O que o commit faz:** adiciona `filtered(toExistingIn:)` (snapshot ⊆ cursores) + guard de vazio. Sob as invariantes atuais, esse critério só dispara com arquivo de snapshot plantado/órfão (defesa em profundidade legítima; pin `staleSnapshotPathsAreNotRestored` segue verde).
+- **O que NÃO faz:** o commit atribui a si o conserto do dobramento do e2e (C:4.0M→C:7.7M, G:193→G:386). Repro determinística provou o contrário: **o store de cursores ACUMULA paths e nunca poda** — o cursor do path velho sobrevive, o stamp do snapshot carimbado com ele BATE, o filtro mantém a entrada (o cursor existe!) e o total morto volta. Vermelho nos 3 providers: 4.003.330 / 4.003.777 / 4.000.238 em vez de 3330/377/238. Quem de fato isolou o e2e foi o `TOKENBAR_SUPPORT_DIR` (WIP `0ea655e`).
+- **Correção (`fbe82cb`):** `filtered(toExistingIn:underScanRoot:)` — só restaura o que (a) tem cursor vivo E (b) está sob a raiz de scan ATUAL do provider. Comparação resolve symlinks dos dois lados: o enumerator grava paths RESOLVIDOS (`/var`→`/private/var`) e `projectsDirectory.path` não-resolvido — sem isso o filtro derrubava o restore legítimo (quebrou `restartMidDayRestoresTodayTotals` durante o desenvolvimento; pinado).
+- **Regressões:** `staleTotalsWithSurvivingCursorsAreNotRestored` nos 3 providers (vermelhas pré-fix, verdes pós-fix); o restart legítimo continua coberto por `restartMidDayRestoresTodayTotals` ×3.
 
 ---
 
 ## Preocupações residuais (documentadas, sem ação na F2)
 
-1. **Restauração é "last-good honesta":** crash ENTRE a gravação dos cursores e a do snapshot (mesma janela de milissegundos por ciclo) deixa o snapshot um ciclo atrás — subconta até o próximo evento do dia (nunca superconta; a ordem escolhida garante isso). Sem correção barata além desta.
-2. **Stamp de cursor não cobre `seenIDs`:** se os cursores sobrevivem mas um `seenIDs` do Gemini se perde mantendo o offset, duplicatas reanexadas no tail já consumido não são re-dedupicadas. Janela mínima e auto-corrigida no rollover; monitorar.
-3. **Overshoot do sleep do scheduler sob carga** (~2% no gap de 673 s vs 660 s teórico): Task.sleep não é hard real-time; irrelevante para o orçamento.
-4. **Instâncias de teste compartilham o App Support** com a instalação real do usuário (o app não respeita `HOME` override no `NSHomeDirectory`) — os harnesses da T8 fizeram scrub das entradas `/tmp` dos stores reais ao fim de cada caso. Para F3: considerar env `TOKENBAR_SUPPORT_DIR` para isolamento limpo de testes.
+1. **Restauração é "last-good honesta":** crash ENTRE a gravação dos cursores e a do snapshot deixa o snapshot um ciclo atrás — subconta até o próximo evento do dia (nunca superconta; a ordem grava cursores → snapshot).
+2. **Stamp de cursor não cobre `seenIDs`:** se o cursor sobrevive mas um `seenIDs` do Gemini se perde mantendo o offset, duplicatas reanexadas no tail já consumido não são re-dedupicadas. Janela mínima, auto-corrigida no rollover; monitorar.
+3. **Stores de cursor/snapshot acumulam paths mortos** (nunca podam). Com o filtro por raiz de scan isso é só higienico (crescimento ~dezenas de bytes por path órfão), não corretivo. Para F3: podar entradas fora da raiz no rollover.
+4. **Path-spelling:** a comparação de raiz resolve symlinks; se a MESMA raiz for acessível por spellings não-equivalentes por symlink (raro), o restore degrada para last-good e se autocorrige no próximo evento (mesma classe do item 1).
+5. **Overshoot do sleep do scheduler sob carga** (~7% no gap de 642 s vs 600 s nominal): `Task.sleep` não é hard real-time; irrelevante para o orçamento.
+6. **Selfcheck sem overrides de API usa endpoints reais** se houver credencial na máquina (comportamento documentado do selfcheck — é um diagnóstico; mas harnesses devem SEMPRE sobrescrever `TOKENBAR_CODEX_API`/`TOKENBAR_ZAI_API`, como o e2e faz). Observado durante esta bateria e corrigido nos harnesses.
+7. **`TOKENBAR_SUPPORT_DIR` existe para testes/e2e** (WIP `0ea655e` + fix de compilação `03e845c`); o app sem a var continua no App Support real — correto para produção.
 
 ## Artefatos
 
-- Commits: `34cd627` (heartbeat v2 degradado), `ae65a92` (e2e v2), `66558c7` (snapshot do ledger), `fa0ea40` (saturação Gemini P1), `2dca544` (stamp de cursores), este relatório.
-- Evidências: `docs/qa/evidence/f2-rt3-500storm-requests.log`, `docs/qa/evidence/f2-rt6-footprint.log`, `docs/qa/evidence/f2-visual-ax-f2.md`.
-- Corpora: `/tmp/tb-rt1` (fuzz), `/tmp/tb-rt6` (gigante) — regeneráveis; removidos ao fim da T8.
+- **Commits deste stream (branch `t8-redteam`):** `03e845c` (build do WIP), `fbe82cb` (raiz de scan — veredicto 42d42e9), `0170edc` (traps Int(Double) + suíte de fuzz), `17001fa` (cauda pós-oversized) + docs/evidência (este commit).
+- **Mantidos após auditoria:** `fa0ea40` (saturação Gemini), `66558c7`/`2dca544` (snapshot do dia + stamp), `34cd627`/`ae65a92` (heartbeat v2 + e2e), `0ea655e` (TOKENBAR_SUPPORT_DIR, selfcheck v2, README/docs).
+- **Evidências:** `docs/qa/evidence/f2-rt3-500storm-requests.log` (refeito com contador), `docs/qa/evidence/f2-rt6-footprint.log` (redo completo), `docs/qa/evidence/e2e-2026-09-03.log` (inclui o FAIL C:15.7M que motivou a auditoria do snapshot), `docs/qa/evidence/run-tests-2026-09-03.log` + log final deste stream.
+- **Corpora:** `/tmp/t8-lab`, `/tmp/t8-storm` — regeneráveis; remover ao fim da T8.

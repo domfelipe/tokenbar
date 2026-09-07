@@ -132,10 +132,14 @@ public final class ClaudeProvider: Sendable, UsageProvider {
         let cursors = offsetStore.cursors()
         // Stamp dos cursores: store perdido/corrompido → NÃO restaura (o
         // re-ingest completo reconstrói o dia sem dobrar) — RT F2 caso 5.
-        // Filtro snapshot ⊆ cursores: entradas de paths que saíram do store
-        // são resíduo de outra corpus/instalação e não voltam — e2e T8 (P1).
+        // Filtro snapshot ⊆ cursores ∧ snapshot ⊆ raiz de scan: entradas de
+        // paths que saíram do store OU estão fora da raiz atual são resíduo de
+        // outro corpus/instalação e não voltam — e2e T8 (P1) + auditoria T8 do
+        // 42d42e9 (o cursor do path velho SOBREVIVE no store acumulado; sem o
+        // escopo da raiz o total morto voltava e dobrava o menu bar).
         if let store = ledgerSnapshotStore,
-           let snapshot = store.load()?.filtered(toExistingIn: cursors),
+           let snapshot = store.load()?.filtered(
+               toExistingIn: cursors, underScanRoot: projectsDirectory.path),
            !snapshot.files.isEmpty,
            snapshot.cursorStamp == LedgerSnapshotStamp.make(cursors) {
             ledger.restoreDay(snapshot, provider: .claude, now: now)

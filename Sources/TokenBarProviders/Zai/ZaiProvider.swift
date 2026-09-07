@@ -255,7 +255,12 @@ public final class ZaiProvider: Sendable, UsageProvider {
     /// dado inventado).
     static func windowLabel(_ kind: ZaiLimitKind, rawType: String?, unit: Int64?, number: Double?) -> String {
         if kind == .time, unit == 5, number == 1 { return "MCP" }
-        let count = number.map { max(1, Int($0.rounded())) } ?? 1
+        // Int(Double) trapa fora do range de Int (Red Team T8 P1: `number:
+        // 1e300` de payload hostil/bugado) — satura ANTES de converter.
+        let count = number.map { n -> Int in
+            guard n.isFinite else { return 1 }
+            return max(1, Int(min(max(n.rounded(), 0), 100_000)))
+        } ?? 1
         switch unit {
         case 3: return "\(count)h"
         case 1: return "\(count)d"

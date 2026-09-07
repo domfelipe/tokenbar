@@ -1,5 +1,32 @@
-1.7 16.6M
-3.4 16.9M
-5.0 16.9M
-6.8 17.3M
-8.5 17.5M
+# RT T8 caso 6 — footprint durante ingest Frio multi-provider (app real, redo completo do log parcial)
+# Corpus: Claude genfixtures 6 sessoes x 60k linhas (342.729 eventos, 79 MB, com poison)
+#         + Codex 3 rollouts sinteticos x 10k token_count (30k eventos, 12 MB)
+#         + Gemini 3 sessoes sinteticas x 30k linhas-raiz (90k eventos, 16 MB)
+# Total ~107 MB, 12 arquivos jsonl, ~463k eventos. TOKENBAR_SUPPORT_DIR isolado; APIs apontadas
+# para porta morta (sem rede). phys_footprint (vmmap --summary) amostrado a cada ~0,7 s durante o ingest frio.
+#
+# t (s) | phys_footprint
+   0.0 | 16.6M
+   2.6 | 16.9M
+   4.1 | 16.9M
+   5.6 | 17.3M
+   7.2 | 18.6M
+   8.7 | 27.7M
+  10.2 | 27.8M
+  11.8 | 27.8M
+#
+# Pico durante o ingest: 27.8M <= 40 MB (orcamento) — bounded; o pico NAO escala com o arquivo
+# (16.6M no launch -> 27.8M com os 3 ingests simultaneos no mesmo processo).
+#
+# Verdade do gerador vs medido (1o ciclo, restart mid-day desligado — selfcheck de verdade separado):
+#   Codex:  152.058.268 == 152.058.268 (EXATO; so last_token_usage, F2-CODEX-DELTA)
+#   Gemini: 241.670.003 == 241.670.003 (EXATO)
+#   Claude: 3.675.162.246 hoje (o gerador espalha ts nas ultimas 24 h; ~77% caem hoje —
+#           total do gerador 4.799.101.993; deterministico entre ciclos)
+#
+# Cold ingest ate o 1o heartbeat: ~10-11 s para 107 MB (~10 MB/s).
+# Extrapolação LINEAR para o scan real do Codex (~10 GB): ~10 GB / 10 MB/s = ~17 min
+#   (coerente com os ~11,5 min medidos na T7 sobre dados reais — mesma ordem;
+#    o real e mais rapido por linha maior/menos overhead de parse por byte).
+# Com o mesmo pico de 27.8M: memória NAO cresce com o corpus (streaming por janela de 262 KB +
+#   eventos aplicados por lote e descartados) — o orçamento de 40 MB vale para 10 GB também.

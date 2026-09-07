@@ -199,10 +199,12 @@ public final class CodexProvider: Sendable, UsageProvider {
         let cursors = offsetStore.cursors()
         // Stamp dos cursores: store perdido/corrompido → NÃO restaura (o
         // re-ingest completo reconstrói o dia sem dobrar) — RT F2 caso 5.
-        // Filtro snapshot ⊆ cursores: entradas de paths que saíram do store
-        // são resíduo de outra corpus/instalação e não voltam — e2e T8 (P1).
+        // Filtro snapshot ⊆ cursores ∧ snapshot ⊆ raiz de scan (auditoria T8
+        // do 42d42e9: o cursor do path velho sobrevive no store acumulado e o
+        // stamp bate — só o escopo da raiz impede o total morto de voltar).
         if let store = ledgerSnapshotStore,
-           let snapshot = store.load()?.filtered(toExistingIn: cursors),
+           let snapshot = store.load()?.filtered(
+               toExistingIn: cursors, underScanRoot: sessionsDirectory.path),
            !snapshot.files.isEmpty,
            snapshot.cursorStamp == LedgerSnapshotStamp.make(cursors) {
             ledger.restoreDay(snapshot, provider: .codex, now: now)
@@ -298,12 +300,16 @@ public final class CodexProvider: Sendable, UsageProvider {
         return UsageWindow(kind: kind, usedFraction: fraction, resetsAt: resetsAt, label: label)
     }
 
+    /// Int(Double) trapa fora do range de Int (Red Team T8 P1: payload hostil
+    /// com `limit_window_seconds: 1e300` ou negativo enorme) — satura ANTES de
+    /// converter; negativo/NaN não é janela → fallback canônico (5h).
     static func kindAndLabel(seconds: Double) -> (WindowKind, String) {
+        guard seconds.isFinite, seconds >= 0 else { return (.session, "5h") }
         if seconds <= 86_400 {
-            let hours = max(1, Int((seconds / 3_600).rounded()))
+            let hours = max(1, Int(min(seconds / 3_600, 24).rounded()))
             return (.session, hours == 5 ? "5h" : "\(hours)h")
         }
-        let days = max(1, Int((seconds / 86_400).rounded()))
+        let days = max(1, Int(min(seconds / 86_400, 365).rounded()))
         return (.weekly, days == 7 ? "Semanal" : "\(days)d")
     }
 
