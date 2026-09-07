@@ -145,3 +145,7 @@ Itens menores do ledger que não viraram decisão própria mas precisam de regis
 - **Tipo desconhecido + `unit 6` Z.ai (Task 5):** cai em `.daily` em vez de `.weekly`; o label cru (`u6`) compensa a imprecisão do kind — dado nunca descartado (emenda §7.2 da spec de fontes).
 - **1º scan Codex real (Task 7):** re-escaneia ~10 GB de sessões no primeiro ciclo (~11,5 min cold, estimado na T7; streaming/bounded). Orçamento real a medir na triagem final; restart mid-day já não amplifica (decisão 10).
 - **Validação ao vivo apiKey vs OAuth Z.ai:** o par embutido consultou o endpoint real com sucesso na T8, mas QUAL credencial foi aceita não é distinguível sem logar credencial (proibido) — validação isolada por tipo segue pendente, mitigada pelo fallback (decisão 8).
+
+## Scan de segurança pós-merge (Mimosa, 2026-09-07)
+
+Scan `scan-2026-09-07T21-52-08.029Z-b809e8c3d1e6` (depth normal): 4 findings "hardcoded credential" (high), todos em `scripts/e2e.sh:145-163` — **falsos positivos**: são os valores de fixture do mock server (`fake-token-e2e`, `fake-api-key-e2e`, `fake-token-e2e-selfcheck`, `fake-api-key-e2e-selfcheck`), cujos NOMES de campo JSON (`access_token`, `apiKey`) são parte do contrato das APIs mockadas. Zero segredo real (confirmado por grep duplo do final review). Aceitos como limitação do scanner estático com fixtures; se o ruído incomodar num futuro scan de release, renomear via construção indireta da string no heredoc.
