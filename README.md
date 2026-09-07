@@ -27,6 +27,22 @@ Behavior highlights: adaptive scheduler (idle 5 min, menu 60 s, pressure ≥ 80%
 ./scripts/e2e.sh               # full end-to-end: mock API server, 4 providers, degradation, resource budget
 ```
 
+## Environment overrides
+
+Every override is optional and intended for tests/e2e — a normal launch uses none of them.
+
+| Variable | What it redirects |
+|---|---|
+| `TOKENBAR_SUPPORT_DIR` | App Support directory holding per-provider state (`<provider>-cursors.json`, `<provider>-ledger.json`). Isolates tests/e2e from real state. |
+| `TOKENBAR_E2E_DIR` | Directory where the E2E heartbeat JSON (per-provider diagnostics) is written. |
+| `TOKENBAR_CLAUDE_DIR` | Claude Code `projects` transcript directory (default `~/.claude/projects`). |
+| `TOKENBAR_CODEX_DIR` | Codex rollout sessions directory (default `~/.codex/sessions`). |
+| `TOKENBAR_CODEX_AUTH` | Path of the Codex `auth.json` read for the API token (default `~/.codex/auth.json`). |
+| `TOKENBAR_CODEX_API` | Base URL of the Codex usage API — the canonical path `backend-api/wham/usage` is appended (default `https://chatgpt.com`). |
+| `TOKENBAR_ZAI_API` | Base URL of the Z.ai quota API — the canonical path `api/monitor/usage/quota/limit` is appended; the host also selects the region (default `https://api.z.ai`). |
+| `TOKENBAR_ZAI_CONFIG` | Path of the Z.ai `config.json` (apiKey + region, default `~/.zcode/v2/config.json`). |
+| `TOKENBAR_ZAI_AUTH` | Path of the Z.ai `credentials.json` (OAuth fallback token, default `~/.zcode/v2/credentials.json`). |
+
 ## Privacy
 
 Read-only on your CLI session files AND on credentials (`~/.codex/auth.json`, `~/.zcode/v2/config.json`, `~/.zcode/v2/credentials.json` — never written, never logged). No telemetry. The only network traffic is the usage query to each configured provider, with your token — which never appears in any log, heartbeat or artifact. Fixtures and tests use `fake-*` values only; the repo is public.

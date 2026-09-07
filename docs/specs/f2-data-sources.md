@@ -9,7 +9,7 @@ Resumo por provider:
 | Provider | Modo F2 | API de usage | Ingest local | Credencial |
 |---|---|---|---|---|
 | Codex (OpenAI/ChatGPT) | API + local | `GET https://chatgpt.com/backend-api/wham/usage` | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | `~/.codex/auth.json` → `.tokens.access_token` |
-| Z.ai (coding plan) | API | `GET https://api.z.ai/api/monitor/usage/quota/limit` | — (nenhum) | `~/.zcode/v2/credentials.json` → `oauth:zai:access_token` (ver §2.2) |
+| Z.ai (coding plan) | API | `GET https://api.z.ai/api/monitor/usage/quota/limit` | — (nenhum) | `~/.zcode/v2/config.json` → `options.apiKey` (1ª tentativa) · `~/.zcode/v2/credentials.json` → `oauth:zai:access_token` (fallback — ver §2.2 e emenda §7.1) |
 | Gemini CLI | Local only | — (fora do escopo; ver §3.6) | `~/.gemini/tmp/<projeto>/chats/session-*.jsonl` | sem uso em F2 |
 
 ---
@@ -223,9 +223,10 @@ Semântica dos campos (lógica do `zai.js`):
 
 | Resposta | Destino |
 |---|---|
-| `TOKENS_LIMIT`/`CREDIT_LIMIT` de janela **mais curta** (ordenar por minutos) | `UsageWindow(kind: .session, usedFraction: percentage/100, resetsAt: Date(ms: nextResetTime), label: "5h"/conforme janela)` |
-| `TOKENS_LIMIT`/`CREDIT_LIMIT` de janela **mais longa** | `UsageWindow(kind: .weekly, …)` |
-| `TIME_LIMIT` | Janela extra, `label: "MCP"` (kind: `.daily` como aproximação ou estender `WindowKind` — decisão da Task 5) |
+| `TOKENS_LIMIT`/`CREDIT_LIMIT` (qualquer janela; `unit ≠ 6`) | `UsageWindow(kind: .session, usedFraction: percentage/100, resetsAt: Date(ms: nextResetTime), label: "5h"/conforme janela)` *(emenda T8: o kind implementado decide por `unit`, não por "mais curta/mais longa" — ver §7.2)* |
+| `TOKENS_LIMIT`/`CREDIT_LIMIT`/`TIME_LIMIT` com `unit = 6` (semana) | `UsageWindow(kind: .weekly, …)` *(emenda T8: regra por unidade)* |
+| `TIME_LIMIT` | Janela extra, `label: "MCP"` quando `unit=5, number=1` (marcador mensal MCP); demais `TIME` → `.daily` com label por unidade *(emenda T8: decisão da Task 5 tomada — ver §7.2)* |
+| Tipo desconhecido | `.daily` com label cru (ex.: `UNKNOWN u99`), percentual exibido — nunca descartar *(emenda T8, §7.2)* |
 | `planName` | identidade/conta exibida |
 | `usageDetails` | detalhe por modelo (painel; opcional F2) |
 
