@@ -101,3 +101,47 @@ Complemento de `docs/decisoes-f1.md` (mesmo formato: contexto → decisão → c
 **Decisão:** `scripts/e2e.sh` sobe um mock `python3 http.server` com handler JSON embutido nas rotas canônicas (`/backend-api/wham/usage`, `/api/monitor/usage/quota/limit`), apontado via `TOKENBAR_CODEX_API`/`TOKENBAR_ZAI_API`, com credenciais 100% fake, log de requests (inclui o header Authorization — prova de que só fake circula), modo 500 por arquivo de controle para o Red Team e cenário de degradação (mock morto → app vivo, selfcheck diagnostica `network`).
 
 **Consequência:** E2E determinístico e sem rede externa; o orçamento de recursos da F1 (footprint ≤40 MB, CPU ≤0,5%) segue como gate. overrides `TOKENBAR_*_DIR` garantem que o teste nunca toca os diretórios reais do usuário.
+
+## Decisão 13: TOKENBAR_SUPPORT_DIR — isolamento do App Support (P1 do e2e)
+
+**Contexto:** cursores e snapshots do dia vivem no App Support (`~/Library/Application Support/TokenBar`). O e2e roda o app REAL com corpora descartáveis e os overrides `TOKENBAR_*_DIR` isolavam só as fontes de dados — o estado GRAVADO (cursores/ledger) continuava indo para o App Support real: cada run acumulava entradas de cursores e o snapshot do dia ressuscitava totais de runs anteriores (P1 aberto no e2e da T8).
+
+**Decisão:** env `TOKENBAR_SUPPORT_DIR` redireciona TODO o estado persistido do app — o diretório é injetado no `ProviderCoordinatorConfig` e a fábrica default grava `<provider>-cursors.json`/`<provider>-ledger.json` lá dentro (`AppState.swift`). Default sem a env segue o App Support real. O heartbeat do e2e usa diretório próprio e separado (`TOKENBAR_E2E_DIR`), porque é saída de diagnóstico, não estado.
+
+**Consequência:** testes/e2e/selfcheck nunca leem nem escrevem o estado real do usuário; runs ficam determinísticas entre si (sem ressurreição de snapshot). O app de produção não muda nada — a env simplesmente não existe fora de teste.
+
+## Decisão 14: scheduler API-driven vs file-driven
+
+**Contexto:** a F2 mistura providers de rede (Codex, Z.ai) e de arquivo (Claude, Gemini). Registrar todos no `AdaptiveScheduler` duplicaria ingest local (scheduler + FSEvents sobre o mesmo arquivo) ou impor cadência de rede a quem só lê disco; o contrário deixaria os API-driven sem reatividade.
+
+**Decisão:** só providers com capability `.apiUsage` (Codex, Z.ai) registram loop no scheduler (`ProviderCoordinator.start`). Claude e Gemini são file-driven: FSEvents → debounce 3 s → ciclo, com fallback poll de 15 min. TODO ciclo de qualquer provider roda ingest local + `fetchUsage` — a capability é gate de REDE (o `fetchUsage` de um local-only nunca gera request), não de chamada; por isso o menu/refresh chama o mesmo `cycle` para todos.
+
+**Consequência:** reatividade local por evento de arquivo sem polling agressivo; cadência adaptativa (menu 60 s, pressão 30 s, backoff) apenas onde há rede. Provider novo escolhe o modo pelas capabilities, sem wiring dedicado.
+
+## Decisão 15: menu estilo `.window` — wiring do menu-open (spec §7)
+
+**Contexto:** a spec §7 exige fire imediato ao abrir o painel (throttle 10 s) e reafirmação da cadência de menu enquanto ele estiver aberto. O `MenuBarExtra` em estilo padrão (`.menu`) não expõe `onAppear`/`onDisappear` — não há como o wiring saber que o menu abriu.
+
+**Decisão:** `.menuBarExtraStyle(.window)` no app (`TokenBarApp.swift`): os hooks alimentam `menuDidOpen`/`menuDidClose` no coordinator — fire imediato de todos os providers com throttle de 10 s e `noteMenuOpened` reafirmado a cada ciclo enquanto aberto (sob pressão ≥ 80%, os 30 s vencem o menu). O scheduler não faz isso sozinho — é obrigação do wiring (obrigação registrada no ledger na Task 3).
+
+**Consequência:** requisitos de menu-open cumpridos sem timer dedicado; o custo é o painel renderizado como janela (mais espaço para uma linha por provider — aceito).
+
+## Decisão 16: siglas D5 no menu bar — C · X · G · Z
+
+**Contexto:** quatro providers dividem uma única linha de menu bar; a decisão D5 do plano F2 ("Saída do menu bar") definiu siglas de uma letra e formato `<sigla>:<valor>` — percentual quando o provider tem janela de limite (API), tokens de hoje quando só local.
+
+**Decisão:** tabela D5 implementada em `MenuBarContent.siglas` (claude=C, codex=X, gemini=G, zai=Z — X para não colidir com C), ordem fixa C · X · G · Z em toda saída (menuBarText, linhas do painel, heartbeat v2). Provider sem dado (sem % e sem tokens) some da string; string vazia → "TB". Siglas dos providers futuros do plano (cursor=U, openrouter=O, copilot=P) ficam para quando entrarem em escopo — o fallback atual (`prefix(1)`) colidiria com C para cursor, registrado aqui de propósito.
+
+**Consequência:** mesma leitura em todas as superfícies (menu, painel, selfcheck); colisão futura evitada por decisão explícita, não por acidente.
+
+---
+
+## Minors e pendências registradas (triagem F2)
+
+Itens menores do ledger que não viraram decisão própria mas precisam de registro:
+
+- **Transição de cursor legado (Task 6):** cursor pré-F2 sem `seenIDs` semeia o dedupe Gemini vazio — a primeira ingest pós-upgrade conta 1× a mais, uma única vez; auto-corrige no rollover (dedupe volta dos `seenIDs` do novo cursor). Aceito: custo de uma leitura, sem dobrar permanente.
+- **Pareamento apiKey↔região Z.ai (Task 5):** `apiKey` sem `baseURL` na entrada do `config.json` pareia a região de outra entrada (`firstRegion`); refino de wiring, mitigado pela validação 401/403 + degradação visível.
+- **Tipo desconhecido + `unit 6` Z.ai (Task 5):** cai em `.daily` em vez de `.weekly`; o label cru (`u6`) compensa a imprecisão do kind — dado nunca descartado (emenda §7.2 da spec de fontes).
+- **1º scan Codex real (Task 7):** re-escaneia ~10 GB de sessões no primeiro ciclo (~11,5 min cold, estimado na T7; streaming/bounded). Orçamento real a medir na triagem final; restart mid-day já não amplifica (decisão 10).
+- **Validação ao vivo apiKey vs OAuth Z.ai:** o par embutido consultou o endpoint real com sucesso na T8, mas QUAL credencial foi aceita não é distinguível sem logar credencial (proibido) — validação isolada por tipo segue pendente, mitigada pelo fallback (decisão 8).
