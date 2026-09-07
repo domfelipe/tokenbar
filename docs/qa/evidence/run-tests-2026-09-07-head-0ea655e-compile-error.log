@@ -1,0 +1,134 @@
+Building for debugging...
+[0/14] Write sources
+[5/14] Write tokenbar-entitlement.plist
+[6/14] Write genfixtures-entitlement.plist
+[7/14] Write swift-version--1AB21518FC5DEDBE.txt
+[9/32] Compiling TokenBarCore TokenBarCore.swift
+[10/33] Compiling TokenBarCore TranscriptWatcher.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-qa/Sources/TokenBarCore/Watcher/TranscriptWatcher.swift:81:9: warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+79 |         ) else { return }
+80 |         stream = streamRef
+81 |         FSEventStreamScheduleWithRunLoop(streamRef, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+   |         `- warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+82 |         FSEventStreamStart(streamRef)
+83 |     }
+
+[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+[11/33] Compiling TokenBarCore AccountID.swift
+[12/33] Compiling TokenBarCore ProviderID.swift
+[13/33] Compiling TokenBarCore TokenSums.swift
+[14/33] Compiling TokenBarCore UsageEvent.swift
+[15/33] Emitting module TokenBarCore
+[16/33] Compiling TokenBarCore FileOffsetStore.swift
+[17/33] Compiling TokenBarCore LedgerSnapshot.swift
+[18/33] Emitting module genfixtures
+[19/33] Compiling genfixtures GenFixtures.swift
+[19/33] Write Objects.LinkFileList
+[21/33] Compiling TokenBarCore UsageProvider.swift
+[22/33] Compiling TokenBarCore TokenLedger.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-qa/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:122:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+120 |                     let tail = pending - idx - 1
+121 |                     if tail > 0 {
+122 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+123 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+124 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-qa/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:143:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+141 |                     let tail = pending - idx - 1
+142 |                     if tail > 0 {
+143 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+144 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+145 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-qa/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:198:9: warning: no calls to throwing functions occur within 'try' expression
+196 |     ) throws {
+197 |         var batch: [UsageEvent] = []
+198 |         try autoreleasepool {
+    |         `- warning: no calls to throwing functions occur within 'try' expression
+199 |             for lineData in segment.split(separator: UInt8(ascii: "\n")) {
+200 |                 let line = String(decoding: lineData, as: UTF8.self)
+[23/33] Compiling TokenBarCore TranscriptIngester.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-qa/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:122:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+120 |                     let tail = pending - idx - 1
+121 |                     if tail > 0 {
+122 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+123 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+124 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-qa/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:143:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+141 |                     let tail = pending - idx - 1
+142 |                     if tail > 0 {
+143 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+144 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+145 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-qa/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:198:9: warning: no calls to throwing functions occur within 'try' expression
+196 |     ) throws {
+197 |         var batch: [UsageEvent] = []
+198 |         try autoreleasepool {
+    |         `- warning: no calls to throwing functions occur within 'try' expression
+199 |             for lineData in segment.split(separator: UInt8(ascii: "\n")) {
+200 |                 let line = String(decoding: lineData, as: UTF8.self)
+[24/33] Compiling TokenBarCore UsageHTTPClient.swift
+[25/33] Compiling TokenBarCore ProviderRegistry.swift
+[26/33] Compiling TokenBarCore UsageSnapshot.swift
+[27/33] Compiling TokenBarCore FileCursor.swift
+[28/33] Compiling TokenBarCore AdaptiveScheduler.swift
+[29/45] Compiling TokenBarProviders ZaiCredentialReader.swift
+[30/45] Compiling TokenBarProviders TokenBarProviders.swift
+[31/45] Compiling TokenBarProviders GeminiSessionIngester.swift
+[32/45] Compiling TokenBarProviders GeminiProvider.swift
+[33/46] Compiling TokenBarProviders CodexSessionIngester.swift
+[34/46] Compiling TokenBarProviders CodexAuthReader.swift
+[34/46] Linking genfixtures
+[35/46] Applying genfixtures
+[37/46] Compiling TokenBarProviders CodexProvider.swift
+[38/46] Compiling TokenBarProviders ClaudeTranscriptLine.swift
+[39/46] Compiling TokenBarProviders ClaudeTranscriptLocator.swift
+[40/46] Emitting module TokenBarProviders
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-qa/Sources/TokenBarProviders/Claude/ClaudeLineParser.swift:20:13: warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 18 |     // Decoder reutilizado: criar um JSONDecoder por linha custa caro em corpus
+ 19 |     // grande (Red Team caso 2) — o uso é single-thread no ingest.
+ 20 |     private nonisolated(unsafe) static let decoder = JSONDecoder()
+    |             `- warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 21 | 
+ 22 |     /// ISO8601 "yyyy-MM-ddTHH:mm:ss[.frac][Z|±HH:MM]" parseado à mão: ~0,06 µs
+[41/46] Compiling TokenBarProviders ClaudeLineParser.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-qa/Sources/TokenBarProviders/Claude/ClaudeLineParser.swift:20:13: warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 18 |     // Decoder reutilizado: criar um JSONDecoder por linha custa caro em corpus
+ 19 |     // grande (Red Team caso 2) — o uso é single-thread no ingest.
+ 20 |     private nonisolated(unsafe) static let decoder = JSONDecoder()
+    |             `- warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 21 | 
+ 22 |     /// ISO8601 "yyyy-MM-ddTHH:mm:ss[.frac][Z|±HH:MM]" parseado à mão: ~0,06 µs
+[42/46] Compiling TokenBarProviders ClaudeProvider.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-qa/Sources/TokenBarProviders/Claude/ClaudeLineParser.swift:20:13: warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 18 |     // Decoder reutilizado: criar um JSONDecoder por linha custa caro em corpus
+ 19 |     // grande (Red Team caso 2) — o uso é single-thread no ingest.
+ 20 |     private nonisolated(unsafe) static let decoder = JSONDecoder()
+    |             `- warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 21 | 
+ 22 |     /// ISO8601 "yyyy-MM-ddTHH:mm:ss[.frac][Z|±HH:MM]" parseado à mão: ~0,06 µs
+[43/46] Compiling TokenBarProviders ZaiProvider.swift
+[44/52] Compiling TokenBarUI TokenBarUI.swift
+[45/52] Compiling TokenBarUI SnapshotStore.swift
+[46/52] Compiling TokenBarUI MenuBarContent.swift
+[47/52] Compiling TokenBarUI E2EHeartbeat.swift
+[48/52] Emitting module TokenBarUI
+[49/52] Compiling TokenBarUI ProviderCoordinator.swift
+[50/56] Emitting module tokenbar
+[51/56] Compiling tokenbar TokenBarApp.swift
+[52/56] Compiling tokenbar SelfCheck.swift
+[53/56] Compiling tokenbar AppState.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/.superpowers/wt/t8-qa/Sources/tokenbar/AppState.swift:23:26: error: incorrect argument label in call (have 'filePath:isDirectory:', expected 'fileURLWithPath:isDirectory:')
+21 |         // Support real e o snapshot do dia as ressuscita entre runs.
+22 |         let supportDir = env["TOKENBAR_SUPPORT_DIR"].map {
+23 |             let url = URL(filePath: $0, isDirectory: true)
+   |                          `- error: incorrect argument label in call (have 'filePath:isDirectory:', expected 'fileURLWithPath:isDirectory:')
+24 |             try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+25 |             return url
+EXIT=1
