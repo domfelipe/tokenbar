@@ -234,6 +234,36 @@ final class ClaudeProviderTests {
         #expect(outcome.providerTotals[.claude] == 3330, "resíduo de snapshot não entra no total")
     }
 
+    /// Red Team T8 (auditoria do fix 42d42e9): o critério "cursor tem de
+    /// existir" NÃO cobre o cenário real do e2e — o store de cursores ACUMULA
+    /// paths de corpora anteriores (nunca poda), então o cursor do path velho
+    /// sobrevive e o stamp BATE. Sem o escopo da raiz de scan, o total morto
+    /// (4M de outro corpus) volta no restore e dobra o menu bar
+    /// (C:4.0M→C:7.7M observado no e2e de 2026-09-03).
+    /// Regra: só restaura o que ainda é ESCANEADO (path sob a raiz atual).
+    @Test func staleTotalsWithSurvivingCursorsAreNotRestored() async throws {
+        try writeFixture()  // 3330
+        let cursors = SharedCursorStore()
+        let ledgerURL = dir.appendingPathComponent("claude-ledger.json")
+        // Path de um corpus ANTERIOR — fora da raiz atual, cursor ainda vivo.
+        let stalePath = "/tmp/tokenbar-e2e.anterior/corpus/session-0/velho.jsonl"
+        try cursors.set(FileCursor(offset: 123), for: stalePath)
+        // Snapshot carimbado com o store atual (stale incluso): stamp BATE.
+        let stale = LedgerSnapshot(
+            day: calendar.startOfDay(for: now),
+            files: [stalePath: TokenSums(input: 4_000_000)],
+            cursorStamp: LedgerSnapshotStamp.make(cursors.cursors())
+        )
+        JSONLedgerSnapshotStore(url: ledgerURL).save(stale)
+
+        let provider = ClaudeProvider(
+            projectsDirectory: dir, offsetStore: cursors, calendar: calendar,
+            ledgerSnapshotStore: JSONLedgerSnapshotStore(url: ledgerURL)
+        )
+        let outcome = try await provider.ingestOnce(now: now)
+        #expect(outcome.providerTotals[.claude] == 3330, "total de path fora da raiz de scan não volta no restore")
+    }
+
     @Test func corruptLedgerSnapshotIsIgnoredNotFatal() async throws {
         try writeFixture()
         let ledgerURL = dir.appendingPathComponent("claude-ledger.json")

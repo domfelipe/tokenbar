@@ -507,6 +507,37 @@ final class CodexProviderTests {
             .ingestLocal(CodexFixtures.localRef, from: IngestCursor(fileOffsets: cursors.cursors()), now: CodexFixtures.now)
         #expect(after.providerTotals[.codex] == 377)
     }
+
+    /// Red Team T8 (auditoria do fix 42d42e9): cursor de path FORA da raiz de
+    /// scan atual sobrevive no store (stores nunca podam) e o stamp do snapshot
+    /// carimbado com ele BATE — sem o escopo da raiz, o total morto volta no
+    /// restore (menu bar dobrava entre runs no e2e de 2026-09-03).
+    @Test func staleTotalsWithSurvivingCursorsAreNotRestored() async throws {
+        try writeRolloutFixture()  // 377
+        let cursors = InMemoryOffsetStore()
+        let ledgerURL = dir.appendingPathComponent("codex-ledger.json")
+        let stalePath = "/tmp/tokenbar-e2e.anterior/codex/rollout-velho.jsonl"
+        try cursors.set(FileCursor(offset: 99), for: stalePath)
+        let stale = LedgerSnapshot(
+            day: calendar.startOfDay(for: CodexFixtures.now),
+            files: [stalePath: TokenSums(input: 4_000_000)],
+            cursorStamp: LedgerSnapshotStamp.make(cursors.cursors())
+        )
+        JSONLedgerSnapshotStore(url: ledgerURL).save(stale)
+
+        let provider = CodexProvider(
+            sessionsDirectory: dir,
+            authReader: CodexAuthReader(authFileURL: dir.appendingPathComponent("auth-ausente.json")),
+            client: UsageHTTPClient(baseURL: URL(string: "https://codex.example.com")!),
+            offsetStore: cursors,
+            calendar: calendar,
+            ledgerSnapshotStore: JSONLedgerSnapshotStore(url: ledgerURL)
+        )
+        let outcome = try await provider.ingestLocal(
+            CodexFixtures.localRef, from: IngestCursor(fileOffsets: cursors.cursors()), now: CodexFixtures.now
+        )
+        #expect(outcome.providerTotals[.codex] == 377, "total de path fora da raiz de scan não volta no restore")
+    }
 }
 
 // MARK: - CodexProvider (usage API via stub)

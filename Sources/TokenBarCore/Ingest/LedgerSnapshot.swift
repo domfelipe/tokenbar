@@ -28,13 +28,29 @@ public struct LedgerSnapshot: Sendable, Equatable {
         self.cursorStamp = cursorStamp
     }
 
-    /// Restringe o snapshot aos paths que AINDA EXISTEM no store de cursores
-    /// (Red Team/e2e T8, P1: o arquivo de snapshot acumula entradas de
-    /// corpora/instalações anteriores; restaurar entradas cujo cursor sumiu
-    /// ressuscita totais de paths que não são mais escaneados — a regra é
-    /// snapshot ⊆ cursores).
-    public func filtered(toExistingIn cursors: [String: FileCursor]) -> LedgerSnapshot {
-        let alive = files.filter { cursors[$0.key] != nil }
+    /// Restringe o snapshot aos paths que (a) AINDA EXISTEM no store de
+    /// cursores e (b) estão sob a RAIZ DE SCAN ATUAL do provider.
+    ///
+    /// (a) Red Team/e2e T8 (P1): o arquivo de snapshot acumula entradas de
+    ///     corpora/instalações anteriores; restaurar entradas cujo cursor sumiu
+    ///     ressuscita totais de paths que não são mais escaneados.
+    /// (b) Red Team T8, auditoria do 42d42e9: o critério (a) sozinho NÃO cobre
+    ///     o cenário do e2e — o store de cursores ACUMULA paths (nunca poda),
+    ///     então o cursor do path velho sobrevive e o stamp do snapshot
+    ///     carimbado com ele BATE; só o escopo da raiz impede que o total morto
+    ///     volte (menu bar dobrava entre runs: C:4.0M→C:7.7M, G:193→G:386).
+    public func filtered(toExistingIn cursors: [String: FileCursor], underScanRoot root: String) -> LedgerSnapshot {
+        // Os paths nos cursores/snapshot vêm do enumerator do scan, que RESOLVE
+        // symlinks da raiz (ex.: /var → /private/var) — os dois lados passam
+        // por `resolvingSymlinksInPath` para a comparação ser de verdade.
+        let resolvedRoot = URL(fileURLWithPath: root, isDirectory: true)
+            .resolvingSymlinksInPath().path
+        let prefix = resolvedRoot.hasSuffix("/") ? resolvedRoot : resolvedRoot + "/"
+        let alive = files.filter { path, _ in
+            guard cursors[path] != nil else { return false }
+            let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+            return resolved == resolvedRoot || resolved.hasPrefix(prefix)
+        }
         return LedgerSnapshot(day: day, files: alive, cursorStamp: cursorStamp)
     }
 }

@@ -486,4 +486,31 @@ final class GeminiProviderTests {
         )
         #expect(after.providerTotals[.gemini] == 238)
     }
+
+    /// Red Team T8 (auditoria do fix 42d42e9): cursor de path FORA da raiz de
+    /// scan atual sobrevive no store (stores nunca podam) e o stamp do snapshot
+    /// carimbado com ele BATE — sem o escopo da raiz, o total morto volta no
+    /// restore (menu bar dobrava entre runs no e2e de 2026-09-03).
+    @Test func staleTotalsWithSurvivingCursorsAreNotRestored() async throws {
+        try writeMixedSession()  // 238
+        let cursors = InMemoryOffsetStore()
+        let ledgerURL = dir.appendingPathComponent("gemini-ledger.json")
+        let stalePath = "/tmp/tokenbar-e2e.anterior/gemini/tmp/proj/chats/session-velha.jsonl"
+        try cursors.set(FileCursor(offset: 77), for: stalePath)
+        let stale = LedgerSnapshot(
+            day: calendar.startOfDay(for: GeminiFixtures.now),
+            files: [stalePath: TokenSums(input: 4_000_000)],
+            cursorStamp: LedgerSnapshotStamp.make(cursors.cursors())
+        )
+        JSONLedgerSnapshotStore(url: ledgerURL).save(stale)
+
+        let provider = GeminiProvider(
+            geminiDirectory: dir, offsetStore: cursors, calendar: calendar,
+            ledgerSnapshotStore: JSONLedgerSnapshotStore(url: ledgerURL)
+        )
+        let outcome = try await provider.ingestLocal(
+            GeminiFixtures.localRef, from: IngestCursor(fileOffsets: cursors.cursors()), now: GeminiFixtures.now
+        )
+        #expect(outcome.providerTotals[.gemini] == 238, "total de path fora da raiz de scan não volta no restore")
+    }
 }
