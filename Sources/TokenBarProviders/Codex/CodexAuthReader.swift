@@ -148,8 +148,12 @@ enum FlexibleJSON {
 
     static func double(_ c: KeyedDecodingContainer<AnyKey>, _ keys: String...) -> Double? {
         for key in keys {
-            if let v = try? c.decode(Double.self, forKey: AnyKey(key)) { return v }
-            if let s = try? c.decode(String.self, forKey: AnyKey(key)), let v = Double(s) { return v }
+            // Só valores FINITOS (Red Team T8, P1): `1e999`/`NaN`/`Infinity`
+            // decodificam para Double não-finito e, mais adiante, conversões
+            // Int(Double) em quem consome (labels/kind) TRAPAM. Não-finito é
+            // lixo de payload hostil/bugado → tratado como ausente.
+            if let v = try? c.decode(Double.self, forKey: AnyKey(key)), v.isFinite { return v }
+            if let s = try? c.decode(String.self, forKey: AnyKey(key)), let v = Double(s), v.isFinite { return v }
         }
         return nil
     }

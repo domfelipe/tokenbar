@@ -300,12 +300,16 @@ public final class CodexProvider: Sendable, UsageProvider {
         return UsageWindow(kind: kind, usedFraction: fraction, resetsAt: resetsAt, label: label)
     }
 
+    /// Int(Double) trapa fora do range de Int (Red Team T8 P1: payload hostil
+    /// com `limit_window_seconds: 1e300` ou negativo enorme) — satura ANTES de
+    /// converter; negativo/NaN não é janela → fallback canônico (5h).
     static func kindAndLabel(seconds: Double) -> (WindowKind, String) {
+        guard seconds.isFinite, seconds >= 0 else { return (.session, "5h") }
         if seconds <= 86_400 {
-            let hours = max(1, Int((seconds / 3_600).rounded()))
+            let hours = max(1, Int(min(seconds / 3_600, 24).rounded()))
             return (.session, hours == 5 ? "5h" : "\(hours)h")
         }
-        let days = max(1, Int((seconds / 86_400).rounded()))
+        let days = max(1, Int(min(seconds / 86_400, 365).rounded()))
         return (.weekly, days == 7 ? "Semanal" : "\(days)d")
     }
 
