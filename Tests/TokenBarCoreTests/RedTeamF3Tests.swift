@@ -69,7 +69,7 @@ final class RedTeamF3Tests {
         // queries consomem para degradar em modo F2. Número nunca é inventado.
         let reopened = try? AppDatabase.open(at: databaseURL)
         let count = reopened.flatMap { try? $0.usageEventCount() }
-        #expect(count == nil || count == 200)
+        #expect(count == nil || count == 500)
     }
 
     // MARK: - Caso 4: re-semeadura stale (rename falho persistente)

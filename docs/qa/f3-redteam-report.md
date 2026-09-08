@@ -2,7 +2,7 @@
 
 **Data:** 2026-09-08
 **Escopo:** bateria adversarial de 7 casos sobre a camada de persistência F3 (SQLite/GRDB, migração de cursores, marca d'água de persistência, export CSV/JSON, queries de leitura) e o orçamento de recursos com o banco aberto, conforme brief da T5. Superfície F2 (parsers, decoders, credenciais, scheduler) já batida em `docs/qa/f2-redteam-report.md` — re-ataques só onde a F3 mudou o caminho (ingest agora persiste; stores de cursor agora moram no DB).
-**Método:** cada caso com (a) regressão pinada na suíte quando automatizável e (b) runtime com o app real quando a prova é de sistema. Evidência bruta: `docs/qa/evidence/f3-redteam-runtime.log` (bateria runtime, 21 PASS / 0 FAIL).
+**Método:** cada caso com (a) regressão pinada na suíte quando automatizável e (b) runtime com o app real quando a prova é de sistema. Evidência bruta: `docs/qa/evidence/f3-redteam-runtime.log` (bateria runtime, 21 PASS / 0 FAIL). **Nota de evidência:** totais de tokens/custo e timings variam entre rodadas (o corpus do genfixtures é relativo ao instante de geração e o agendamento da máquina varia); a evidência autoritativa é o log commitado — os números citados neste relatório são os dele.
 
 ---
 
