@@ -98,3 +98,8 @@ Itens menores do ledger que não viraram decisão própria mas precisam de regis
 - Suíte: **304 testes / 37 suítes verdes** (`./run-tests.sh`) — 296 base + 1 pin do fix T4 + 7 Red Team (4 `RedTeamF3Tests` + 2 `CoordinatorRedTeamTests` + 1 pin... detalhamento no `f3-redteam-report.md`).
 - E2E v3: **39 checks PASS, exit 0** (log integral em `docs/qa/evidence/e2e-f3-2026-09-08.log`).
 - Red Team runtime: log integral em `docs/qa/evidence/f3-redteam-runtime.log` (21 PASS / exit 0).
+
+## Minors registrados no final review (2026-09-08)
+
+- **Truncamento com rewrite duplica eventos no DB** (caso patológico): o ledger corrige o display, mas o DB não "des-soma" — limitação documentada no contrato de `UsageEventPersisting`; entrada na lista de minors p/ F4.
+- **Período "24h" = dia-calendário de hoje** (não janela rolante de 24h): decisão racional porque a persistência é diária; documentada aqui para não ser lida como bug.
