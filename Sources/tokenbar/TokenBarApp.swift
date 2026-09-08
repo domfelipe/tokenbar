@@ -37,10 +37,16 @@ struct TokenBarApp: App {
         // wiring cumpre a spec §7 (fire imediato ao abrir, reafirmar enquanto
         // aberto). F4: painel rico (abas por provider com logo, barras de
         // janela com countdown, pacing, custos e chart 30d) no lugar da lista
-        // de texto; ações preservadas. "Add account…" é o scaffold da Task 3.
+        // de texto; ações preservadas; multi-conta (F4 Task 3) com seção de
+        // contas por aba e item "Add account…".
         MenuBarExtra {
             VStack(alignment: .leading, spacing: 8) {
-                ProviderPanelView(store: appState.store)
+                // F4 Task 3: painel recebe o modelo de contas + ação de abrir
+                // o formulário de add-account (janela própria).
+                ProviderPanelView(
+                    store: appState.store,
+                    accounts: appState.accountsModel,
+                    addAccountAction: { appState.showAddAccount(for: $0) })
                 Divider()
                 Button("Refresh now") {
                     Task { await appState.forceIngest() }
@@ -56,10 +62,18 @@ struct TokenBarApp: App {
                 Button("Export history…") {
                     Task { await appState.exportHistory() }
                 }
-                // F4 Task 3: multi-conta — por ora o item existe e está
-                // desabilitado (o registry ainda não foi entregue).
-                Button("Add account…") {}
-                    .disabled(true)
+                // F4 Task 3: multi-conta — abre o form para o provider da aba
+                // selecionada (ou o primeiro com suporte). Sem DB (degradação
+                // F2) ou sem suporte → item oculto (honesto: nada a registrar).
+                if appState.accountsModel.registry != nil {
+                    Button("Add account…") {
+                        let target = appState.store.selectedProvider
+                            ?? appState.accountsModel.multiAccountProviders.sorted { $0.rawValue < $1.rawValue }.first
+                        if let target {
+                            appState.showAddAccount(for: target)
+                        }
+                    }
+                }
                 Divider()
                 Button("Quit TokenBar") {
                     appState.stop()

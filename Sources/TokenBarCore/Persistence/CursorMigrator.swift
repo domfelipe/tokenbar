@@ -44,7 +44,7 @@ public enum CursorMigrator {
                 for (path, cursor) in cursors {
                     try db.execute(
                         sql: "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
-                        arguments: [highWaterKey(provider: provider, path: path), String(cursor.offset)])
+                        arguments: [highWaterKey(provider: provider, accountKey: nil, path: path), String(cursor.offset)])
                 }
             }
         } catch {

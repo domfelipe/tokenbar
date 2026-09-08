@@ -98,8 +98,17 @@ public final class CodexProvider: Sendable, UsageProvider {
 
     public static let userAgent = "TokenBar/\(ProvidersInfo.version)"
 
-    public var account: AccountID { AccountID(provider: .codex, key: "local") }
-    public var accountRef: AccountRef { AccountRef(id: account, label: "local") }
+    public var account: AccountID { AccountID(provider: .codex, key: accountKey) }
+    public var accountRef: AccountRef { AccountRef(id: account, label: accountKey == "local" ? "local" : label) }
+
+    /// Key da conta que ESTA instância serve ("local" na canônica; contas
+    /// registradas recebem instância própria no wiring — F4).
+    public let accountKey: String
+    /// Label de exibição da conta registrada (igual ao key em instâncias locais).
+    private let label: String
+    /// Registry multi-conta (F4): presente na instância canônica, alimenta a
+    /// descoberta MERGE. `nil` = comportamento F2.
+    private let accounts: AccountRegistry?
 
     private let sessionsDirectory: URL
     private let authReader: CodexAuthReader
@@ -119,7 +128,10 @@ public final class CodexProvider: Sendable, UsageProvider {
         offsetStore: any FileOffsetStoring,
         calendar: Calendar,
         ledgerSnapshotStore: (any LedgerSnapshotStoring)? = nil,
-        persisting: (any UsageEventPersisting)? = nil
+        persisting: (any UsageEventPersisting)? = nil,
+        accountKey: String = "local",
+        label: String = "local",
+        accounts: AccountRegistry? = nil
     ) {
         self.sessionsDirectory = sessionsDirectory
         self.authReader = authReader
@@ -129,8 +141,11 @@ public final class CodexProvider: Sendable, UsageProvider {
         self.persisting = persisting
         self.ledger = TokenLedger(calendar: calendar)
         self.calendar = calendar
+        self.accountKey = accountKey
+        self.label = label
+        self.accounts = accounts
         self.sessionIngester = CodexSessionIngester(
-            account: AccountID(provider: .codex, key: "local"),
+            account: AccountID(provider: .codex, key: accountKey),
             modelTracker: CodexModelTracker()
         )
     }
@@ -154,11 +169,20 @@ public final class CodexProvider: Sendable, UsageProvider {
 
     public var id: ProviderID { .codex }
 
-    public var capabilities: ProviderCapabilities { [.apiUsage, .localIngest] }
+    /// F4: `.multiAccount` — auth files registrados ganham instância própria
+    /// no wiring (a planilha de teste usa 2 auth files via paths registrados).
+    public var capabilities: ProviderCapabilities { [.apiUsage, .localIngest, .multiAccount] }
 
-    /// 1 conta de `auth.json` presente; sem credencial decodificável → [].
+    /// Descoberta MERGE (F4): auto (`auth.json` presente) + contas ATIVAS do
+    /// registry, dedupe por key. Falha de leitura do registry → só as auto.
     public func discoverAccounts() async -> [AccountRef] {
-        authReader.read() == nil ? [] : [accountRef]
+        var refs: [AccountRef] = authReader.read() == nil ? [] : [accountRef]
+        guard let accounts else { return refs }
+        let registered = (try? accounts.activeAccounts(provider: .codex)) ?? []
+        for entry in registered where !refs.contains(where: { $0.id.key == entry.accountKey }) {
+            refs.append(AccountRef(id: AccountID(provider: .codex, key: entry.accountKey), label: entry.label))
+        }
+        return refs
     }
 
     public func fetchUsage(_ account: AccountRef) async throws -> UsageSnapshot {

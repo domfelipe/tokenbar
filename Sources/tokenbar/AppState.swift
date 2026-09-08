@@ -17,6 +17,9 @@ private let appLog = Logger(subsystem: "dev.domhubs.TokenBar", category: "app")
 @MainActor
 final class AppState: NSObject, NSWindowDelegate {
     private let coordinator: ProviderCoordinator
+    /// Gerenciamento de contas (F4): registry do coordinator + providers com
+    /// suporte. Mutação → refresh imediato (painel reflete na hora).
+    let accountsModel: AccountsModel
 
     var store: SnapshotStore { coordinator.store }
 
@@ -33,16 +36,26 @@ final class AppState: NSObject, NSWindowDelegate {
             try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             return url
         }
-        coordinator = ProviderCoordinator(config: ProviderCoordinatorConfig(
+        // Locais primeiro: closures abaixo capturam a constante, não self
+        // (self só é utilizável após super.init — NSObject).
+        let coord = ProviderCoordinator(config: ProviderCoordinatorConfig(
             environment: env,
             home: URL(filePath: NSHomeDirectory()),
             supportDirectory: supportDir,
             e2eDirectory: e2eDir
         ))
+        coordinator = coord
+        let multiAccount = Set(ProviderID.allCases.filter { coord.supportsMultiAccount($0) })
+        accountsModel = AccountsModel(
+            registry: coord.accountRegistry,
+            multiAccountProviders: multiAccount)
         super.init()  // NSObject: antes de qualquer uso de self (delegates)
+        accountsModel.onMutation = { [weak self] in
+            guard let self else { return }
+            Task { await self.coordinator.refreshAllNow() }
+        }
         installSleepObservers()
     }
-
     func start() {
         Task { await coordinator.start() }
     }
@@ -64,13 +77,41 @@ final class AppState: NSObject, NSWindowDelegate {
         coordinator.menuDidClose()
     }
 
-    // MARK: - Analytics (F3 Task 3): janela PRÓPRIA, sob demanda
+    // MARK: - Multi-conta (F4): janela PRÓPRIA do "+ Add account"
 
-    /// Janela de analytics — `nil` = fechada/descartada. As views e o modelo
-    /// SÓ existem enquanto ela está aberta (orçamento de RAM ≤40MB): fechar
-    /// derruba a referência, o NSHostingView solta o `AnalyticsModel` e os
-    /// charts/arrays vão embora com ele.
+    /// Janela do formulário de add-account — `nil` = fechada. Janela própria
+    /// (não sheet no MenuBarExtra): NSOpenPanel precisa de app ativo, e a
+    /// janela garante isso; mesmo padrão de ciclo de vida do analytics.
+    private var addAccountWindow: NSWindow?
     private var analyticsWindow: NSWindow?
+
+    /// Item "Add account…": abre (ou traz à frente) o formulário para o
+    /// provider indicado. Idempotente: janela já aberta só ganha foco.
+    func showAddAccount(for provider: ProviderID) {
+        guard accountsModel.registry != nil else {
+            appLog.error("add account ignorado: sem banco (degradação F2)")
+            return
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        if let addAccountWindow {
+            addAccountWindow.makeKeyAndOrderFront(nil)
+            return
+        }
+        let hosting = NSHostingView(
+            rootView: AddAccountView(provider: provider, model: accountsModel) { [weak self] in
+                self?.addAccountWindow?.close()
+            })
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 420, height: 240),
+                              styleMask: [.titled, .closable],
+                              backing: .buffered, defer: false)
+        window.title = "Add Account"
+        window.contentView = hosting
+        window.isReleasedWhenClosed = false  // ciclo de vida é NOSSO (nil no close)
+        window.delegate = self
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        addAccountWindow = window
+    }
 
     /// Item "Analytics…": abre (ou traz à frente) a janela própria — nunca
     /// o painel. Idempotente: janela já aberta só ganha foco.
@@ -94,11 +135,16 @@ final class AppState: NSObject, NSWindowDelegate {
         analyticsWindow = window
     }
 
-    /// Fecho da janela de analytics = descartar views + modelo (spec F3:
-    /// "fechar descarta").
+    /// Fecho da janela de analytics/add-account = descartar views + modelo
+    /// (spec F3: "fechar descarta"; F4 idem para o form de conta).
     func windowWillClose(_ notification: Notification) {
-        guard (notification.object as? NSWindow) === analyticsWindow else { return }
-        analyticsWindow = nil  // última referência: NSHostingView e o modelo vão junto
+        let closing = notification.object as? NSWindow
+        if closing === analyticsWindow {
+            analyticsWindow = nil  // última referência: NSHostingView e o modelo vão junto
+        }
+        if closing === addAccountWindow {
+            addAccountWindow = nil
+        }
     }
 
     // MARK: - Export CSV/JSON (F3 Task 3)

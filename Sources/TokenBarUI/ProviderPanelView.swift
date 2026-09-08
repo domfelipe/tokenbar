@@ -17,6 +17,11 @@ import TokenBarCore
 public struct ProviderPanelView: View {
     /// Store observável (dados chegam pelo ciclo do coordinator).
     let store: SnapshotStore
+    /// Gerenciamento de contas (F4). `nil` = sem registry (sem DB) — controles
+    /// de conta não aparecem.
+    let accounts: AccountsModel?
+    /// Ação de abrir o formulário "+ Add account" (janela própria no app).
+    let addAccountAction: ((ProviderID) -> Void)?
 
     /// "Agora" local do countdown — atualizado a cada tick de 30 s. NUNCA
     /// alimenta texto do menu bar.
@@ -25,8 +30,14 @@ public struct ProviderPanelView: View {
     /// (painel aberto) — fechar o painel cancela a subscrição (spec F4).
     private let ticker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
-    public init(store: SnapshotStore) {
+    public init(
+        store: SnapshotStore,
+        accounts: AccountsModel? = nil,
+        addAccountAction: ((ProviderID) -> Void)? = nil
+    ) {
         self.store = store
+        self.accounts = accounts
+        self.addAccountAction = addAccountAction
     }
 
     public var body: some View {
@@ -41,11 +52,19 @@ public struct ProviderPanelView: View {
                 tabRow(tabs, selected: selected)
                 Divider()
                 if let selected, let display = store.providers[selected] {
-                    ProviderDetailView(provider: selected, display: display, now: countdownNow)
+                    ProviderDetailView(
+                        provider: selected,
+                        display: display,
+                        now: countdownNow,
+                        accounts: accounts,
+                        addAccountAction: addAccountAction)
                 }
             }
         }
-        .onAppear { countdownNow = Date() }
+        .onAppear {
+            countdownNow = Date()
+            accounts?.reload()  // painel aberto: lista de contas fresca
+        }
         .onReceive(ticker) { countdownNow = $0 }
     }
 
@@ -119,6 +138,9 @@ struct ProviderDetailView: View {
     let provider: ProviderID
     let display: ProviderDisplay
     let now: Date
+    /// Gerenciamento de contas (F4); `nil` = sem registry.
+    let accounts: AccountsModel?
+    let addAccountAction: ((ProviderID) -> Void)?
 
     var body: some View {
         ScrollView(.vertical) {
@@ -147,6 +169,7 @@ struct ProviderDetailView: View {
                 if !display.monthSeries.isEmpty {
                     monthChart
                 }
+                accountsSection
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 2)
@@ -197,6 +220,111 @@ struct ProviderDetailView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    // MARK: Contas (F4 multi-conta)
+
+    /// Seção de contas: uma linha por conta quando o provider tem MAIS DE UMA
+    /// conta ativa no ciclo (decisão F4-MULTIACCOUNT: com uma conta só, a
+    /// seção é ruído — as janelas já estão no topo). Toggle liga/desliga a
+    /// conta; context menu remove; path inexistente ganha badge de erro.
+    @ViewBuilder
+    private var accountsSection: some View {
+        if let accounts, display.accounts.count > 1 {
+            Divider()
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Accounts")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ForEach(display.accounts) { account in
+                    AccountRowView(
+                        provider: provider,
+                        account: account,
+                        now: now,
+                        model: accounts)
+                }
+                if let addAccountAction {
+                    Button {
+                        addAccountAction(provider)
+                    } label: {
+                        Label("Add account…", systemImage: "plus.circle")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Add account for \(MenuBarContent.displayName(for: provider))")
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Linha de conta (F4): label + badges + toggle ativa + remover
+
+struct AccountRowView: View {
+    let provider: ProviderID
+    let account: AccountDisplay
+    let now: Date
+    @Bindable var model: AccountsModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 5) {
+                Text(account.label)
+                    .font(.callout)
+                if account.invalidCredential {
+                    Text("invalid path")
+                        .font(.caption2)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(.red.opacity(0.75)))
+                } else {
+                    Text(ProviderPanelModel.authBadgeText(
+                        source: account.display.source,
+                        authState: account.display.authState))
+                        .font(.caption2)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(Color.secondary.opacity(0.18)))
+                }
+                Spacer(minLength: 0)
+                Toggle("", isOn: activeBinding)
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .labelsHidden()
+                    .accessibilityLabel("Enable \(account.label)")
+            }
+            // Janelas DA CONTA (decisão F4: com >1 conta, as linhas de janela
+            // por conta moram aqui — o topo mostra a crítica/agregada).
+            ForEach(ProviderPanelModel.windowRows(windows: account.display.windows, now: now)) { row in
+                WindowBarRow(row: row)
+                    .font(.caption)
+            }
+        }
+        .padding(.vertical, 2)
+        .contextMenu {
+            Button("Remove account", role: .destructive) {
+                if let registered = registered {
+                    model.remove(registered)
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    /// Registro correspondente no registry (fonte de remove/setActive).
+    private var registered: RegisteredAccount? {
+        model.accounts(for: provider).first { $0.accountKey == account.key }
+    }
+
+    private var activeBinding: Binding<Bool> {
+        Binding(
+            get: { account.active },
+            set: { newValue in
+                if let registered {
+                    model.setActive(newValue, account: registered)
+                }
+            })
     }
 }
 

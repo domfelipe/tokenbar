@@ -114,15 +114,33 @@ public final class ZaiProvider: Sendable, UsageProvider {
 
     public static let userAgent = "TokenBar/\(ProvidersInfo.version)"
 
-    public var account: AccountID { AccountID(provider: .zai, key: "local") }
-    public var accountRef: AccountRef { AccountRef(id: account, label: "local") }
+    public var account: AccountID { AccountID(provider: .zai, key: accountKey) }
+    public var accountRef: AccountRef { AccountRef(id: account, label: accountKey == "local" ? "local" : label) }
+
+    /// Key da conta que ESTA instância serve ("local" na canônica; contas
+    /// registradas recebem instância própria no wiring — F4).
+    public let accountKey: String
+    /// Label de exibição da conta registrada (igual ao key em instâncias locais).
+    private let label: String
+    /// Registry multi-conta (F4): presente na instância canônica, alimenta a
+    /// descoberta MERGE. `nil` = comportamento F2.
+    private let accounts: AccountRegistry?
 
     private let credentialReader: ZaiCredentialReader
     private let client: UsageHTTPClient
 
-    public init(credentialReader: ZaiCredentialReader, client: UsageHTTPClient) {
+    public init(
+        credentialReader: ZaiCredentialReader,
+        client: UsageHTTPClient,
+        accountKey: String = "local",
+        label: String = "local",
+        accounts: AccountRegistry? = nil
+    ) {
         self.credentialReader = credentialReader
         self.client = client
+        self.accountKey = accountKey
+        self.label = label
+        self.accounts = accounts
     }
 
     /// Resolução de base URL p/ wiring (testes injetam direto no init). Ordem:
@@ -143,19 +161,25 @@ public final class ZaiProvider: Sendable, UsageProvider {
     public var id: ProviderID { .zai }
 
     /// API-only na F2: Z.ai não tem arquivo de sessão com contagem de tokens
-    /// mapeada (spec §2.5) — sem `.localIngest`. O protocolo exige o método;
-    /// ele é identidade: nenhum arquivo consumido, cursor ecoado intacto
-    /// (contrato de cursor: `nextCursor` = o que o ciclo de fato consumiu).
-    public var capabilities: ProviderCapabilities { [.apiUsage] }
+    /// mapeada (spec §2.5) — sem `.localIngest`. F4: `.multiAccount` — contas
+    /// com config.json registrado ganham instância própria no wiring.
+    public var capabilities: ProviderCapabilities { [.apiUsage, .multiAccount] }
 
     public func ingestLocal(_ account: AccountRef, from cursor: IngestCursor) async throws -> IngestBatch {
         try guardKnownAccount(account)
         return IngestBatch(events: [], eventsApplied: 0, providerTotals: [:], nextCursor: cursor)
     }
 
-    /// 1 conta enquanto houver credencial (apiKey ou OAuth); sem nenhuma → [].
+    /// Descoberta MERGE (F4): auto (credencial presente) + contas ATIVAS do
+    /// registry, dedupe por key. Falha de leitura do registry → só as auto.
     public func discoverAccounts() async -> [AccountRef] {
-        credentialReader.read()?.hasCredential == true ? [accountRef] : []
+        var refs: [AccountRef] = credentialReader.read()?.hasCredential == true ? [accountRef] : []
+        guard let accounts else { return refs }
+        let registered = (try? accounts.activeAccounts(provider: .zai)) ?? []
+        for entry in registered where !refs.contains(where: { $0.id.key == entry.accountKey }) {
+            refs.append(AccountRef(id: AccountID(provider: .zai, key: entry.accountKey), label: entry.label))
+        }
+        return refs
     }
 
     public func fetchUsage(_ account: AccountRef) async throws -> UsageSnapshot {

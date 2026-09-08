@@ -18,19 +18,30 @@ import os
 public final class DBOffsetStore: Sendable, FileOffsetStoring {
     private let database: AppDatabase
     private let provider: ProviderID
+    /// Chave RESOLVIDA na init (evita divergência entre leitura e escrita —
+    /// a conta registrada NUNCA pode vazar para a chave legada e vice-versa).
+    private let settingsKey: String
     private let state: OSAllocatedUnfairLock<[String: FileCursor]>
 
-    public static func settingsKey(for provider: ProviderID) -> String {
-        "cursors:\(provider.rawValue)"
+    /// Chave do mapa de cursores no `settings`. Conta default (nil/"local")
+    /// mantém a chave legada `cursors:<provider>` (obrigação dura F2/F3);
+    /// contas registradas (F4) ganham namespace próprio
+    /// `cursors:<provider>:<accountKey>` — cursores por CONTA.
+    public static func settingsKey(for provider: ProviderID, accountKey: String? = nil) -> String {
+        if let accountKey, accountKey != "local" {
+            return "cursors:\(provider.rawValue):\(accountKey)"
+        }
+        return "cursors:\(provider.rawValue)"
     }
 
     /// Semeia o mirror da tabela `settings` (CursorMigrador plantou lá o
     /// legado; nas sessões seguintes é o próprio store que escreveu).
-    public init(database: AppDatabase, provider: ProviderID) {
+    public init(database: AppDatabase, provider: ProviderID, accountKey: String? = nil) {
         self.database = database
         self.provider = provider
+        self.settingsKey = Self.settingsKey(for: provider, accountKey: accountKey)
         let seed: [String: FileCursor]
-        if let raw = try? database.setting(forKey: Self.settingsKey(for: provider)),
+        if let raw = try? database.setting(forKey: settingsKey),
            let data = raw.data(using: .utf8),
            let decoded = try? JSONDecoder().decode([String: FileCursor].self, from: data) {
             seed = decoded
@@ -50,6 +61,6 @@ public final class DBOffsetStore: Sendable, FileOffsetStoring {
             return cache
         }
         let data = try JSONEncoder().encode(snapshot)
-        try database.setSetting(String(decoding: data, as: UTF8.self), forKey: Self.settingsKey(for: provider))
+        try database.setSetting(String(decoding: data, as: UTF8.self), forKey: settingsKey)
     }
 }

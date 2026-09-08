@@ -62,6 +62,12 @@ public final class AppDatabase: Sendable {
     /// Migrations v1 — schema da spec §6 (DDL verbatim). Versões futuras
     /// adicionam `registerMigration("v2")` etc.; nunca editar uma já
     /// publicada (o SQLite de usuários reais carrega o histórico).
+    ///
+    /// v2 (F4 multi-conta): a tabela `accounts` ganha as colunas de resolução
+    /// read-only da credencial e do corpus local — `credential_path` (arquivo
+    /// de credencial que o provider lê no ciclo) e `directory_path` (raiz de
+    /// ingest própria da conta; vazio = conta API-only, sem ingest). ALTER
+    /// TABLE aditivo: o schema §6 v1 permanece intacto para bancos existentes.
     static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("v1") { db in
@@ -113,6 +119,16 @@ public final class AppDatabase: Sendable {
                 """)
 
             try db.execute(sql: "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        }
+        // v2 (F4 multi-conta): colunas de resolução da conta registrada —
+        // `credential_path` (arquivo lido read-only pelo provider no ciclo) e
+        // `directory_path` (raiz de ingest própria; vazio = conta API-only).
+        // ALTER aditivo: bancos v1 existentes migram sem tocar no histórico.
+        migrator.registerMigration("v2") { db in
+            try db.execute(
+                sql: "ALTER TABLE accounts ADD COLUMN credential_path TEXT NOT NULL DEFAULT ''")
+            try db.execute(
+                sql: "ALTER TABLE accounts ADD COLUMN directory_path TEXT NOT NULL DEFAULT ''")
         }
         return migrator
     }

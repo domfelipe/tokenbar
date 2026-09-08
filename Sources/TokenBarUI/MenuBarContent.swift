@@ -40,6 +40,32 @@ public func formatEstimatedUSD(_ cost: Double) -> String {
     return String(format: "~$%.2f", cost)
 }
 
+/// Linha de UMA conta no painel (F4 multi-conta): identidade + estado do
+/// ciclo da conta. `invalidCredential` = path registrado inexistente (badge
+/// de erro na linha — a conta degrada sozinha, sem derrubar o provider).
+/// `display` carrega as janelas/auth/da CONTA (mesmo tipo do agregado).
+public struct AccountDisplay: Equatable, Sendable, Identifiable {
+    public let key: String
+    public let label: String
+    public let active: Bool
+    public let invalidCredential: Bool
+    public let display: ProviderDisplay
+
+    /// Key da conta é única por provider (PK provider+account_id do schema §6).
+    public var id: String { key }
+
+    public init(
+        key: String, label: String, active: Bool,
+        invalidCredential: Bool, display: ProviderDisplay
+    ) {
+        self.key = key
+        self.label = label
+        self.active = active
+        self.invalidCredential = invalidCredential
+        self.display = display
+    }
+}
+
 /// Estado de exibição de UM provider — o que a UI/heartbeat consome por ciclo.
 /// `percent` em escala 0...100 (`nil` = sem janela com fração conhecida);
 /// `resetsAt` da janela crítica (linha "reseta em" do menu); `source` alimenta
@@ -85,6 +111,10 @@ public struct ProviderDisplay: Equatable, Sendable {
     public var pacing: PacingForecast?
     /// Série diária 30d do provider (chart do painel; ≤30 pontos, daily_agg).
     public var monthSeries: [PanelDayPoint]
+    /// Multi-conta (F4): linhas por conta ciclada. Vazio = conta única — o
+    /// comportamento F2/F3 fica bit-a-bit igual (nenhum campo do menu bar ou
+    /// do heartbeat v3 depende disto; é só painel).
+    public var accounts: [AccountDisplay]
 
     public init(
         percent: Double? = nil,
@@ -102,7 +132,8 @@ public struct ProviderDisplay: Equatable, Sendable {
         monthCostUsd: Double? = nil,
         monthHistoryAvailable: Bool = false,
         pacing: PacingForecast? = nil,
-        monthSeries: [PanelDayPoint] = []
+        monthSeries: [PanelDayPoint] = [],
+        accounts: [AccountDisplay] = []
     ) {
         self.percent = percent
         self.todayTokens = todayTokens
@@ -120,6 +151,7 @@ public struct ProviderDisplay: Equatable, Sendable {
         self.monthHistoryAvailable = monthHistoryAvailable
         self.pacing = pacing
         self.monthSeries = monthSeries
+        self.accounts = accounts
     }
 
     /// Estado inicial (nada ciclo ainda): sem dado — some da string do menu.
