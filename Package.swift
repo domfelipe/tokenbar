@@ -15,7 +15,13 @@ let package = Package(
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.1"),
     ],
     targets: [
-        .target(name: "TokenBarCore", dependencies: [.product(name: "GRDB", package: "GRDB.swift")]),
+        // `Resources/pricing.json` (F3 Task 2) viaja embutido no módulo —
+        // `Bundle.module` só existe quando o target declara resources.
+        .target(
+            name: "TokenBarCore",
+            dependencies: [.product(name: "GRDB", package: "GRDB.swift")],
+            resources: [.copy("Resources/pricing.json")]
+        ),
         .target(name: "TokenBarProviders", dependencies: ["TokenBarCore"]),
         .target(name: "TokenBarUI", dependencies: ["TokenBarCore", "TokenBarProviders"]),
         .executableTarget(

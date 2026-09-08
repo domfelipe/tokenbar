@@ -21,6 +21,13 @@ public protocol UsageEventPersisting: Sendable {
     ///   d'água anterior é descartada e o conteúdo re-lido é persistido como
     ///   novo (o ledger exibe a soma corrigida; no DB o conteúdo antigo do
     ///   mesmo arquivo permanece — limitação documentada do caso patológico).
+    ///
+    /// Custo (F3 Task 2): `cost_usd` é calculado NA INGEST pela `PricingTable`
+    /// injetada no `AppDatabase` e gravado na mesma INSERT (`usage_events`) e
+    /// no upsert de `daily_agg`. Modelo sem preço público → `NULL`, nunca 0.
+    /// NÃO-RETROATIVO POR CONSTRUÇÃO: eventos já persistidos (T1, sem custo —
+    /// e sem tabela de preços) ficam como estão — o `hwm` impede re-leitura,
+    /// então nunca são re-precificados; só eventos novos ganham custo.
     func persistBatch(
         provider: ProviderID, path: String, events: [UsageEvent],
         endOffset: UInt64, resetToZero: Bool
@@ -60,12 +67,37 @@ extension AppDatabase: UsageEventPersisting {
                     var account: String
                     var model: String
                     var input: Int64 = 0, output: Int64 = 0, cacheRead: Int64 = 0, cacheWrite: Int64 = 0
+                    var cost: Double = 0
+                    /// Eventos do grupo SEM preço na tabela deixam o custo do
+                    /// grupo NULL (honesto) — nunca 0 ("grátis").
+                    var hasCost = false
                 }
                 var groups: [String: Group] = [:]
+                // Memo de preço por string de modelo do lote: o match de
+                // prefixo roda 1× por modelo distinto, não por evento
+                // (transcripts repetem poucos modelos em milhares de linhas).
+                var priceByModel: [String: PricingTable.ModelPrice?] = [:]
                 for event in events {
                     let day = dayString(from: event.ts)
                     let model = event.model ?? Self.unknownModel
                     let groupKey = "\(day)|\(event.provider.rawValue)|\(event.account.key)|\(model)"
+                    // Custo do evento: calculado NA INGEST (Task 2); modelo
+                    // `nil` ou sem entrada na tabela → NULL no banco.
+                    var eventCost: Double?
+                    if let eventModel = event.model {
+                        let price: PricingTable.ModelPrice?
+                        if let cached = priceByModel[eventModel] {
+                            price = cached
+                        } else {
+                            let looked = pricing?.price(forModel: eventModel)
+                            priceByModel[eventModel] = looked
+                            price = looked
+                        }
+                        eventCost = price?.costUSD(
+                            inputTokens: event.inputTokens, outputTokens: event.outputTokens,
+                            cacheReadTokens: event.cacheReadTokens,
+                            cacheWriteTokens: event.cacheWriteTokens)
+                    }
                     var group = groups[groupKey] ?? Group(
                         day: day, provider: event.provider.rawValue,
                         account: event.account.key, model: model)
@@ -73,27 +105,35 @@ extension AppDatabase: UsageEventPersisting {
                     group.output += event.outputTokens
                     group.cacheRead += event.cacheReadTokens
                     group.cacheWrite += event.cacheWriteTokens
+                    if let eventCost {
+                        group.cost += eventCost
+                        group.hasCost = true
+                    }
                     groups[groupKey] = group
                     // Insert tipado (UsageEventRecord → colunas §6); o GRDB
                     // reusa a prepared statement entre chamadas.
-                    try UsageEventRecord(event).insert(db)
+                    try UsageEventRecord(event, costUSD: eventCost).insert(db)
                 }
 
                 let upsert = try db.cachedStatement(sql: """
                     INSERT INTO daily_agg (day, provider, account, model, input_tokens, output_tokens,
                                            cache_read_tokens, cache_write_tokens, cost_usd)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (day, provider, account, model) DO UPDATE SET
                       input_tokens = input_tokens + excluded.input_tokens,
                       output_tokens = output_tokens + excluded.output_tokens,
                       cache_read_tokens = cache_read_tokens + excluded.cache_read_tokens,
                       cache_write_tokens = cache_write_tokens + excluded.cache_write_tokens,
-                      cost_usd = cost_usd + excluded.cost_usd
+                      cost_usd = CASE
+                        WHEN excluded.cost_usd IS NULL THEN cost_usd
+                        ELSE COALESCE(cost_usd, 0) + excluded.cost_usd
+                      END
                     """)
                 for group in groups.values {
                     try upsert.execute(
                         arguments: [group.day, group.provider, group.account, group.model,
-                                    group.input, group.output, group.cacheRead, group.cacheWrite])
+                                    group.input, group.output, group.cacheRead, group.cacheWrite,
+                                    group.hasCost ? group.cost : nil])
                 }
             }
 

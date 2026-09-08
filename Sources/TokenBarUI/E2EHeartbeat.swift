@@ -7,7 +7,9 @@ import TokenBarCore
 /// Formato v2 (F2): `{"menuBarText", "providers": {provider: {"menuBar",
 /// "percent", "todayTokens", "authState", "fetchedAt"}}, "updatedAt"}` —
 /// inclui TODOS os providers passados, mesmo os degradados/sem dado (a string
-/// do ícone omiti-ia; o heartbeat é diagnóstico).
+/// do ícone omiti-ia; o heartbeat é diagnóstico). F3 Task 2 adiciona o campo
+/// OPCIONAL `todayCostUsd` (número, custo estimado do dia) por provider —
+/// omitido quando nil, preservando a compatibilidade do contrato v2.
 public enum E2EHeartbeat {
     /// Monta o payload v2. `errors` (selfcheck) é opcional e tokenizado —
     /// nunca inclui mensagem de erro crua (pode conter URL/shape).
@@ -30,6 +32,11 @@ public enum E2EHeartbeat {
                 "authState": display.authState.rawValue,
                 "fetchedAt": ISO8601DateFormatter().string(from: display.fetchedAt),
             ]
+            // F3 Task 2: custo estimado do dia (número) — omitido quando nil
+            // (sem DB / sem evento precificado hoje); nunca vira null "fake".
+            if let cost = display.todayCostUsd {
+                entry["todayCostUsd"] = cost
+            }
             if let error = errors[id] {
                 entry["error"] = error
             }

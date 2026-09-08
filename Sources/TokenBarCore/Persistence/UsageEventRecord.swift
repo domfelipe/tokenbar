@@ -38,7 +38,10 @@ public struct UsageEventRecord: Sendable, Codable, FetchableRecord, PersistableR
     /// ingest local; o dia em que usage via API virar evento, entra "api").
     public static let localSource = "local"
 
-    public init(_ event: UsageEvent, source: String = UsageEventRecord.localSource) {
+    public init(
+        _ event: UsageEvent, costUSD: Double? = nil,
+        source: String = UsageEventRecord.localSource
+    ) {
         self.id = nil
         self.ts = event.ts
         self.provider = event.provider.rawValue
@@ -48,7 +51,9 @@ public struct UsageEventRecord: Sendable, Codable, FetchableRecord, PersistableR
         self.outputTokens = event.outputTokens
         self.cacheReadTokens = event.cacheReadTokens
         self.cacheWriteTokens = event.cacheWriteTokens
-        self.costUSD = nil
+        // Custo calculado NA INGEST pela PricingTable (Task 2); `nil` = modelo
+        // ausente da tabela — fica NULL no banco, nunca 0 nem chute.
+        self.costUSD = costUSD
         self.source = source
         self.project = event.project
     }

@@ -85,6 +85,10 @@ public final class ProviderCoordinator {
     public let scheduler: AdaptiveScheduler
     private let config: ProviderCoordinatorConfig
     private let registry: ProviderRegistry
+    /// Banco aberto no init (F3); `nil` = degradação F2 (sem persistência e
+    /// sem custo: `todayCostUsd` do display fica `nil` — nunca chutado).
+    /// Retido além do wiring dos providers para a consulta do custo do dia.
+    private let database: AppDatabase?
 
     /// Dirs observados por FSEvents (file-driven): Claude projects, Gemini tmp.
     private let watcherDirectories: [ProviderID: URL]
@@ -122,6 +126,7 @@ public final class ProviderCoordinator {
         let database = try? AppDatabase.open(
             at: config.supportDirectory.appendingPathComponent(AppDatabase.databaseName),
             calendar: calendar)
+        self.database = database
         if let database {
             // Migração dos cursores legados F1/F2 (JSON → settings), uma vez
             // por arquivo (idempotente); o live store vira DBOffsetStore.
@@ -288,6 +293,13 @@ public final class ProviderCoordinator {
                 cursorSeeds[id] = batch.nextCursor
                 var display = displays[id] ?? .empty
                 display.todayTokens = batch.providerTotals[id] ?? 0
+                // Custo do dia (F3): soma de cost_usd dos eventos de hoje,
+                // direto do DB — 1 leitura indexada por CICLO (o render do
+                // menu bar segue sem tocar no banco; gate da F1). Falha de
+                // leitura → nil (painel fica só com tokens, honesto).
+                if let database {
+                    display.todayCostUsd = try? database.todayCostUSD(provider: id)
+                }
                 display.fetchedAt = Date()
                 displays[id] = display
             } catch {

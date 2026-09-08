@@ -26,20 +26,34 @@ public final class AppDatabase: Sendable {
 
     let writer: any DatabaseWriter
     private let calendar: Calendar
+    /// Tabela de preços públicos (F3 Task 2) usada para calcular `cost_usd`
+    /// NA INGEST. `nil` = sem tabela (recurso ausente/corrompido ou `nil`
+    /// explícito) → todo evento persiste com custo NULL — degradação honesta.
+    /// Internal (não `private`): a extensão `UsageEventPersisting`, em outro
+    /// arquivo, é quem consome no hot loop da ingest.
+    let pricing: PricingTable?
 
     /// Abre (ou cria) o banco em `url` e roda as migrations. Throws — o
     /// chamador (coordinator) degrada para o comportamento F2 em caso de erro
     /// (disco cheio/ilegível, path inválido…): persistência é aditiva, nunca
-    /// uma condição de crash.
-    public static func open(at url: URL, calendar: Calendar = .current) throws -> AppDatabase {
+    /// uma condição de crash. `pricing` default = tabela embutida
+    /// (`Resources/pricing.json`); `nil` explícito = eventos sem custo.
+    public static func open(
+        at url: URL, calendar: Calendar = .current,
+        pricing: PricingTable? = PricingTable.bundled()
+    ) throws -> AppDatabase {
         let pool = try DatabasePool(path: url.path)
         try Self.migrator.migrate(pool)
-        return AppDatabase(writer: pool, calendar: calendar)
+        return AppDatabase(writer: pool, calendar: calendar, pricing: pricing)
     }
 
-    init(writer: any DatabaseWriter, calendar: Calendar = .current) {
+    init(
+        writer: any DatabaseWriter, calendar: Calendar = .current,
+        pricing: PricingTable? = nil
+    ) {
         self.writer = writer
         self.calendar = calendar
+        self.pricing = pricing
     }
 
     /// Migrations v1 — schema da spec §6 (DDL verbatim). Versões futuras
@@ -183,6 +197,26 @@ public final class AppDatabase: Sendable {
                     costUSD: cost ?? 0
                 )
             }
+        }
+    }
+
+    /// Soma de `cost_usd` dos eventos de HOJE (fuso do calendar injetado) de
+    /// um provider — fonte do "~$" do painel (F3 Task 2). `nil` = nenhum
+    /// evento com custo computável hoje (o provider fica só com tokens);
+    /// eventos persistidos com custo NULL (T1/modelo sem preço) ficam de fora
+    /// — a soma nunca inventa custo. Query de leitura indexada, 1× por ciclo
+    /// do provider (o render gate da F1 NÃO consulta o banco).
+    public func todayCostUSD(provider: ProviderID, now: Date = Date()) throws -> Double? {
+        let today = calendar.startOfDay(for: now)
+        guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) else { return nil }
+        return try writer.read { db in
+            try Double.fetchOne(
+                db,
+                sql: """
+                    SELECT SUM(cost_usd) FROM usage_events
+                    WHERE provider = ? AND ts >= ? AND ts < ?
+                    """,
+                arguments: [provider.rawValue, today, tomorrow])
         }
     }
 
