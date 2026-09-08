@@ -53,6 +53,12 @@ public struct ProviderDisplay: Equatable, Sendable {
     /// painel mantém só tokens. NUNCA aparece na string do menu bar (o render
     /// gate da F1 preserva "C:12.4k X:0% Z:17%"); custo é só painel/heartbeat.
     public var todayCostUsd: Double?
+    /// Tokens dos últimos 7 dias (daily_agg, janela de 7 dias calendário) —
+    /// F3 Task 3, linha "7d: X tok ~$Y" do painel. 0 = sem histórico na
+    /// janela (segmento omitido). Atualizado 1× por ciclo, fora da MainActor.
+    public var weekTokens: Int64
+    /// Custo estimado dos 7 dias (`nil` = sem custo computável — NULL ≠ 0).
+    public var weekCostUsd: Double?
     public var authState: AuthState
     public var source: DataSource
     public var resetsAt: Date?
@@ -62,6 +68,8 @@ public struct ProviderDisplay: Equatable, Sendable {
         percent: Double? = nil,
         todayTokens: Int64 = 0,
         todayCostUsd: Double? = nil,
+        weekTokens: Int64 = 0,
+        weekCostUsd: Double? = nil,
         authState: AuthState = .missing,
         source: DataSource = .localOnly,
         resetsAt: Date? = nil,
@@ -70,6 +78,8 @@ public struct ProviderDisplay: Equatable, Sendable {
         self.percent = percent
         self.todayTokens = todayTokens
         self.todayCostUsd = todayCostUsd
+        self.weekTokens = weekTokens
+        self.weekCostUsd = weekCostUsd
         self.authState = authState
         self.source = source
         self.resetsAt = resetsAt
@@ -177,6 +187,15 @@ public struct MenuBarContent: Equatable, Sendable {
             // Custo do dia vem logo após a métrica principal ("C:12.4k ~$0.08").
             if let cost = display.todayCostUsd {
                 line += " " + formatEstimatedUSD(cost)
+            }
+            // Histórico 7d (F3 Task 3): após as métricas de hoje, antes do
+            // sufixo de reset — "· 7d: 45.6k ~$0.31". Sem tokens na janela →
+            // segmento omitido (nada inventado); custo só quando computável.
+            if display.weekTokens > 0 {
+                line += " · 7d: " + abbrevTokens(display.weekTokens)
+                if let weekCost = display.weekCostUsd {
+                    line += " " + formatEstimatedUSD(weekCost)
+                }
             }
             if let resetsAt = display.resetsAt, let suffix = Self.resetSuffix(from: now, to: resetsAt) {
                 line += " — \(suffix)"

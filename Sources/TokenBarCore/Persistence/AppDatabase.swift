@@ -25,7 +25,10 @@ public final class AppDatabase: Sendable {
     public static let databaseName = "tokenbar.sqlite"
 
     let writer: any DatabaseWriter
-    private let calendar: Calendar
+    /// Internal (não `private`): as extensões de leitura de histórico
+    /// (`HistoryQueries`) usam o MESMO calendar do rollover do ledger e da
+    /// escrita de `daily_agg` — painel e gráficos têm que concordar no dia.
+    let calendar: Calendar
     /// Tabela de preços públicos (F3 Task 2) usada para calcular `cost_usd`
     /// NA INGEST. `nil` = sem tabela (recurso ausente/corrompido ou `nil`
     /// explícito) → todo evento persiste com custo NULL — degradação honesta.

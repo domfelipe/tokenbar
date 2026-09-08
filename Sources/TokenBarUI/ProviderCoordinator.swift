@@ -89,6 +89,11 @@ public final class ProviderCoordinator {
     /// sem custo: `todayCostUsd` do display fica `nil` — nunca chutado).
     /// Retido além do wiring dos providers para a consulta do custo do dia.
     private let database: AppDatabase?
+    /// Exposição só-LEITURA do banco p/ a UI de F3 (linha 7d do painel,
+    /// analytics, export). Queries rodam FORA da MainActor no chamador.
+    public var historyDatabase: AppDatabase? { database }
+    /// Support directory (o export grava em `<support>/exports`).
+    public var supportDirectory: URL { config.supportDirectory }
 
     /// Dirs observados por FSEvents (file-driven): Claude projects, Gemini tmp.
     private let watcherDirectories: [ProviderID: URL]
@@ -299,6 +304,17 @@ public final class ProviderCoordinator {
                 // leitura → nil (painel fica só com tokens, honesto).
                 if let database {
                     display.todayCostUsd = try? database.todayCostUSD(provider: id)
+                    // Histórico 7d (F3 Task 3): 1 query indexada por CICLO —
+                    // FORA da MainActor (SQLite não roda na main), chega via
+                    // await. Falha de leitura → mantém o último valor bom
+                    // (nunca zera o histórico por um erro transitório).
+                    let week = await Task.detached(priority: .utility) {
+                        try? database.weekTotal(provider: id)
+                    }.value
+                    if let week {
+                        display.weekTokens = week.tokens
+                        display.weekCostUsd = week.costUSD
+                    }
                 }
                 display.fetchedAt = Date()
                 displays[id] = display

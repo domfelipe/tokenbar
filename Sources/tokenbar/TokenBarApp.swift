@@ -48,6 +48,17 @@ struct TokenBarApp: App {
                 Task { await appState.forceIngest() }
             }
             Divider()
+            // F3 Task 3: analytics em janela PRÓPRIA (não o painel) e export
+            // CSV/JSON do histórico (30d) com reveal no Finder. Sem atalhos
+            // próprios (padrão F2: só o Quit tem — evita colidir com bindings
+            // padrão do macOS).
+            Button("Analytics…") {
+                appState.showAnalytics()
+            }
+            Button("Export history…") {
+                Task { await appState.exportHistory() }
+            }
+            Divider()
             Button("Quit TokenBar") {
                 appState.stop()
                 NSApp.terminate(nil)
