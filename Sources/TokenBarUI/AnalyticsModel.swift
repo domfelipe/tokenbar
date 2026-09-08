@@ -152,12 +152,18 @@ public final class AnalyticsModel {
     /// conhecidos; só é `nil` (fora do chart) quando TODOS os providers do
     /// dia estão sem custo computável. Dias sem nenhum evento não entram.
     /// `nonisolated` — função pura, chamável de qualquer contexto.
+    ///
+    /// Review T3: a guarda de "primeira vista do dia" é o set `seen`,
+    /// INDEPENDENTE do custo — usar o dicionário de soma (que só popula com
+    /// custo não-nil) duplicava o dia quando o primeiro provider em ordem
+    /// tinha custo nil, e id duplicado no Chart = barra sobreposta.
     nonisolated public static func dayCosts(from series: [AppDatabase.DailySeriesRow]) -> [DayCost] {
+        var seen: Set<String> = []
         var order: [String] = []
         var knownByDay: [String: Double] = [:]
         var hasAnyByDay: [String: Bool] = [:]
         for row in series {
-            if knownByDay[row.day] == nil { order.append(row.day) }
+            if seen.insert(row.day).inserted { order.append(row.day) }
             hasAnyByDay[row.day] = (hasAnyByDay[row.day] ?? false) || (row.costUSD != nil)
             if let cost = row.costUSD {
                 knownByDay[row.day] = (knownByDay[row.day] ?? 0) + cost

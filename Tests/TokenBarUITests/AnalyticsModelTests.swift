@@ -185,4 +185,26 @@ final class AnalyticsModelTests {
         #expect(AnalyticsModel.dayCosts(from: []).isEmpty)
         #expect(AnalyticsModel.dayCosts(from: [row("2026-08-30", nil)]).isEmpty)
     }
+
+    /// Review T3 (finding Important): provider nil-custo ANTES do precificado
+    /// no MESMO dia — a guarda antiga usava o dicionário de soma (que só
+    /// popula com custo não-nil) e o dia entrava DUPLICADO em `order` →
+    /// id duplicado no Chart = barra sobreposta. Dia tem que aparecer 1×.
+    @Test("dayCosts: dia com provider nil-custo antes do precificado aparece 1×")
+    func dayCostsNilCostProviderBeforePricedAppearsOnce() {
+        func row(_ day: String, _ cost: Double?) -> AppDatabase.DailySeriesRow {
+            .init(day: day, provider: "claude", tokens: 1, costUSD: cost)
+        }
+        let nilFirst = AnalyticsModel.dayCosts(from: [
+            row("2026-08-30", nil), row("2026-08-30", 0.5),
+        ])
+        #expect(nilFirst.map { "\($0.day)|\($0.costUSD)" } == ["2026-08-30|0.5"])
+
+        // E com 3+ providers no mesmo dia, ordens variadas.
+        let mixed = AnalyticsModel.dayCosts(from: [
+            row("2026-08-30", nil), row("2026-08-30", 0.5), row("2026-08-30", nil),
+            row("2026-08-30", 0.25),
+        ])
+        #expect(mixed.map { "\($0.day)|\($0.costUSD)" } == ["2026-08-30|0.75"])
+    }
 }
