@@ -10,6 +10,10 @@ import TokenBarCore
 /// falhou (sem DB — degradação F2 — ou erro transitório; nada fake), enquanto
 /// tokens/custo presenciam `todayCostUsd` (F3 Task 2) e o painel mantém o
 /// último valor bom.
+///
+/// F4 (painel rico) é ADITIVO no v3: `monthTokens`/`monthCostUsd` (30d, só
+/// quando a query rodou) e `pacing` (forecast contra a janela crítica, só
+/// quando existe). A string do menu bar segue intocada.
 public enum E2EHeartbeat {
     /// Monta o payload v3. `errors` (selfcheck) é opcional e tokenizado —
     /// nunca inclui mensagem de erro crua (pode conter URL/shape).
@@ -49,6 +53,29 @@ public enum E2EHeartbeat {
                     history7d["costUsd"] = NSNull()
                 }
                 entry["history7d"] = history7d
+            }
+            // F4 (ADITIVO — painel rico): totais 30d. `monthTokens`/`monthCostUsd`
+            // presentes SOMENTE quando a query do ciclo rodou (mesma honestidade
+            // do history7d); custo sem preço computável → chave ausente (nunca
+            // zero fake).
+            if display.monthHistoryAvailable {
+                entry["monthTokens"] = display.monthTokens
+                if let monthCost = display.monthCostUsd {
+                    entry["monthCostUsd"] = monthCost
+                }
+            }
+            // F4 (ADITIVO): forecast de pacing contra a janela crítica — só
+            // quando existe (`nil` = sem chute → omitido). `exhaustedIn`/
+            // `deficitPct` são null EXPLÍCITO quando não se aplicam (a chave
+            // existir prova que o forecast existe, o valor diz o estado).
+            if let pacing = display.pacing {
+                let exhausted: Any = pacing.exhaustedIn ?? NSNull()
+                let deficit: Any = pacing.deficitPct ?? NSNull()
+                entry["pacing"] = [
+                    "exhaustedIn": exhausted,
+                    "projectedFraction": pacing.projectedFraction,
+                    "deficitPct": deficit,
+                ]
             }
             if let error = errors[id] {
                 entry["error"] = error

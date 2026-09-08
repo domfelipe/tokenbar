@@ -85,6 +85,9 @@ public final class ProviderCoordinator {
     public let scheduler: AdaptiveScheduler
     private let config: ProviderCoordinatorConfig
     private let registry: ProviderRegistry
+    /// Calendar do ciclo (rollover do ledger, janelas e pacing) — o mesmo
+    /// injetado nos providers no init.
+    private let calendar: Calendar
     /// Banco aberto no init (F3); `nil` = degradação F2 (sem persistência e
     /// sem custo: `todayCostUsd` do display fica `nil` — nunca chutado).
     /// Retido além do wiring dos providers para a consulta do custo do dia.
@@ -123,6 +126,7 @@ public final class ProviderCoordinator {
         let env = config.environment
         let home = config.home
         let calendar = Calendar.current
+        self.calendar = calendar
 
         // F3: banco SQLite (schema spec §6) na support directory — o
         // TOKENBAR_SUPPORT_DIR do AppState isola app/e2e. Falha de abertura
@@ -289,6 +293,10 @@ public final class ProviderCoordinator {
 
         var ok = true
         var errorToken: String?
+        // Input de pacing do ciclo (diários 30d do provider×conta) — carregado
+        // na seção 1 (local ingest) e consumido na seção 2, quando as janelas
+        // do snapshot chegam. Vazio p/ API-only (zai não persiste diários).
+        var pacingInput: [(day: Date, total: Int64)] = []
 
         // Conta: a descoberta quando visível; fallback é a conta local canônica
         // que todo provider F2 atende (sem credencial → snapshot degradado,
@@ -311,20 +319,41 @@ public final class ProviderCoordinator {
                 // leitura → nil (painel fica só com tokens, honesto).
                 if let database {
                     display.todayCostUsd = try? database.todayCostUSD(provider: id)
-                    // Histórico 7d (F3 Task 3): 1 query indexada por CICLO —
-                    // FORA da MainActor (SQLite não roda na main), chega via
-                    // await. Falha de leitura → mantém o último valor bom no
-                    // painel (nunca zera o histórico por um erro transitório)
-                    // e o heartbeat v3 OMITE o history7d (flag abaixo).
-                    let week = await Task.detached(priority: .utility) {
-                        try? database.weekTotal(provider: id)
+                    // Histórico do ciclo (F3 7d + F4 30d/série/pacing): 1
+                    // conjunto de queries indexadas por CICLO — FORA da
+                    // MainActor (SQLite não roda na main), chega via await.
+                    // Falha do 7d → mantém o último valor bom no painel (nunca
+                    // zera o histórico por um erro transitório) e o heartbeat
+                    // OMITE history7d (flag abaixo); falha do 30d é análoga.
+                    let stats = await Task.detached(priority: .utility) { () -> HistoryStats? in
+                        guard let week = try? database.weekTotal(provider: id) else { return nil }
+                        let month = try? database.weekTotal(provider: id, days: 30)
+                        let series = (try? database.dailySeries(provider: id, days: 30)) ?? []
+                        let pacing = (try? database.pacingInput(
+                            provider: id, account: account.id, days: 30)) ?? []
+                        return HistoryStats(
+                            week: week, month: month, series: series, pacingInput: pacing)
                     }.value
-                    if let week {
-                        display.weekTokens = week.tokens
-                        display.weekCostUsd = week.costUSD
+                    if let stats {
+                        display.weekTokens = stats.week.tokens
+                        display.weekCostUsd = stats.week.costUSD
                         display.weekHistoryAvailable = true
+                        if let month = stats.month {
+                            display.monthTokens = month.tokens
+                            display.monthCostUsd = month.costUSD
+                            display.monthHistoryAvailable = true
+                        } else {
+                            display.monthHistoryAvailable = false
+                        }
+                        // Série do chart: ≤30 pontos (daily_agg, 1 por dia com
+                        // dado) — mapeada para o tipo do painel.
+                        display.monthSeries = stats.series.map {
+                            PanelDayPoint(day: $0.day, tokens: $0.tokens, costUSD: $0.costUSD)
+                        }
+                        pacingInput = stats.pacingInput
                     } else {
                         display.weekHistoryAvailable = false
+                        display.monthHistoryAvailable = false
                     }
                 }
                 display.fetchedAt = Date()
@@ -348,6 +377,20 @@ public final class ProviderCoordinator {
             var display = displays[id] ?? .empty
             display.percent = critical?.usedFraction.map { $0 * 100 }
             display.resetsAt = critical?.resetsAt
+            // F4 (painel rico): TODAS as janelas do snapshot (barras do painel)
+            // + forecast de pacing contra a janela CRÍTICA — a mesma que
+            // alimenta o percent do menu bar. Sem janela com fração/reset
+            // conhecidos → `pacing = nil` (o PacingEngine devolve nil e a
+            // linha de pacing não aparece — sem chute). Additivo: a string do
+            // menu bar não muda com nenhum destes campos.
+            display.windows = snapshot.windows
+            display.pacing = critical.flatMap {
+                PacingEngine.forecast(
+                    dailySums: pacingInput,
+                    window: $0,
+                    now: Date(),
+                    calendar: calendar)
+            }
             display.authState = snapshot.authState
             display.source = snapshot.source
             display.fetchedAt = snapshot.fetchedAt
@@ -429,4 +472,16 @@ public final class ProviderCoordinator {
         case nil: return String(describing: type(of: error))
         }
     }
+}
+
+/// Conjunto de leituras de histórico de UM ciclo (F4): 7d/30d totals + série
+/// diária do chart + input do pacing. Atravessa a fronteira do
+/// `Task.detached` — tudo Sendable (tuplas de Sendable são Sendable).
+private struct HistoryStats: Sendable {
+    var week: AppDatabase.WeekTotal
+    /// `nil` = query 30d falhou (o 7d pode ter vindo) → flag do heartbeat
+    /// omite, painel mantém o último valor bom.
+    var month: AppDatabase.WeekTotal?
+    var series: [AppDatabase.DailySeriesRow]
+    var pacingInput: [(day: Date, total: Int64)]
 }
