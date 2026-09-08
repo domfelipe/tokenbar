@@ -306,14 +306,18 @@ public final class ProviderCoordinator {
                     display.todayCostUsd = try? database.todayCostUSD(provider: id)
                     // Histórico 7d (F3 Task 3): 1 query indexada por CICLO —
                     // FORA da MainActor (SQLite não roda na main), chega via
-                    // await. Falha de leitura → mantém o último valor bom
-                    // (nunca zera o histórico por um erro transitório).
+                    // await. Falha de leitura → mantém o último valor bom no
+                    // painel (nunca zera o histórico por um erro transitório)
+                    // e o heartbeat v3 OMITE o history7d (flag abaixo).
                     let week = await Task.detached(priority: .utility) {
                         try? database.weekTotal(provider: id)
                     }.value
                     if let week {
                         display.weekTokens = week.tokens
                         display.weekCostUsd = week.costUSD
+                        display.weekHistoryAvailable = true
+                    } else {
+                        display.weekHistoryAvailable = false
                     }
                 }
                 display.fetchedAt = Date()

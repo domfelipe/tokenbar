@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import TokenBarUI
 
@@ -8,6 +9,13 @@ enum TokenBarMain {
         if arguments.count > 1, arguments[1] == "selfcheck" {
             try? await SelfCheck.run(arguments: Array(arguments.dropFirst()))
             return
+        }
+        // F3 Task 4: `history` não sobe o app de menu bar — lê o banco, imprime
+        // a série no stdout (contrato csv/json) e sai. Mesmo padrão do
+        // selfcheck: subcomando resolve e retorna antes do `TokenBarApp.main()`.
+        if arguments.count > 1, arguments[1] == "history" {
+            let status = HistoryCommand.run(arguments: Array(arguments.dropFirst(2)))
+            exit(status)
         }
         TokenBarApp.main()
     }

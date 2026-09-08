@@ -22,17 +22,12 @@ final class AppState: NSObject, NSWindowDelegate {
 
     override init() {
         let env = ProcessInfo.processInfo.environment
-        // Override de testes/e2e (T8): isola cursores/ledger em um diretório
+        // Override de testes/e2e (T8): isola cursores/ledger/DB em um diretório
         // próprio — sem ele, corpora descartáveis acumulam entradas no App
-        // Support real e o snapshot do dia as ressuscita entre runs.
-        let supportDir = env["TOKENBAR_SUPPORT_DIR"].map {
-            let url = URL(fileURLWithPath: $0, isDirectory: true)
-            try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-            return url
-        } ?? FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("TokenBar", isDirectory: true)
-        try? FileManager.default.createDirectory(at: supportDir, withIntermediateDirectories: true)
+        // Support real e o snapshot do dia as ressuscita entre runs. Regra
+        // compartilhada com o `history` CLI (SupportDirectory.resolve) para os
+        // dois caminhos abrirem o MESMO banco.
+        let supportDir = SupportDirectory.resolve(environment: env)
         let e2eDir = env["TOKENBAR_E2E_DIR"].map {
             let url = URL(filePath: $0)
             try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)

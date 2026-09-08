@@ -59,6 +59,11 @@ public struct ProviderDisplay: Equatable, Sendable {
     public var weekTokens: Int64
     /// Custo estimado dos 7 dias (`nil` = sem custo computável — NULL ≠ 0).
     public var weekCostUsd: Double?
+    /// A leitura do histórico 7d foi bem-sucedida no ciclo (F3 Task 4, campo
+    /// `history7d` do heartbeat v3): `true` só quando a query do banco rodou;
+    /// `false` = sem DB, query falhou ou nunca rodou — o heartbeat OMITE o
+    /// campo (nada fake), enquanto o painel mantém o último valor bom.
+    public var weekHistoryAvailable: Bool
     public var authState: AuthState
     public var source: DataSource
     public var resetsAt: Date?
@@ -70,6 +75,7 @@ public struct ProviderDisplay: Equatable, Sendable {
         todayCostUsd: Double? = nil,
         weekTokens: Int64 = 0,
         weekCostUsd: Double? = nil,
+        weekHistoryAvailable: Bool = false,
         authState: AuthState = .missing,
         source: DataSource = .localOnly,
         resetsAt: Date? = nil,
@@ -80,6 +86,7 @@ public struct ProviderDisplay: Equatable, Sendable {
         self.todayCostUsd = todayCostUsd
         self.weekTokens = weekTokens
         self.weekCostUsd = weekCostUsd
+        self.weekHistoryAvailable = weekHistoryAvailable
         self.authState = authState
         self.source = source
         self.resetsAt = resetsAt
