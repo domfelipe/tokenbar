@@ -106,6 +106,8 @@ public final class CodexProvider: Sendable, UsageProvider {
     private let client: UsageHTTPClient
     private let offsetStore: any FileOffsetStoring
     private let ledgerSnapshotStore: (any LedgerSnapshotStoring)?
+    /// Persistência F3 aditiva (spec §6); `nil` = degradação F2 (sem DB).
+    private let persisting: (any UsageEventPersisting)?
     private let ledger: TokenLedger
     private let sessionIngester: CodexSessionIngester
     private let calendar: Calendar
@@ -116,13 +118,15 @@ public final class CodexProvider: Sendable, UsageProvider {
         client: UsageHTTPClient,
         offsetStore: any FileOffsetStoring,
         calendar: Calendar,
-        ledgerSnapshotStore: (any LedgerSnapshotStoring)? = nil
+        ledgerSnapshotStore: (any LedgerSnapshotStoring)? = nil,
+        persisting: (any UsageEventPersisting)? = nil
     ) {
         self.sessionsDirectory = sessionsDirectory
         self.authReader = authReader
         self.client = client
         self.offsetStore = offsetStore
         self.ledgerSnapshotStore = ledgerSnapshotStore
+        self.persisting = persisting
         self.ledger = TokenLedger(calendar: calendar)
         self.calendar = calendar
         self.sessionIngester = CodexSessionIngester(
@@ -223,7 +227,7 @@ public final class CodexProvider: Sendable, UsageProvider {
         let updates = try sessionIngester.ingestChangedFilesStreaming(
             under: sessionsDirectory,
             cursors: scanCursors
-        ) { path, events, reset in
+        ) { path, events, reset, endOffset in
             applied += events.count
             ledger.apply(
                 [FileIngestResult(
@@ -234,6 +238,17 @@ public final class CodexProvider: Sendable, UsageProvider {
                 )],
                 now: now
             )
+            // F3: persistência aditiva — erro de DB não aborta o ingest
+            // (loga e segue; DB nunca derruba o app).
+            if let persisting {
+                do {
+                    try persisting.persistBatch(
+                        provider: .codex, path: path, events: events,
+                        endOffset: endOffset, resetToZero: reset)
+                } catch {
+                    persistenceLog.error("persist failed for \(self.id.rawValue, privacy: .public): \(String(describing: type(of: error)), privacy: .public)")
+                }
+            }
         }
 
         // nextCursor por construção: semeado + atualizações do ciclo.

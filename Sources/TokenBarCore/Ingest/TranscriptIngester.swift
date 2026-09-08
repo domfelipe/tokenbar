@@ -48,7 +48,7 @@ public struct TranscriptIngester: Sendable {
             under: directory,
             cursors: cursors,
             makeEvent: makeEvent
-        ) { path, events, _ in
+        ) { path, events, _, _ in
             eventsByPath[path, default: []].append(contentsOf: events)
         }
         return updates.map {
@@ -63,18 +63,24 @@ public struct TranscriptIngester: Sendable {
 
     /// Núcleo streaming: leitura em janela única reutilizada (`read(2)` + memmove
     /// da cauda parcial), parse por segmento com autoreleasepool e entrega dos
-    /// eventos por lote via `onEvents(path, events, reset)` — memória limitada
-    /// independentemente do tamanho do arquivo (Red Team F1, caso 2).
+    /// eventos por lote via `onEvents(path, events, reset, endOffset)` — memória
+    /// limitada independentemente do tamanho do arquivo (Red Team F1, caso 2).
     ///
     /// `reset` vem `true` no primeiro callback relativo a um arquivo que
     /// ENCOLHEU desde o último ciclo (inclusive truncado a zero, mesmo sem
     /// linhas novas) — o ledger usa isso para zerar a soma daquele arquivo e
     /// os totais se autocorrigirem.
+    ///
+    /// `endOffset` (F3): offset ABSOLUTO no arquivo logo após o último byte
+    /// do segmento entregue — a persistência o usa como marca d'água para
+    /// dedupe de re-ingest (rollover re-lê o arquivo do zero; lotes com
+    /// endOffset já coberto NÃO são re-persistidos — sem isso o histórico
+    /// dobraria a cada virada de dia).
     public func ingestChangedFilesStreaming(
         under directory: URL,
         cursors: [String: FileCursor],
         makeEvent: (UsageEvent, String) -> UsageEvent,
-        onEvents: (String, [UsageEvent], Bool) throws -> Void
+        onEvents: (String, [UsageEvent], Bool, UInt64) throws -> Void
     ) throws -> [FileCursorUpdate] {
         let fm = FileManager.default
         guard fm.fileExists(atPath: directory.path) else { return [] }
@@ -127,11 +133,13 @@ public struct TranscriptIngester: Sendable {
                     skipping = false
                 } else {
                     guard let idx = window[0..<pending].lastIndex(of: UInt8(ascii: "\n")) else { return }
+                    let segmentEnd = startOffset + consumed + UInt64(idx + 1)
                     try Self.processSegment(
                         window[0...idx],
                         path: path,
                         modified: modified,
                         reset: reset && !resetSignaled,
+                        endOffset: segmentEnd,
                         parseLine: parseLine,
                         makeEvent: makeEvent,
                         onEvents: onEvents
@@ -189,7 +197,7 @@ public struct TranscriptIngester: Sendable {
             // Encolheu sem nenhuma linha completa (ex.: truncado a 0): ainda
             // sinaliza o reset para o ledger zerar a soma daquele arquivo.
             if reset && !resetSignaled {
-                try onEvents(path, [], true)
+                try onEvents(path, [], true, startOffset + consumed)
             }
 
             let finalCursor = startOffset + consumed
@@ -208,9 +216,10 @@ public struct TranscriptIngester: Sendable {
         path: String,
         modified: Date,
         reset: Bool,
+        endOffset: UInt64,
         parseLine: @Sendable (String, Date) -> UsageEvent?,
         makeEvent: (UsageEvent, String) -> UsageEvent,
-        onEvents: (String, [UsageEvent], Bool) throws -> Void
+        onEvents: (String, [UsageEvent], Bool, UInt64) throws -> Void
     ) throws {
         var batch: [UsageEvent] = []
         try autoreleasepool {
@@ -222,11 +231,11 @@ public struct TranscriptIngester: Sendable {
             }
         }
         if !batch.isEmpty {
-            try onEvents(path, batch, reset)
+            try onEvents(path, batch, reset, endOffset)
         } else if reset {
             // Segmento sem eventos em arquivo que encolheu: o primeiro callback
             // carrega o sinal de reset (ledger zera a soma do arquivo).
-            try onEvents(path, [], true)
+            try onEvents(path, [], true, endOffset)
         }
     }
 

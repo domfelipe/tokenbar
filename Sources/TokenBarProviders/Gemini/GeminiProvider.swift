@@ -89,6 +89,8 @@ public final class GeminiProvider: Sendable, UsageProvider {
     private let accountID: AccountID
     private let offsetStore: any FileOffsetStoring
     private let ledgerSnapshotStore: (any LedgerSnapshotStoring)?
+    /// Persistência F3 aditiva (spec §6); `nil` = degradação F2 (sem DB).
+    private let persisting: (any UsageEventPersisting)?
     private let ledger: TokenLedger
     private let dedupe: GeminiDedupe
     private let sessionIngester: GeminiSessionIngester
@@ -98,7 +100,8 @@ public final class GeminiProvider: Sendable, UsageProvider {
         geminiDirectory: URL,
         offsetStore: any FileOffsetStoring,
         calendar: Calendar,
-        ledgerSnapshotStore: (any LedgerSnapshotStoring)? = nil
+        ledgerSnapshotStore: (any LedgerSnapshotStoring)? = nil,
+        persisting: (any UsageEventPersisting)? = nil
     ) {
         let account = AccountID(provider: .gemini, key: "local")
         self.accountID = account
@@ -106,6 +109,7 @@ public final class GeminiProvider: Sendable, UsageProvider {
         self.tmpDirectory = geminiDirectory.appendingPathComponent("tmp", isDirectory: true)
         self.offsetStore = offsetStore
         self.ledgerSnapshotStore = ledgerSnapshotStore
+        self.persisting = persisting
         self.ledger = TokenLedger(calendar: calendar)
         self.dedupe = GeminiDedupe()
         self.calendar = calendar
@@ -205,7 +209,7 @@ public final class GeminiProvider: Sendable, UsageProvider {
         let updates = try sessionIngester.ingestChangedFilesStreaming(
             under: tmpDirectory,
             cursors: scanCursors
-        ) { path, events, reset in
+        ) { path, events, reset, endOffset in
             // Dedupe por id (spec §3.3: duplicata real) — drop ANTES do ledger.
             var fresh: [UsageEvent] = []
             fresh.reserveCapacity(events.count)
@@ -228,6 +232,17 @@ public final class GeminiProvider: Sendable, UsageProvider {
                 )],
                 now: now
             )
+            // F3: persistência aditiva APÓS o dedupe (duplicata não vira linha
+            // no DB); erro de DB não aborta o ingest (loga e segue).
+            if let persisting {
+                do {
+                    try persisting.persistBatch(
+                        provider: .gemini, path: path, events: fresh,
+                        endOffset: endOffset, resetToZero: reset)
+                } catch {
+                    persistenceLog.error("persist failed for \(self.id.rawValue, privacy: .public): \(String(describing: type(of: error)), privacy: .public)")
+                }
+            }
         }
 
         // nextCursor por construção: semeado + atualizações do ciclo, cada

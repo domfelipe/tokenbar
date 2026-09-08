@@ -210,7 +210,7 @@ final class TranscriptIngesterTests: Sendable {
             under: dir,
             cursors: [:],
             makeEvent: identityTag
-        ) { _, events, reset in
+        ) { _, events, reset, _ in
             deliveries.append((events.count, reset))
         }
         let totalEvents = deliveries.reduce(0) { $0 + $1.events }
@@ -238,7 +238,7 @@ final class TranscriptIngesterTests: Sendable {
             under: dir,
             cursors: [first[0].path: first[0].cursor],
             makeEvent: identityTag
-        ) { _, events, reset in
+        ) { _, events, reset, _ in
             if reset { resets += 1 }
             #expect(events.isEmpty)
         }
@@ -273,7 +273,7 @@ final class TranscriptIngesterTests: Sendable {
             under: dir,
             cursors: [first[0].path: first[0].cursor],
             makeEvent: identityTag
-        ) { _, events, reset in
+        ) { _, events, reset, _ in
             deliveries.append((events.map { Int($0.outputTokens) }, reset))
         }
         let flat = deliveries.flatMap(\.events)
@@ -297,7 +297,7 @@ final class TranscriptIngesterTests: Sendable {
             under: dir,
             cursors: [:],
             makeEvent: identityTag
-        ) { _, events, _ in total += events.count }
+        ) { _, events, _, _ in total += events.count }
         #expect(total == 3_000)
         #expect(Int(updates[0].cursor.offset) == body.utf8.count - 2, "cauda 'T7' fica para o próximo ciclo")
     }
