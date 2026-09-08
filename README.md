@@ -42,6 +42,7 @@ Every override is optional and intended for tests/e2e — a normal launch uses n
 | `TOKENBAR_ZAI_API` | Base URL of the Z.ai quota API — the canonical path `api/monitor/usage/quota/limit` is appended; the host also selects the region (default `https://api.z.ai`). |
 | `TOKENBAR_ZAI_CONFIG` | Path of the Z.ai `config.json` (apiKey + region, default `~/.zcode/v2/config.json`). |
 | `TOKENBAR_ZAI_AUTH` | Path of the Z.ai `credentials.json` (OAuth fallback token, default `~/.zcode/v2/credentials.json`). |
+| `TOKENBAR_GEMINI_DIR` | Gemini CLI state directory whose `tmp/<project>/chats/session-*.jsonl` files are ingested (default `~/.gemini`). |
 
 ## Privacy
 
