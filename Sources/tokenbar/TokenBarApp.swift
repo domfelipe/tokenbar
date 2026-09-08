@@ -63,12 +63,17 @@ struct TokenBarApp: App {
                     Task { await appState.exportHistory() }
                 }
                 // F4 Task 3: multi-conta — abre o form para o provider da aba
-                // selecionada (ou o primeiro com suporte). Sem DB (degradação
-                // F2) ou sem suporte → item oculto (honesto: nada a registrar).
+                // selecionada COM suporte (aba Gemini/sem suporte não registra
+                // linha morta; review T3 Minor 2) ou o primeiro com suporte.
+                // Sem DB (degradação F2) → item oculto (honesto: nada a
+                // registrar).
                 if appState.accountsModel.registry != nil {
                     Button("Add account…") {
-                        let target = appState.store.selectedProvider
-                            ?? appState.accountsModel.multiAccountProviders.sorted { $0.rawValue < $1.rawValue }.first
+                        let selected = appState.store.selectedProvider
+                        let target = selected
+                            .flatMap { appState.accountsModel.supportsMultiAccount($0) ? $0 : nil }
+                            ?? appState.accountsModel.multiAccountProviders
+                                .sorted { $0.rawValue < $1.rawValue }.first
                         if let target {
                             appState.showAddAccount(for: target)
                         }

@@ -91,4 +91,100 @@ struct AccountsModelTests {
             directoryPath: "/tokenbar/nao/existe-dir")
         #expect(withDir.warnings.count == 2)
     }
+
+    // MARK: - Guard de overlap (review T3, Important)
+
+    /// Fixture real com dir canônica, dir irmã e symlink → canônica.
+    @Test("validação: diretório sobreposto a raiz em uso é BLOQUEADO; irmão passa")
+    func validationBlocksOverlappingDirectory() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("overlap-\(UUID().uuidString)", isDirectory: true)
+        let canonical = root.appendingPathComponent("canon", isDirectory: true)
+        let sibling = root.appendingPathComponent("sibling", isDirectory: true)
+        for dir in [canonical, sibling] {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        let link = root.appendingPathComponent("link-to-canon")
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: canonical.path)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let roots = [canonical.path]
+        let credential = sibling.path  // existe → sem warning de credencial
+
+        func validate(directory: String) -> AddAccountForm.Validation {
+            AddAccountForm.validate(
+                label: "Work", credentialPath: credential,
+                directoryPath: directory, existingScanRoots: roots)
+        }
+
+        // Igual → bloqueado.
+        var result = validate(directory: canonical.path)
+        #expect(!result.isAddable)
+        #expect(result.blocking.contains("Directory overlaps an existing account's scan root."))
+
+        // Contida na raiz (subdir) → bloqueado.
+        result = validate(directory: canonical.appendingPathComponent("sub").path)
+        #expect(!result.isAddable)
+
+        // Contendo a raiz (pai) → bloqueado.
+        result = validate(directory: root.path)
+        #expect(!result.isAddable)
+
+        // Symlink resolvendo pro mesmo dir → bloqueado.
+        result = validate(directory: link.path)
+        #expect(!result.isAddable, "symlink para a canônica é o mesmo scan root")
+
+        // Irmão não-sobreposto → passa limpo.
+        let ok = validate(directory: sibling.path)
+        #expect(ok.isAddable)
+        #expect(ok.blocking.isEmpty && ok.warnings.isEmpty)
+
+        // Dir inexistente SEM overlap → segue sendo só aviso (nunca bloqueio).
+        let missing = validate(directory: root.appendingPathComponent("futura").path)
+        #expect(missing.isAddable)
+        #expect(missing.warnings.count == 1)
+    }
+
+    @Test("model: raízes em uso = canônica + registradas; guard pina overlap por provider")
+    func modelScanRootsAndOverlapGuard() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("overlap-model-\(UUID().uuidString)", isDirectory: true)
+        let canonical = root.appendingPathComponent("canon", isDirectory: true)
+        let work = root.appendingPathComponent("work", isDirectory: true)
+        let sibling = root.appendingPathComponent("sibling", isDirectory: true)
+        for dir in [canonical, work, sibling] {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let db = try makeDatabase()
+        let registry = AccountRegistry(database: db)
+        let model = AccountsModel(
+            registry: registry,
+            multiAccountProviders: [.claude, .zai],
+            canonicalRoots: [.claude: canonical.path])
+
+        // Só a canônica em uso antes de qualquer registro.
+        #expect(model.existingScanRoots(provider: .claude) == [canonical.path])
+
+        // Guard: igual/contida → overlap; irmã → não.
+        #expect(model.directoryOverlaps(provider: .claude, directoryPath: canonical.path))
+        #expect(model.directoryOverlaps(provider: .claude, directoryPath: canonical.appendingPathComponent("sub").path))
+        #expect(!model.directoryOverlaps(provider: .claude, directoryPath: sibling.path))
+
+        // Conta registrada com dir própria entra nas raízes em uso.
+        let account = try model.add(
+            provider: .claude, label: "Work",
+            credentialPath: sibling.path, directoryPath: work.path)
+        #expect(Set(model.existingScanRoots(provider: .claude)) == Set([canonical.path, work.path]))
+        #expect(model.directoryOverlaps(provider: .claude, directoryPath: work.path),
+                "dir de outra conta registrada também é raiz em uso")
+
+        // Provider diferente: mesma dir NÃO é overlap (queries são por provider).
+        #expect(!model.directoryOverlaps(provider: .zai, directoryPath: canonical.path))
+
+        // Remoção devolve a raiz ao estado livre.
+        model.remove(account)
+        #expect(!model.directoryOverlaps(provider: .claude, directoryPath: work.path))
+    }
 }

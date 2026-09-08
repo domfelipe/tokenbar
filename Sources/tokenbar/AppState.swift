@@ -46,9 +46,18 @@ final class AppState: NSObject, NSWindowDelegate {
         ))
         coordinator = coord
         let multiAccount = Set(ProviderID.allCases.filter { coord.supportsMultiAccount($0) })
+        // Raízes canônicas de scan: insumo do guard de overlap do registro
+        // (dir de conta sobre a canônica dobraria o histórico — review T3).
+        var canonicalRoots: [ProviderID: String] = [:]
+        for id in multiAccount {
+            if let root = coord.canonicalScanRoot(for: id) {
+                canonicalRoots[id] = root.path
+            }
+        }
         accountsModel = AccountsModel(
             registry: coord.accountRegistry,
-            multiAccountProviders: multiAccount)
+            multiAccountProviders: multiAccount,
+            canonicalRoots: canonicalRoots)
         super.init()  // NSObject: antes de qualquer uso de self (delegates)
         accountsModel.onMutation = { [weak self] in
             guard let self else { return }

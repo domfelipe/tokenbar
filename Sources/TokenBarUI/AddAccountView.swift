@@ -66,7 +66,11 @@ public struct AddAccountView: View {
     }
 
     private var validation: AddAccountForm.Validation {
-        AddAccountForm.validate(label: label, credentialPath: credentialPath, directoryPath: directoryPath)
+        // Raízes em uso (canônica + dirs de contas registradas) alimentam o
+        // guard de overlap — dir sobreposta é registro BLOQUEADO (review T3).
+        AddAccountForm.validate(
+            label: label, credentialPath: credentialPath, directoryPath: directoryPath,
+            existingScanRoots: model.existingScanRoots(provider: provider))
     }
 
     private func add() {

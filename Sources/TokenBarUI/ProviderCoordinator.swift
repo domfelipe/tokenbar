@@ -336,6 +336,19 @@ public final class ProviderCoordinator {
         registry.provider(for: id)?.capabilities.contains(.multiAccount) ?? false
     }
 
+    /// Raiz de scan canônica do provider (conta default) — insumo do guard de
+    /// overlap do registro de contas (review T3: dir de conta sobrepondo a
+    /// raiz canônica dobraria o histórico provider-wide de forma persistente).
+    /// `nil` = provider sem ingest local (nada a proteger).
+    public func canonicalScanRoot(for id: ProviderID) -> URL? {
+        switch id {
+        case .claude: return defaultClaudeDirectory
+        case .codex: return defaultCodexSessionsDirectory
+        case .gemini: return watcherDirectories[.gemini]
+        default: return nil
+        }
+    }
+
     /// Um ciclo do provider: descoberta MERGE de contas → por conta (ingest
     /// local + fetchUsage) → agregado → publish → noteResult. Skip-if-busy:
     /// ciclo em curso deste provider → este vira não-op (o próximo tick
