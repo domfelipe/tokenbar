@@ -25,7 +25,7 @@ public struct GeminiSessionIngester: Sendable {
     public func ingestChangedFilesStreaming(
         under directory: URL,
         cursors: [String: FileCursor],
-        onEvents: (String, [UsageEvent], Bool) throws -> Void
+        onEvents: (String, [UsageEvent], Bool, UInt64) throws -> Void
     ) throws -> [FileCursorUpdate] {
         try ingester.ingestChangedFilesStreaming(
             under: directory,

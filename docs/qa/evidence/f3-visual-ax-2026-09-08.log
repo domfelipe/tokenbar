@@ -1,0 +1,41 @@
+[qa] gerando corpus pequeno + sessão Gemini
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'genfixtures' complete! (0.16s)
+[qa] launch do app real (isolado; sem credenciais → API-driven em .missing, zero rede)
+[qa] heartbeat: menuBarText='C:37.8k G:193' claude=37820 cost=0.10211085 h7=63077 h7cost=0.1571421
+[qa] === QA-1: AX item na menu bar (nome == menuBarText) ===
+C:37.8k G:193
+[qa] === QA-2: AX clicar no item → painel .window ===
+AXWindow, AXSystemDialog
+[qa] === QA-3: AX textos do painel (linhas por provider com custo ~$ e 7d) ===
+C Claude: 37.8k hoje ~$0.10 · 7d: 63.1k ~$0.16 (local), G Gemini: 193 hoje ~$0.0003 · 7d: 193 ~$0.0003 (local)
+[qa] === QA-4: AX botões do painel (nomes em group 1) ===
+missing value, missing value, missing value, missing value
+[qa] === QA-5: AX clicar 'Analytics…' (botão 2) ===
+por-posicao
+[qa] === QA-5b: AX janela Analytics presente (título + geometria + processo vivo) ===
+, TokenBar Analytics
+AXWindow, 640, 532, 894, 1221
+[qa] QA-5c: processo vivo com a janela aberta: SIM
+[qa] === QA-5d: screenshot da janela Analytics (só funciona com Screen Recording liberada) ===
+  pixelWidth: 2560
+  pixelHeight: 1080
+[qa] screenshot: /tmp/qa-analytics-XXXX.png
+[qa] === QA-6: AX clicar 'Export history…' (botão 3) ===
+por-posicao
+[qa] QA-6b: conteúdo de <support>/exports:
+total 16
+drwxr-xr-x@ 4 felipedomingues  wheel   128 Sep  8 13:16 .
+drwxr-xr-x@ 9 felipedomingues  wheel   288 Sep  8 13:16 ..
+-rw-r--r--@ 1 felipedomingues  wheel   438 Sep  8 13:16 history-20260908-161607.csv
+-rw-r--r--@ 1 felipedomingues  wheel  1360 Sep  8 13:16 history-20260908-161607.json
+[qa] === QA-3 (re-validação dos textos do painel, pós-analytics/abrir de novo) ===
+
+[qa] === QA-7: AX Refresh now (botão 1) → updatedAt avança ===
+83:120: execution error: System Events obteve um erro: Não é possível obter button 1 of group 1 of window 1 of process 1 whose unix id = 71961. Índice inválido. (-1719)
+[qa] QA-7b: updatedAt 2026-09-08T16:16:02Z → 2026-09-08T16:16:02Z; processo vivo: sim
+[qa] === QA-8: AX Quit (botão 4) → sem zumbi ===
+179:216: execution error: System Events obteve um erro: Não é possível obter button 4 of group 1 of window 1 of process 1 whose unix id = 71961. Índice inválido. (-1719)
+[qa] QA-8b: pgrep pós-quit: '71961 ' (vazio = limpo)
+[qa] fim do checklist

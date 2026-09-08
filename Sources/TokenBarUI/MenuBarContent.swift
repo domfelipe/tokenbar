@@ -29,6 +29,17 @@ public func criticalWindow(in windows: [UsageWindow]) -> UsageWindow? {
     return best
 }
 
+/// Formato do custo estimado no painel: "~$12.34". Abaixo de 1 centavo usa 4
+/// decimais para não virar "~$0.00" (que esconderia gasto real pequeno); o
+/// "~" marca estimativa — conversão de moeda e precisão de centavos são fora
+/// de escopo (Global Constraints F3).
+public func formatEstimatedUSD(_ cost: Double) -> String {
+    if cost > 0, cost < 0.01 {
+        return String(format: "~$%.4f", cost)
+    }
+    return String(format: "~$%.2f", cost)
+}
+
 /// Estado de exibição de UM provider — o que a UI/heartbeat consome por ciclo.
 /// `percent` em escala 0...100 (`nil` = sem janela com fração conhecida);
 /// `resetsAt` da janela crítica (linha "reseta em" do menu); `source` alimenta
@@ -37,6 +48,22 @@ public func criticalWindow(in windows: [UsageWindow]) -> UsageWindow? {
 public struct ProviderDisplay: Equatable, Sendable {
     public var percent: Double?
     public var todayTokens: Int64
+    /// Custo estimado do dia (soma de `cost_usd` dos eventos de hoje, do DB).
+    /// `nil` = sem custo computável (sem DB, sem evento precificado hoje) — o
+    /// painel mantém só tokens. NUNCA aparece na string do menu bar (o render
+    /// gate da F1 preserva "C:12.4k X:0% Z:17%"); custo é só painel/heartbeat.
+    public var todayCostUsd: Double?
+    /// Tokens dos últimos 7 dias (daily_agg, janela de 7 dias calendário) —
+    /// F3 Task 3, linha "7d: X tok ~$Y" do painel. 0 = sem histórico na
+    /// janela (segmento omitido). Atualizado 1× por ciclo, fora da MainActor.
+    public var weekTokens: Int64
+    /// Custo estimado dos 7 dias (`nil` = sem custo computável — NULL ≠ 0).
+    public var weekCostUsd: Double?
+    /// A leitura do histórico 7d foi bem-sucedida no ciclo (F3 Task 4, campo
+    /// `history7d` do heartbeat v3): `true` só quando a query do banco rodou;
+    /// `false` = sem DB, query falhou ou nunca rodou — o heartbeat OMITE o
+    /// campo (nada fake), enquanto o painel mantém o último valor bom.
+    public var weekHistoryAvailable: Bool
     public var authState: AuthState
     public var source: DataSource
     public var resetsAt: Date?
@@ -45,6 +72,10 @@ public struct ProviderDisplay: Equatable, Sendable {
     public init(
         percent: Double? = nil,
         todayTokens: Int64 = 0,
+        todayCostUsd: Double? = nil,
+        weekTokens: Int64 = 0,
+        weekCostUsd: Double? = nil,
+        weekHistoryAvailable: Bool = false,
         authState: AuthState = .missing,
         source: DataSource = .localOnly,
         resetsAt: Date? = nil,
@@ -52,6 +83,10 @@ public struct ProviderDisplay: Equatable, Sendable {
     ) {
         self.percent = percent
         self.todayTokens = todayTokens
+        self.todayCostUsd = todayCostUsd
+        self.weekTokens = weekTokens
+        self.weekCostUsd = weekCostUsd
+        self.weekHistoryAvailable = weekHistoryAvailable
         self.authState = authState
         self.source = source
         self.resetsAt = resetsAt
@@ -145,7 +180,8 @@ public struct MenuBarContent: Equatable, Sendable {
     }
 
     /// Linhas do painel (menu aberto): "X Codex: 62% — reseta em 2h",
-    /// "C Claude: 12.4k hoje (local)". Provider sem dado não ganha linha.
+    /// "C Claude: 12.4k hoje ~$0.08 (local)". Provider sem dado não ganha
+    /// linha; provider sem custo computável mantém só tokens (F3 Task 2).
     public func menuLines(now: Date = Date()) -> [String] {
         orderedProviders().map { id, display in
             var line = "\(Self.sigla(for: id)) \(Self.displayName(for: id)): "
@@ -154,6 +190,19 @@ public struct MenuBarContent: Equatable, Sendable {
                 line += "\(Int(clamped.rounded()))%"
             } else {
                 line += abbrevTokens(display.todayTokens) + " hoje"
+            }
+            // Custo do dia vem logo após a métrica principal ("C:12.4k ~$0.08").
+            if let cost = display.todayCostUsd {
+                line += " " + formatEstimatedUSD(cost)
+            }
+            // Histórico 7d (F3 Task 3): após as métricas de hoje, antes do
+            // sufixo de reset — "· 7d: 45.6k ~$0.31". Sem tokens na janela →
+            // segmento omitido (nada inventado); custo só quando computável.
+            if display.weekTokens > 0 {
+                line += " · 7d: " + abbrevTokens(display.weekTokens)
+                if let weekCost = display.weekCostUsd {
+                    line += " " + formatEstimatedUSD(weekCost)
+                }
             }
             if let resetsAt = display.resetsAt, let suffix = Self.resetSuffix(from: now, to: resetsAt) {
                 line += " — \(suffix)"

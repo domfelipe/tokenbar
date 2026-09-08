@@ -4,10 +4,12 @@ import TokenBarProviders
 
 /// Configuração de wiring do coordinator — tudo injetável p/ testes e
 /// selfcheck: environment (overrides TOKENBAR_*), dirs, e2e e fábrica de
-/// stores de cursor. Default da fábrica: um JSON POR provider no App Support
-/// (`claude-cursors.json`, `codex-cursors.json`, `gemini-cursors.json`) —
-/// OBRIGAÇÃO DURA F2: compartilhar um arquivo cruzaria providers (o rollover
-/// zera todos os paths do store injetado).
+/// stores de cursor. Default da fábrica (F3): store de cursores em SQLite
+/// (`DBOffsetStore`, tabela `settings`) quando o banco abre — um POR provider,
+/// chave `cursors:<provider>` — com fallback JSON POR provider no App Support
+/// (`claude-cursors.json`, …) quando o DB não abre. OBRIGAÇÃO DURA F2:
+/// compartilhar um store cruzaria providers (o rollover zera todos os paths
+/// do store injetado). Fábrica injetada (testes/selfcheck) tem precedência.
 public struct ProviderCoordinatorConfig: Sendable {
     public let environment: [String: String]
     public let home: URL
@@ -15,6 +17,9 @@ public struct ProviderCoordinatorConfig: Sendable {
     public let e2eDirectory: URL?
     public let makeOffsetStore: @Sendable (ProviderID) -> any FileOffsetStoring
     public let makeLedgerSnapshotStore: @Sendable (ProviderID) -> (any LedgerSnapshotStoring)?
+    /// `false` quando o chamador injetou fábrica própria (testes/selfcheck) —
+    /// nesse caso a store de cursores em SQLite NÃO substitui a injetada.
+    let usesDefaultOffsetStore: Bool
 
     public init(
         environment: [String: String],
@@ -28,6 +33,7 @@ public struct ProviderCoordinatorConfig: Sendable {
         self.home = home
         self.supportDirectory = supportDirectory
         self.e2eDirectory = e2eDirectory
+        self.usesDefaultOffsetStore = (makeOffsetStore == nil)
         if let makeOffsetStore {
             self.makeOffsetStore = makeOffsetStore
         } else {
@@ -79,6 +85,15 @@ public final class ProviderCoordinator {
     public let scheduler: AdaptiveScheduler
     private let config: ProviderCoordinatorConfig
     private let registry: ProviderRegistry
+    /// Banco aberto no init (F3); `nil` = degradação F2 (sem persistência e
+    /// sem custo: `todayCostUsd` do display fica `nil` — nunca chutado).
+    /// Retido além do wiring dos providers para a consulta do custo do dia.
+    private let database: AppDatabase?
+    /// Exposição só-LEITURA do banco p/ a UI de F3 (linha 7d do painel,
+    /// analytics, export). Queries rodam FORA da MainActor no chamador.
+    public var historyDatabase: AppDatabase? { database }
+    /// Support directory (o export grava em `<support>/exports`).
+    public var supportDirectory: URL { config.supportDirectory }
 
     /// Dirs observados por FSEvents (file-driven): Claude projects, Gemini tmp.
     private let watcherDirectories: [ProviderID: URL]
@@ -109,13 +124,50 @@ public final class ProviderCoordinator {
         let home = config.home
         let calendar = Calendar.current
 
+        // F3: banco SQLite (schema spec §6) na support directory — o
+        // TOKENBAR_SUPPORT_DIR do AppState isola app/e2e. Falha de abertura
+        // → nil → comportamento F2 degradado (JSON stores, sem persistência):
+        // DB nunca derruba o app. O diretório TEM que existir antes do open
+        // (DatabasePool não cria diretórios): o AppState cria via
+        // SupportDirectory.resolve e as fábricas default também criam, mas o
+        // selfcheck passa um dir próprio com fábricas injetadas — sem o
+        // createDirectory aqui o DB dele NUNCA abria e o history7d ficava
+        // sempre omitido (review T4, Important).
+        try? FileManager.default.createDirectory(
+            at: config.supportDirectory, withIntermediateDirectories: true)
+        let database = try? AppDatabase.open(
+            at: config.supportDirectory.appendingPathComponent(AppDatabase.databaseName),
+            calendar: calendar)
+        self.database = database
+        if let database {
+            // Migração dos cursores legados F1/F2 (JSON → settings), uma vez
+            // por arquivo (idempotente); o live store vira DBOffsetStore.
+            for id in [ProviderID.claude, .codex, .gemini] {
+                CursorMigrator.migrate(
+                    provider: id,
+                    jsonURL: config.supportDirectory.appendingPathComponent("\(id.rawValue)-cursors.json"),
+                    database: database)
+            }
+        }
+
         // Um store POR provider (obrigação dura F2); guarda p/ semeadura de
-        // primeira fase ("store fresco").
-        let stores: [ProviderID: any FileOffsetStoring] = [
-            .claude: config.makeOffsetStore(.claude),
-            .codex: config.makeOffsetStore(.codex),
-            .gemini: config.makeOffsetStore(.gemini),
-        ]
+        // primeira fase ("store fresco"). Com DB aberto e fábrica DEFAULT,
+        // o store vivo é o DBOffsetStore (settings); fábrica injetada
+        // (testes/selfcheck) tem precedência; sem DB → JSON legado (F2).
+        let stores: [ProviderID: any FileOffsetStoring]
+        if let database, config.usesDefaultOffsetStore {
+            stores = [
+                .claude: DBOffsetStore(database: database, provider: .claude),
+                .codex: DBOffsetStore(database: database, provider: .codex),
+                .gemini: DBOffsetStore(database: database, provider: .gemini),
+            ]
+        } else {
+            stores = [
+                .claude: config.makeOffsetStore(.claude),
+                .codex: config.makeOffsetStore(.codex),
+                .gemini: config.makeOffsetStore(.gemini),
+            ]
+        }
         offsetStores = stores
         // Snapshot do dia por provider (restart mid-day, Red Team F2 caso 7):
         // mesmo diretório dos cursores; Z.ai não tem ingest → sem snapshot.
@@ -131,7 +183,8 @@ public final class ProviderCoordinator {
             projectsDirectory: claudeDirectory,
             offsetStore: stores[.claude]!,
             calendar: calendar,
-            ledgerSnapshotStore: ledgerStores[.claude]
+            ledgerSnapshotStore: ledgerStores[.claude],
+            persisting: database
         )
         let codex = CodexProvider(
             sessionsDirectory: CodexProvider.resolveSessionsDirectory(environment: env, home: home),
@@ -139,13 +192,15 @@ public final class ProviderCoordinator {
             client: UsageHTTPClient(baseURL: CodexProvider.resolveBaseURL(environment: env)),
             offsetStore: stores[.codex]!,
             calendar: calendar,
-            ledgerSnapshotStore: ledgerStores[.codex]
+            ledgerSnapshotStore: ledgerStores[.codex],
+            persisting: database
         )
         let gemini = GeminiProvider(
             geminiDirectory: geminiDirectory,
             offsetStore: stores[.gemini]!,
             calendar: calendar,
-            ledgerSnapshotStore: ledgerStores[.gemini]
+            ledgerSnapshotStore: ledgerStores[.gemini],
+            persisting: database
         )
         let zaiReader = ZaiCredentialReader.resolve(environment: env, home: home)
         let zai = ZaiProvider(
@@ -250,6 +305,28 @@ public final class ProviderCoordinator {
                 cursorSeeds[id] = batch.nextCursor
                 var display = displays[id] ?? .empty
                 display.todayTokens = batch.providerTotals[id] ?? 0
+                // Custo do dia (F3): soma de cost_usd dos eventos de hoje,
+                // direto do DB — 1 leitura indexada por CICLO (o render do
+                // menu bar segue sem tocar no banco; gate da F1). Falha de
+                // leitura → nil (painel fica só com tokens, honesto).
+                if let database {
+                    display.todayCostUsd = try? database.todayCostUSD(provider: id)
+                    // Histórico 7d (F3 Task 3): 1 query indexada por CICLO —
+                    // FORA da MainActor (SQLite não roda na main), chega via
+                    // await. Falha de leitura → mantém o último valor bom no
+                    // painel (nunca zera o histórico por um erro transitório)
+                    // e o heartbeat v3 OMITE o history7d (flag abaixo).
+                    let week = await Task.detached(priority: .utility) {
+                        try? database.weekTotal(provider: id)
+                    }.value
+                    if let week {
+                        display.weekTokens = week.tokens
+                        display.weekCostUsd = week.costUSD
+                        display.weekHistoryAvailable = true
+                    } else {
+                        display.weekHistoryAvailable = false
+                    }
+                }
                 display.fetchedAt = Date()
                 displays[id] = display
             } catch {

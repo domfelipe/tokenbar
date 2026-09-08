@@ -38,6 +38,10 @@ public final class ClaudeProvider: Sendable, UsageProvider {
     private let projectsDirectory: URL
     private let offsetStore: any FileOffsetStoring
     private let ledgerSnapshotStore: (any LedgerSnapshotStoring)?
+    /// Persistência F3 (aditiva — o ledger do dia continua sendo a fonte do
+    /// display; spec §6). `nil` = degradação F2 (DB indisponível/falha de
+    /// abertura): ingest segue idêntica, eventos não são persistidos.
+    private let persisting: (any UsageEventPersisting)?
     private let ledger: TokenLedger
     private let ingester: TranscriptIngester
     private let calendar: Calendar
@@ -46,11 +50,13 @@ public final class ClaudeProvider: Sendable, UsageProvider {
         projectsDirectory: URL,
         offsetStore: any FileOffsetStoring,
         calendar: Calendar,
-        ledgerSnapshotStore: (any LedgerSnapshotStoring)? = nil
+        ledgerSnapshotStore: (any LedgerSnapshotStoring)? = nil,
+        persisting: (any UsageEventPersisting)? = nil
     ) {
         self.projectsDirectory = projectsDirectory
         self.offsetStore = offsetStore
         self.ledgerSnapshotStore = ledgerSnapshotStore
+        self.persisting = persisting
         self.ledger = TokenLedger(calendar: calendar)
         self.calendar = calendar
         let account = AccountID(provider: .claude, key: "local")
@@ -174,7 +180,7 @@ public final class ClaudeProvider: Sendable, UsageProvider {
                 e.project = e.project ?? project
                 return e
             },
-            onEvents: { path, events, reset in
+            onEvents: { path, events, reset, endOffset in
                 applied += events.count
                 // Aplica imediatamente e descarta o lote — sem retenção de eventos.
                 ledger.apply(
@@ -186,6 +192,19 @@ public final class ClaudeProvider: Sendable, UsageProvider {
                     )],
                     now: now
                 )
+                // F3: persistência aditiva na MESMA passada (single-flight do
+                // ciclo preservado). Erro de DB não aborta o ingest — loga e
+                // segue (display do dia continua correto; spec: DB nunca
+                // derruba o app). Sem credenciais no log.
+                if let persisting {
+                    do {
+                        try persisting.persistBatch(
+                            provider: .claude, path: path, events: events,
+                            endOffset: endOffset, resetToZero: reset)
+                    } catch {
+                        persistenceLog.error("persist failed for \(self.id.rawValue, privacy: .public): \(String(describing: type(of: error)), privacy: .public)")
+                    }
+                }
             }
         )
         // nextCursor por construção: semeado + atualizações do ciclo (não re-lê

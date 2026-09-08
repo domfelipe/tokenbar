@@ -1,0 +1,17 @@
+[qa4] lab: /tmp/t5-qa-lab (support/e2e intactos da rodada do f3-visual-ax-2026-09-08.log)
+[qa4] === launch do app real ===
+[qa4] APP_PID=89788
+[qa4] heartbeat: menuBarText='C:37.8k G:193' updatedAt=2026-09-08T16:43:39Z
+[qa4] === item 5: abrir o painel e clicar Refresh now (botão 1 de group 1 de window 1) ===
+[qa4] windows após abrir painel: 1
+[qa4] updatedAt ANTES do refresh: 2026-09-08T16:43:41Z
+button 1 of group 1 of window 1 of application process tokenbar
+[qa4] updatedAt DEPOIS do refresh: 2026-09-08T16:43:43Z
+[qa4] ITEM 5 PASS: updatedAt avançou (2026-09-08T16:43:41Z → 2026-09-08T16:43:43Z)
+[qa4] processo vivo pós-refresh: sim
+[qa4] === item 6: clicar Quit TokenBar (botão 4 de group 1 de window 1) ===
+[qa4] windows antes do quit: 1
+missing value
+[qa4] pgrep pós-quit: ''
+[qa4] ITEM 6 PASS: processo encerrado, sem zumbi
+[qa4] fim da re-execução

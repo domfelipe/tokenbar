@@ -1,3 +1,4 @@
+import Darwin
 import Testing
 import Foundation
 import TokenBarCore
@@ -50,6 +51,14 @@ struct ProviderCoordinatorTests {
                 e2eDirectory: e2e
             )
         }
+    }
+
+    /// Timestamp de AGORA em ISO8601 fracionado (formato dos transcripts reais):
+    /// o ledger só soma eventos do dia corrente.
+    private static func isoNow() -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f.string(from: Date())
     }
 
     private final class MemOffsetStore: FileOffsetStoring, @unchecked Sendable {
@@ -208,4 +217,95 @@ struct ProviderCoordinatorTests {
         let raw = String(decoding: data, as: UTF8.self)
         #expect(!raw.contains(fakeToken))
     }
+
+    /// F3 wiring (default factory): com o banco abrindo, o store de cursores
+    /// vivo é o DBOffsetStore e a ingest PERSISTE eventos — sem fábrica
+    /// injetada, sem cursors.json novo, eventos consultáveis no SQLite.
+    @Test("wiring F3: ingest do coordinator persiste no SQLite (store de cursores no settings)")
+    func databaseWiringPersistsIngestedEvents() async throws {
+        let fixture = try Fixture.make(fakeToken: "t7-synthetic-token-never-real")
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+
+        // Corpus Claude sintético (formato real do transcript).
+        let session = fixture.root.appendingPathComponent("claude/proj", isDirectory: true)
+        try FileManager.default.createDirectory(at: session, withIntermediateDirectories: true)
+        let line =
+            "{\"type\":\"assistant\",\"timestamp\":\"\(Self.isoNow())\",\"message\":{\"model\":\"claude-sonnet-4-6\",\"usage\":{\"input_tokens\":33,\"output_tokens\":44}}}"
+        try (line + "\n").write(to: session.appendingPathComponent("s1.jsonl"), atomically: true, encoding: .utf8)
+
+        let support = fixture.root.appendingPathComponent("support")
+        let coordinator = ProviderCoordinator(config: ProviderCoordinatorConfig(
+            environment: fixture.environment,
+            home: fixture.root,
+            supportDirectory: support,
+            e2eDirectory: fixture.e2eDirectory
+        ))  // SEM makeOffsetStore: default F3 → DBOffsetStore
+
+        await coordinator.refreshAllNow()
+
+        // Banco criado na support directory com eventos persistidos.
+        let db = try AppDatabase.open(at: support.appendingPathComponent(AppDatabase.databaseName))
+        #expect(try db.usageEventCount(provider: .claude) == 1)
+        let agg = try db.dailyAggRows(provider: .claude)
+        #expect(agg.count == 1 && agg[0].inputTokens == 33 && agg[0].outputTokens == 44)
+
+        // Cursores vivem no settings (não há JSON novo); marca d'água avançou
+        // (o scan do ingester resolve symlinks: /var → /private/var).
+        #expect(try db.setting(forKey: "cursors:claude") != nil)
+        let transcript = session.appendingPathComponent("s1.jsonl").path
+        #expect(try db.highWater(provider: .claude, path: resolvedPath(transcript)) != nil)
+
+        // Segundo ciclo: nada novo no DB (cursor do settings evita re-ingest).
+        await coordinator.refreshAllNow()
+        let db2 = try AppDatabase.open(at: support.appendingPathComponent(AppDatabase.databaseName))
+        #expect(try db2.usageEventCount(provider: .claude) == 1)
+    }
+
+    /// Red Team Task 1: DB que não abre (support dir é um ARQUIVO) → degrada
+    /// para o comportamento F2 (JSON stores, sem persistência) — ciclos
+    /// completam, heartbeat v2 sai com os 4 providers, sem crash.
+    @Test("degradação sem DB: coordinator segue vivo com comportamento F2")
+    func coordinatorDegradesWhenDatabaseUnavailable() async throws {
+        let fixture = try Fixture.make(fakeToken: "t7-synthetic-token-never-real")
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+
+        let session = fixture.root.appendingPathComponent("claude/proj", isDirectory: true)
+        try FileManager.default.createDirectory(at: session, withIntermediateDirectories: true)
+        let line =
+            "{\"type\":\"assistant\",\"timestamp\":\"\(Self.isoNow())\",\"message\":{\"model\":\"claude-sonnet-4-6\",\"usage\":{\"input_tokens\":5,\"output_tokens\":6}}}"
+        try (line + "\n").write(to: session.appendingPathComponent("s1.jsonl"), atomically: true, encoding: .utf8)
+
+        // O support dir do fixture já existe (criado no setup) — apontamos o
+        // coordinator para um ARQUIVO: AppDatabase.open falha (criar
+        // <file>/x.sqlite é impossível) — o caminho de degradação.
+        let blocker = fixture.root.appendingPathComponent("support-blocker")
+        try Data("not a directory".utf8).write(to: blocker)
+
+        let coordinator = ProviderCoordinator(config: ProviderCoordinatorConfig(
+            environment: fixture.environment,
+            home: fixture.root,
+            supportDirectory: blocker,
+            e2eDirectory: fixture.e2eDirectory
+        ))
+
+        await coordinator.refreshAllNow()
+
+        let data = try Data(contentsOf: fixture.e2eDirectory.appendingPathComponent("state.json"))
+        let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let providers = try #require(json["providers"] as? [String: Any])
+        #expect(Set(providers.keys) == ["claude", "codex", "gemini", "zai"])
+
+        // Sem DB, ingest local continua funcionando: display do dia correto
+        // (ledger), apenas sem persistência.
+        #expect((providers["claude"] as? [String: Any])?["todayTokens"] as? Int == 11)
+        #expect(!FileManager.default.fileExists(atPath: blocker.appendingPathComponent("tokenbar.sqlite").path))
+    }
+}
+
+/// Resolve o path como o `FileManager.enumerator` faz (realpath: /var →
+/// /private/var) — as chaves de marca d'água/cursores usam o path da scan.
+func resolvedPath(_ path: String) -> String {
+    guard let r = realpath(path, nil) else { return path }
+    defer { free(r) }
+    return String(cString: r)
 }
