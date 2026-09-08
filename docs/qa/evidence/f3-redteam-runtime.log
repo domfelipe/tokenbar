@@ -1,0 +1,48 @@
+[rt] === RT1: DB corrompido (bytes lixo no .sqlite) → reabre em F2 sem crash ===
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'genfixtures' complete! (0.18s)
+[rt] PASS: RT1: processo vivo com DB lixo
+[rt] PASS: RT1: heartbeat ok (ingest segue: C:3 eventos → tokens > 0)
+[rt] PASS: RT1: history7d OMITIDO (sem DB → modo F2, nada fake)
+[rt] PASS: RT1: CLI history degrada vazio ([]) com exit 0 e aviso no stderr
+[rt] === RT2: disco cheio/readonly durante a abertura → app vivo, degrada ===
+[0/1] Planning build
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'genfixtures' complete! (0.19s)
+[rt] PASS: RT2: processo vivo com support readonly
+[rt] PASS: RT2: heartbeat do claude ok (display intacto sem persistência)
+[rt] PASS: RT2: history7d OMITIDO (DB não abriu → degradação honesta)
+[rt] PASS: RT2: nenhum sqlite escrito no dir readonly
+[rt] === RT4: rename falho persistente (chflags uchg) — re-semeadura stale e auto-recuperação ===
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'genfixtures' complete! (0.11s)
+[rt] PASS: RT4: app vivo com rename falho (arquivo legado imutável)
+[rt] PASS: RT4: settings migrou o conteúdo mesmo com rename falho
+[rt] PASS: RT4: rename NÃO aconteceu (arquivo ainda no lugar, sem .migrated)
+[rt] PASS: RT4: re-semeadura stale não duplica o banco (0 eventos, corpus curto estável)
+[rt] PASS: RT4: auto-recuperação — com a causa removida, a migração converge (.migrated)
+[rt] === RT6: SQL injection via corpus hostil (model com ' ; --) → prepared statements ===
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'genfixtures' complete! (0.22s)
+[rt] PASS: RT6: app vivo e ingest contou o evento hostil (777 no display)
+[rt] PASS: RT6: model hostil persistido/recuperado exato via bind (1 evento)
+[rt] PASS: RT6: nenhuma tabela derrubada (sqlite_master tem as 6 do schema §6 + migrator)
+[rt] PASS: RT6: daily_agg íntegra (contém o evento hostil: soma ≥ 333)
+[rt] === RT7: corpus 100k eventos — orçamento (footprint, DB size, query não bloqueia) ===
+[rt] RT7: gerando corpus (~100k linhas)...
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'genfixtures' complete! (0.10s)
+[rt] RT7: corpus com 100000 linhas
+[rt] PASS: RT7: 1º heartbeat em 9s com 767594672 tokens
+[rt] PASS: RT7: query history durante ingest < 5s (fora da MainActor, não bloqueia o menu): 2.92s
+[rt] PASS: RT7: DB size sane (17998KB < 20MB)
+[rt] PASS: RT7: phys_footprint pico durante ingest 29.6MB ≤ 40MB
+[rt] PASS: RT7: estacionário (60s ocioso, DB aberto): footprint 17.2M ≤ 40MB, cpu 0.0% ≤ 0.5%
+[rt] PASS: RT7: history 7d tem linhas para o corpus inteiro (10 grupos d×p, custo > 0): 2
+[rt] concluído: 0 falha(s)
+EXIT=0
