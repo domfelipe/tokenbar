@@ -2,7 +2,7 @@
 
 Native macOS menu bar app that keeps your AI coding usage visible — light enough to never think about it.
 
-**Status: F2** — Codex, Gemini CLI and Z.ai in the menu bar, on top of the F1 Claude local core. Full roadmap: `docs/specs/2026-09-02-design.md` (pt-BR).
+**Status: F3** — everything from F2 (Codex, Gemini CLI, Z.ai on top of the F1 Claude local core) plus a local SQLite history: estimated cost per model, 7-day totals in the panel, an Analytics window and CSV/JSON export. Full roadmap: `docs/specs/2026-09-02-design.md` (pt-BR).
 
 ## What you see (F2)
 
@@ -15,16 +15,24 @@ Order is fixed C · X · G · Z; providers without data stay hidden.
 | `G:193` | Gemini CLI | local sessions (`~/.gemini/tmp/**/chats`), real tokens |
 | `Z:81%` | Z.ai coding plan | usage API (`quota/limit`) |
 
-Open the panel for a line per provider (percent + reset time, or today's tokens), **Refresh now** and **Quit TokenBar** (⌘Q).
+Open the panel for a line per provider (percent + reset time, or today's tokens with estimated cost), the **7-day history line** (`7d: X tok ~$Y`), **Analytics…**, **Export history…**, **Refresh now** and **Quit TokenBar** (⌘Q).
 
-Behavior highlights: adaptive scheduler (idle 5 min, menu 60 s, pressure ≥ 80% → 30 s, error backoff ×2 capped at 30 min, zero network during sleep) · graceful degradation (API down → last good state, local providers keep counting; restart mid-day keeps today's totals) · per-provider cursor files + day snapshot, self-healing against truncation and corrupted state.
+Behavior highlights: adaptive scheduler (idle 5 min, menu 60 s, pressure ≥ 80% → 30 s, error backoff ×2 capped at 30 min, zero network during sleep) · graceful degradation (API down → last good state, local providers keep counting; restart mid-day keeps today's totals; database unavailable → app runs in F2 mode, never crashes) · per-provider cursors + day snapshot, self-healing against truncation and corrupted state.
+
+## History, cost & export (F3)
+
+- **SQLite (WAL via GRDB)** at `~/Library/Application Support/TokenBar/tokenbar.sqlite`. Every ingested event is persisted (same transaction updates the daily aggregate); legacy F2 `cursors.json` files migrate automatically on first launch (renamed `.migrated`) — no re-scan, no backfill.
+- **Estimated cost (`~$`)** is computed at ingest time from the versioned pricing table (`Sources/TokenBarCore/Resources/pricing.json` — public per-MTok prices from vendor pages, PR-welcome). Models without a public price get no cost (NULL, never $0). Costs are never recomputed retroactively.
+- **`tokenbar history [--days N] [--provider P] [--format csv|json]`** prints the daily series from the same database the UI reads. Empty window → header-only CSV / `[]`, exit 0.
+- **Export history…** writes `history-<timestamp>.csv|.json` (RFC 4180 CSV, n-null JSON) to `<App Support>/TokenBar/exports/` and reveals them in Finder.
+- The database is additive: corruption, full disk or permission errors degrade to F2 behavior (no history display, app keeps working). E2E covers migration, re-run idempotency and resource budget with the database open.
 
 ## Build (no Xcode required)
 
 ```bash
 ./run-tests.sh                 # build + tests (Swift Testing; never run bare `swift test` — false green on CLT toolchains)
 ./scripts/make-app.sh          # → build/TokenBar.app
-./scripts/e2e.sh               # full end-to-end: mock API server, 4 providers, degradation, resource budget
+./scripts/e2e.sh               # full end-to-end: mock API server, 4 providers, degradation, persistence, migration, resource budget
 ```
 
 ## Environment overrides
@@ -33,8 +41,8 @@ Every override is optional and intended for tests/e2e — a normal launch uses n
 
 | Variable | What it redirects |
 |---|---|
-| `TOKENBAR_SUPPORT_DIR` | App Support directory holding per-provider state (`<provider>-cursors.json`, `<provider>-ledger.json`). Isolates tests/e2e from real state. |
-| `TOKENBAR_E2E_DIR` | Directory where the E2E heartbeat JSON (per-provider diagnostics) is written. |
+| `TOKENBAR_SUPPORT_DIR` | App Support directory holding ALL persisted state: `tokenbar.sqlite` (+ WAL), per-provider cursors/ledger, `exports/`. Isolates tests/e2e from real state. |
+| `TOKENBAR_E2E_DIR` | Directory where the E2E heartbeat JSON (per-provider diagnostics, incl. `history7d`) is written. |
 | `TOKENBAR_CLAUDE_DIR` | Claude Code `projects` transcript directory (default `~/.claude/projects`). |
 | `TOKENBAR_CODEX_DIR` | Codex rollout sessions directory (default `~/.codex/sessions`). |
 | `TOKENBAR_CODEX_AUTH` | Path of the Codex `auth.json` read for the API token (default `~/.codex/auth.json`). |
@@ -52,5 +60,5 @@ Read-only on your CLI session files AND on credentials (`~/.codex/auth.json`, `~
 
 - `docs/specs/2026-09-02-design.md` — design/spec
 - `docs/specs/f2-data-sources.md` — F2 data sources reference (endpoints, shapes, fixture rules)
-- `docs/decisoes-f1.md`, `docs/decisoes-f2.md` — technical decisions (context → decision → consequence)
-- `docs/qa/f1-*.md`, `docs/qa/f2-*.md` — QA gates and Red Team reports
+- `docs/decisoes-f1.md`, `docs/decisoes-f2.md`, `docs/decisoes-f3.md` — technical decisions (context → decision → consequence)
+- `docs/qa/f1-*.md`, `docs/qa/f2-*.md`, `docs/qa/f3-*.md` — QA gates and Red Team reports
