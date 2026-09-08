@@ -127,7 +127,14 @@ public final class ProviderCoordinator {
         // F3: banco SQLite (schema spec §6) na support directory — o
         // TOKENBAR_SUPPORT_DIR do AppState isola app/e2e. Falha de abertura
         // → nil → comportamento F2 degradado (JSON stores, sem persistência):
-        // DB nunca derruba o app.
+        // DB nunca derruba o app. O diretório TEM que existir antes do open
+        // (DatabasePool não cria diretórios): o AppState cria via
+        // SupportDirectory.resolve e as fábricas default também criam, mas o
+        // selfcheck passa um dir próprio com fábricas injetadas — sem o
+        // createDirectory aqui o DB dele NUNCA abria e o history7d ficava
+        // sempre omitido (review T4, Important).
+        try? FileManager.default.createDirectory(
+            at: config.supportDirectory, withIntermediateDirectories: true)
         let database = try? AppDatabase.open(
             at: config.supportDirectory.appendingPathComponent(AppDatabase.databaseName),
             calendar: calendar)

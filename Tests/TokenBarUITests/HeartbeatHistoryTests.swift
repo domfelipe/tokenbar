@@ -160,4 +160,69 @@ struct HeartbeatHistoryTests {
         // A string do ícone segue o formato F1 (histórico não vaza pro menu bar).
         #expect(json["menuBarText"] as? String == "C:77")
     }
+
+    /// PIN do review T4 (Important): o selfcheck constrói o coordinator com
+    /// support dir PRÓPRIO e NUNCA criado + fábricas injetadas (offset em
+    /// memória, snapshot nil) — ninguém criava o diretório, `DatabasePool`
+    /// não abria, e o history7d ficava SEMPRE omitido no selfcheck. O fix
+    /// cria o diretório no init do coordinator; este teste reproda o setup
+    /// EXATO do selfcheck e fica vermelho se alguém remover o createDirectory.
+    @Test("modo selfcheck (support dir inexistente, stores injetados): DB abre e history7d presente")
+    @MainActor
+    func selfcheckModeWithOwnSupportDirectoryIncludesHistory7d() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("t5-selfcheck-\(UUID().uuidString)", isDirectory: true)
+        let claude = root.appendingPathComponent("claude/proj", isDirectory: true)
+        let support = root.appendingPathComponent("support", isDirectory: true)  // NÃO criado
+        let e2e = root.appendingPathComponent("e2e", isDirectory: true)
+        for dir in [root, claude, e2e] {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+        #expect(!FileManager.default.fileExists(atPath: support.path))
+
+        // Corpus com dados de HOJE (mesmo fixture dos outros testes).
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let line = #"{"type":"assistant","timestamp":"\#(f.string(from: Date()))","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":33,"output_tokens":44}}}"#
+        try (line + "\n").write(to: claude.appendingPathComponent("s1.jsonl"), atomically: true, encoding: .utf8)
+
+        // Setup IGUAL ao do SelfCheck.run: offset store em memória e snapshot
+        // de ledger nil (somente-leitura sobre o mundo) — nenhuma fábrica
+        // default para criar o diretório no caminho.
+        final class MemOffsetStore: FileOffsetStoring, @unchecked Sendable {
+            private let lock = NSLock()
+            private var storage: [String: FileCursor] = [:]
+            func cursors() -> [String: FileCursor] {
+                lock.lock(); defer { lock.unlock() }
+                return storage
+            }
+            func set(_ cursor: FileCursor?, for path: String) throws {
+                lock.lock(); defer { lock.unlock() }
+                if let cursor { storage[path] = cursor } else { storage.removeValue(forKey: path) }
+            }
+        }
+        let coordinator = ProviderCoordinator(config: ProviderCoordinatorConfig(
+            environment: ["TOKENBAR_CLAUDE_DIR": claude.path],
+            home: root,
+            supportDirectory: support,
+            e2eDirectory: e2e,
+            makeOffsetStore: { _ in MemOffsetStore() },
+            makeLedgerSnapshotStore: { _ in nil }
+        ))
+        await coordinator.refreshAllNow()
+
+        // DB criado no dir que ninguém criara + history7d presente com os
+        // tokens do corpus (77) e custo computado (modelo precificado).
+        let data = try Data(contentsOf: e2e.appendingPathComponent("state.json"))
+        let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let providers = try #require(json["providers"] as? [String: Any])
+        let claudeEntry = try #require(providers["claude"] as? [String: Any])
+        let history = try #require(claudeEntry["history7d"] as? [String: Any])
+        #expect(history["tokens"] as? Int64 == 77)
+        #expect((history["costUsd"] as? Double ?? 0) > 0)
+        // O próprio diretório passou a existir (o DB mora lá).
+        #expect(FileManager.default.fileExists(
+            atPath: support.appendingPathComponent(AppDatabase.databaseName).path))
+    }
 }
