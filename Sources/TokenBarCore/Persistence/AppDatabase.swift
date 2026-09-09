@@ -21,6 +21,30 @@ package let persistenceLog = Logger(subsystem: "dev.domhubs.TokenBar", category:
 /// Sendable: `DatabasePool` é Sendable e `Calendar` (injetado para o dia de
 /// `daily_agg` bater com o ledger dos providers) é struct imutável.
 public final class AppDatabase: Sendable {
+    /// Fonte da tabela de preços. `.bundledLazy` = tabela embutida via
+    /// `Bundle.module` — carregada LAZY na 1ª leitura (ver `BundledPricingBox`);
+    /// `.fixed` = tabela explícita (`pricing:` no `open`, testes/wiring).
+    private enum PricingSource: Sendable {
+        case bundledLazy
+        case fixed(PricingTable?)
+    }
+
+    private let pricingSource: PricingSource
+    /// Box do `.bundledLazy` — alocação barata (um lock), criada sempre.
+    private let bundledPricing = BundledPricingBox()
+
+    /// Tabela de preços em uso — lida APENAS no hot loop da ingest
+    /// (`persistBatch`, extensão `UsageEventPersisting`), que roda fora da
+    /// main thread dentro do ciclo do coordinator. É a garantia do fix do
+    /// hang: o accessor `Bundle.module` nunca roda na main thread do init.
+    var pricing: PricingTable? {
+        switch pricingSource {
+        case .fixed(let table):
+            return table
+        case .bundledLazy:
+            return bundledPricing.value
+        }
+    }
     /// Nome do arquivo na support directory (wiring do coordinator).
     public static let databaseName = "tokenbar.sqlite"
 
@@ -32,31 +56,44 @@ public final class AppDatabase: Sendable {
     /// Tabela de preços públicos (F3 Task 2) usada para calcular `cost_usd`
     /// NA INGEST. `nil` = sem tabela (recurso ausente/corrompido ou `nil`
     /// explícito) → todo evento persiste com custo NULL — degradação honesta.
-    /// Internal (não `private`): a extensão `UsageEventPersisting`, em outro
-    /// arquivo, é quem consome no hot loop da ingest.
-    let pricing: PricingTable?
+    /// (O acesso passou para a computed `pricing` — lazy quando `.bundledLazy`.)
 
-    /// Abre (ou cria) o banco em `url` e roda as migrations. Throws — o
-    /// chamador (coordinator) degrada para o comportamento F2 em caso de erro
-    /// (disco cheio/ilegível, path inválido…): persistência é aditiva, nunca
-    /// uma condição de crash. `pricing` default = tabela embutida
-    /// (`Resources/pricing.json`); `nil` explícito = eventos sem custo.
+    /// Abre (ou cria) o banco em `url` e roda as migrations, com a pricing
+    /// table EMBUTIDA em modo LAZY — o accessor `Bundle.module` NÃO roda neste
+    /// call site (era o hang via `open`: default argument avaliado dentro do
+    /// `ProviderCoordinator.init`, na main thread, sob a transação do
+    /// CFBundle do LaunchServices). Throws — o chamador (coordinator) degrada
+    /// para o comportamento F2 em caso de erro: persistência é aditiva, nunca
+    /// uma condição de crash. A 1ª leitura da tabela acontece no ciclo de
+    /// ingest (fora da main) — ver `BundledPricingBox`.
+    public static func open(at url: URL, calendar: Calendar = .current) throws -> AppDatabase {
+        try open(at: url, calendar: calendar, source: .bundledLazy)
+    }
+
+    /// Variante com pricing table EXPLÍCITA (`nil` = eventos sem custo) —
+    /// testes e wiring que já têm a tabela na mão; carregamento imediato,
+    /// sem tocar `Bundle.module`.
     public static func open(
-        at url: URL, calendar: Calendar = .current,
-        pricing: PricingTable? = PricingTable.bundled()
+        at url: URL, calendar: Calendar = .current, pricing: PricingTable?
+    ) throws -> AppDatabase {
+        try open(at: url, calendar: calendar, source: .fixed(pricing))
+    }
+
+    private static func open(
+        at url: URL, calendar: Calendar, source: PricingSource
     ) throws -> AppDatabase {
         let pool = try DatabasePool(path: url.path)
         try Self.migrator.migrate(pool)
-        return AppDatabase(writer: pool, calendar: calendar, pricing: pricing)
+        return AppDatabase(writer: pool, calendar: calendar, pricingSource: source)
     }
 
-    init(
+    private init(
         writer: any DatabaseWriter, calendar: Calendar = .current,
-        pricing: PricingTable? = nil
+        pricingSource: PricingSource = .fixed(nil)
     ) {
         self.writer = writer
         self.calendar = calendar
-        self.pricing = pricing
+        self.pricingSource = pricingSource
     }
 
     /// Migrations v1 — schema da spec §6 (DDL verbatim). Versões futuras
@@ -244,5 +281,42 @@ public final class AppDatabase: Sendable {
     public func dayString(from date: Date) -> String {
         let c = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+}
+
+/// Box LAZY e thread-safe da pricing table embutida (`PricingTable.bundled()`).
+///
+/// Fix do hang pós-merge F4: o default argument `pricing: PricingTable? =
+/// PricingTable.bundled()` avaliava `Bundle.module` NO call site — dentro do
+/// `ProviderCoordinator.init`, na main thread, ANTES do NSApplication
+/// completar o launch. Lançado via LaunchServices (`open`), o CFBundle está em
+/// transação nesse momento e o accessor (`_cfBundle`/`NSBundle
+/// URLForResource`) trava a main thread por minutos (status item nunca
+/// aparece); via exec direto nunca reproduzia. Agora o accessor só roda na
+/// 1ª LEITURA de `AppDatabase.pricing` — que acontece no hot loop da ingest
+/// (`persistBatch`, dentro do ciclo do coordinator, FORA da main thread).
+///
+/// Memoização com `OSAllocatedUnfairLock`: computa UMA vez (mesma semântica
+/// do argumento default eager, que também avaliava 1× por open) e memoiza
+/// `nil` também — recurso ausente/corrompido segue a degradação honesta
+/// (custo `nil` em todo evento), sem retry implícito a cada lote. Ingests
+/// concorrentes (multi-conta/providers em paralelo) disputam o lock, não o
+/// carregamento duplicado.
+private final class BundledPricingBox: @unchecked Sendable {
+    private struct State: Sendable {
+        var table: PricingTable?
+        var loaded = false
+    }
+
+    private let lock = OSAllocatedUnfairLock<State>(initialState: State())
+
+    var value: PricingTable? {
+        lock.withLock { state in
+            if !state.loaded {
+                state.table = PricingTable.bundled()
+                state.loaded = true
+            }
+            return state.table
+        }
     }
 }

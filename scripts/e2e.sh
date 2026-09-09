@@ -311,6 +311,13 @@ echo ok > "$MOCK_MODE"
 # 4. App real com os mesmos overrides — MESMO caminho de corpus do selfcheck.
 # ---------------------------------------------------------------------------
 ./scripts/make-app.sh release >/dev/null
+# Regressão do fix do hang via `open` (F3/F4): os bundles SPM (.copy) precisam
+# estar dentro do .app — sem eles Bundle.module pendura a main thread em
+# NSBundle URLForResource quando lançado via LaunchServices.
+for b in GRDB_GRDB TokenBar_TokenBarCore TokenBar_TokenBarUI; do
+  check "bundle de recursos no .app: $b.bundle em Contents/Resources" \
+    "[ -d 'build/TokenBar.app/Contents/Resources/$b.bundle' ]"
+done
 env "${COMMON_ENV[@]}" TOKENBAR_E2E_DIR="$STATE" \
   "build/TokenBar.app/Contents/MacOS/tokenbar" &
 APP_PID=$!

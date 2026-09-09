@@ -33,5 +33,19 @@ for s in 16 32 64 128 256 512 1024; do
   sips -z $s $s build/icon-1024.png --out "build/TokenBar.iconset/icon_${s}x${s}.png" >/dev/null
 done
 iconutil -c icns build/TokenBar.iconset -o "$APP/Contents/Resources/TokenBar.icns"
+# resources dos targets (SPM .copy("Resources")): sem eles, Bundle.module via
+# LaunchServices (`open`) pendura a main thread em NSBundle URLForResource —
+# copiar TODOS os *.bundle ANTES do codesign (o selo precisa cobri-los).
+for b in ".build/$CONFIG/"*.bundle; do
+  [ -e "$b" ] || continue
+  cp -R "$b" "$APP/Contents/Resources/"
+done
+# smoke check: os 3 bundles esperados precisam estar no .app (fail loud).
+for b in GRDB_GRDB TokenBar_TokenBarCore TokenBar_TokenBarUI; do
+  if [ ! -d "$APP/Contents/Resources/$b.bundle" ]; then
+    echo "ERRO: $b.bundle ausente em $APP/Contents/Resources (hang do Bundle.module via open)" >&2
+    exit 1
+  fi
+done
 codesign --force --sign - "$APP"
 echo "OK: $APP"
