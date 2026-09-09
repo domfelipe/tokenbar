@@ -35,43 +35,61 @@ struct TokenBarApp: App {
     var body: some Scene {
         // Estilo .window: dá onAppear/onDisappear do painel — é assim que o
         // wiring cumpre a spec §7 (fire imediato ao abrir, reafirmar enquanto
-        // aberto). Uma linha por provider ativo + Refresh + Quit.
+        // aberto). F4: painel rico (abas por provider com logo, barras de
+        // janela com countdown, pacing, custos e chart 30d) no lugar da lista
+        // de texto; ações preservadas; multi-conta (F4 Task 3) com seção de
+        // contas por aba e item "Add account…".
         MenuBarExtra {
-            VStack(alignment: .leading, spacing: 4) {
-                let lines = appState.store.menuLines
-                if lines.isEmpty {
-                    Text("TokenBar — sem dados ainda")
-                } else {
-                    ForEach(lines.indices, id: \.self) { index in
-                        Text(lines[index])
+            VStack(alignment: .leading, spacing: 8) {
+                // F4 Task 3: painel recebe o modelo de contas + ação de abrir
+                // o formulário de add-account (janela própria).
+                ProviderPanelView(
+                    store: appState.store,
+                    accounts: appState.accountsModel,
+                    addAccountAction: { appState.showAddAccount(for: $0) })
+                Divider()
+                Button("Refresh now") {
+                    Task { await appState.forceIngest() }
+                }
+                Divider()
+                // F3 Task 3: analytics em janela PRÓPRIA (não o painel) e export
+                // CSV/JSON do histórico (30d) com reveal no Finder. Sem atalhos
+                // próprios (padrão F2: só o Quit tem — evita colidir com bindings
+                // padrão do macOS).
+                Button("Analytics…") {
+                    appState.showAnalytics()
+                }
+                Button("Export history…") {
+                    Task { await appState.exportHistory() }
+                }
+                // F4 Task 3: multi-conta — abre o form para o provider da aba
+                // selecionada COM suporte (aba Gemini/sem suporte não registra
+                // linha morta; review T3 Minor 2) ou o primeiro com suporte.
+                // Sem DB (degradação F2) → item oculto (honesto: nada a
+                // registrar).
+                if appState.accountsModel.registry != nil {
+                    Button("Add account…") {
+                        let selected = appState.store.selectedProvider
+                        let target = selected
+                            .flatMap { appState.accountsModel.supportsMultiAccount($0) ? $0 : nil }
+                            ?? appState.accountsModel.multiAccountProviders
+                                .sorted { $0.rawValue < $1.rawValue }.first
+                        if let target {
+                            appState.showAddAccount(for: target)
+                        }
                     }
                 }
+                Divider()
+                Button("Quit TokenBar") {
+                    appState.stop()
+                    NSApp.terminate(nil)
+                }
+                .keyboardShortcut("q")
             }
             .padding(10)
-            .frame(minWidth: 200, alignment: .leading)
+            .frame(minWidth: 280, alignment: .leading)
             .onAppear { appState.menuDidOpen() }
             .onDisappear { appState.menuDidClose() }
-            Divider()
-            Button("Refresh now") {
-                Task { await appState.forceIngest() }
-            }
-            Divider()
-            // F3 Task 3: analytics em janela PRÓPRIA (não o painel) e export
-            // CSV/JSON do histórico (30d) com reveal no Finder. Sem atalhos
-            // próprios (padrão F2: só o Quit tem — evita colidir com bindings
-            // padrão do macOS).
-            Button("Analytics…") {
-                appState.showAnalytics()
-            }
-            Button("Export history…") {
-                Task { await appState.exportHistory() }
-            }
-            Divider()
-            Button("Quit TokenBar") {
-                appState.stop()
-                NSApp.terminate(nil)
-            }
-            .keyboardShortcut("q")
         } label: {
             Text(appState.store.menuBarText)
         }

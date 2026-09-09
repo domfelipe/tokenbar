@@ -369,7 +369,7 @@ final class ZaiProviderTests {
             credentials: ZaiFixtures.credentialsJSON()
         )
         #expect(provider.id == .zai)
-        #expect(provider.capabilities == [.apiUsage], "Z.ai é API-only na F2 — sem ingest local (spec §2.5)")
+        #expect(provider.capabilities == [.apiUsage, .multiAccount], "API-only na F2 (spec §2.5); F4: contas com config registrado")
     }
 
     /// Ordem de base URL: env `TOKENBAR_ZAI_API` → hint de região (config.json,

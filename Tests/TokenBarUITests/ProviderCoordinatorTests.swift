@@ -85,7 +85,7 @@ struct ProviderCoordinatorTests {
             home: fixture.root,  // home fake: nada real é lido
             supportDirectory: fixture.root.appendingPathComponent("support"),
             e2eDirectory: fixture.e2eDirectory,
-            makeOffsetStore: { _ in MemOffsetStore() }
+            makeOffsetStore: { _, _ in MemOffsetStore() }
         ))
 
         // Um ciclo de cada provider, direto (sem start(): watchers/scheduler
@@ -150,7 +150,7 @@ struct ProviderCoordinatorTests {
             home: fixture.root,
             supportDirectory: fixture.root,
             e2eDirectory: fixture.e2eDirectory,
-            makeOffsetStore: { _ in MemOffsetStore() }
+            makeOffsetStore: { _, _ in MemOffsetStore() }
         ))
 
         // M1 é skip-if-busy sob MainActor: dois ciclos enfileirados do mesmo
@@ -188,7 +188,7 @@ struct ProviderCoordinatorTests {
             home: fixture.root,
             supportDirectory: fixture.root.appendingPathComponent("support"),
             e2eDirectory: fixture.e2eDirectory,
-            makeOffsetStore: { _ in MemOffsetStore() }
+            makeOffsetStore: { _, _ in MemOffsetStore() }
         ))
 
         await coordinator.refreshAllNow()

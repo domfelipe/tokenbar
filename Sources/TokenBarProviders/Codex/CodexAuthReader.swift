@@ -1,4 +1,5 @@
 import Foundation
+import TokenBarCore
 
 /// Credencial Codex lida de `~/.codex/auth.json` — mantida em memória, nunca
 /// logada (spec §9): este arquivo não tem print/log e nunca vai ter.
@@ -53,8 +54,13 @@ public struct CodexAuthReader: Sendable {
     /// Lê e decodifica a credencial. Arquivo ausente/ilegível/ilegível-como-JSON
     /// → `nil` (nenhuma conta visível); JSON válido com campos faltando → auth
     /// com `hasOAuth: false` (a conta existe p/ ingest local, spec §1.6).
+    ///
+    /// Guard Red Team F4 (caso 4): só ARQUIVO REGULAR é lido — FIFO sem
+    /// escritor bloquearia `Data(contentsOf:)` para sempre (hang do ciclo);
+    /// device/diretório não são credencial. Todos degradam `nil`.
     public func read() -> CodexAuth? {
-        guard let data = try? Data(contentsOf: authFileURL),
+        guard FileKind.isRegularFile(atPath: authFileURL.path),
+              let data = try? Data(contentsOf: authFileURL),
               let file = try? Self.decoder.decode(AuthFile.self, from: data)
         else { return nil }
         let accountID = file.tokens?.accountID

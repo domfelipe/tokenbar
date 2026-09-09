@@ -373,7 +373,7 @@ final class CodexProviderTests {
     @Test func conformsToUsageProviderBasics() async {
         let provider: any UsageProvider = makeProvider()
         #expect(provider.id == .codex)
-        #expect(provider.capabilities == [.apiUsage, .localIngest])
+        #expect(provider.capabilities == [.apiUsage, .localIngest, .multiAccount])  // F4: contas com auth file registrado
         #expect(CodexProvider.localDailyWindowLabel == "Hoje", "mesmo padrão pt-BR do ClaudeProvider")
     }
 

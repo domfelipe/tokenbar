@@ -40,6 +40,32 @@ public func formatEstimatedUSD(_ cost: Double) -> String {
     return String(format: "~$%.2f", cost)
 }
 
+/// Linha de UMA conta no painel (F4 multi-conta): identidade + estado do
+/// ciclo da conta. `invalidCredential` = path registrado inexistente (badge
+/// de erro na linha — a conta degrada sozinha, sem derrubar o provider).
+/// `display` carrega as janelas/auth/da CONTA (mesmo tipo do agregado).
+public struct AccountDisplay: Equatable, Sendable, Identifiable {
+    public let key: String
+    public let label: String
+    public let active: Bool
+    public let invalidCredential: Bool
+    public let display: ProviderDisplay
+
+    /// Key da conta é única por provider (PK provider+account_id do schema §6).
+    public var id: String { key }
+
+    public init(
+        key: String, label: String, active: Bool,
+        invalidCredential: Bool, display: ProviderDisplay
+    ) {
+        self.key = key
+        self.label = label
+        self.active = active
+        self.invalidCredential = invalidCredential
+        self.display = display
+    }
+}
+
 /// Estado de exibição de UM provider — o que a UI/heartbeat consome por ciclo.
 /// `percent` em escala 0...100 (`nil` = sem janela com fração conhecida);
 /// `resetsAt` da janela crítica (linha "reseta em" do menu); `source` alimenta
@@ -68,6 +94,27 @@ public struct ProviderDisplay: Equatable, Sendable {
     public var source: DataSource
     public var resetsAt: Date?
     public var fetchedAt: Date
+    // MARK: Campos aditivos F4 (painel rico) — TODOS com default; a string do
+    // menu bar NÃO muda com nenhum deles (render gate da F1 intocado).
+    /// Todas as janelas do último snapshot (barras do painel; o menu bar
+    /// continua mostrando só a crítica via `percent`/`resetsAt`).
+    public var windows: [UsageWindow]
+    /// Tokens dos últimos 30 dias (daily_agg) — totais do painel + heartbeat.
+    public var monthTokens: Int64
+    /// Custo estimado dos 30 dias (`nil` = sem custo computável — NULL ≠ 0).
+    public var monthCostUsd: Double?
+    /// A leitura 30d do ciclo foi bem-sucedida (`false` → heartbeat OMITE o
+    /// campo; painel mantém o último valor bom — mesmo padrão do 7d).
+    public var monthHistoryAvailable: Bool
+    /// Forecast de pacing contra a janela crítica (`nil` = sem chute — <2
+    /// pontos, janela sem reset/fração; linha de pacing some do painel).
+    public var pacing: PacingForecast?
+    /// Série diária 30d do provider (chart do painel; ≤30 pontos, daily_agg).
+    public var monthSeries: [PanelDayPoint]
+    /// Multi-conta (F4): linhas por conta ciclada. Vazio = conta única — o
+    /// comportamento F2/F3 fica bit-a-bit igual (nenhum campo do menu bar ou
+    /// do heartbeat v3 depende disto; é só painel).
+    public var accounts: [AccountDisplay]
 
     public init(
         percent: Double? = nil,
@@ -79,7 +126,14 @@ public struct ProviderDisplay: Equatable, Sendable {
         authState: AuthState = .missing,
         source: DataSource = .localOnly,
         resetsAt: Date? = nil,
-        fetchedAt: Date = Date(timeIntervalSince1970: 0)
+        fetchedAt: Date = Date(timeIntervalSince1970: 0),
+        windows: [UsageWindow] = [],
+        monthTokens: Int64 = 0,
+        monthCostUsd: Double? = nil,
+        monthHistoryAvailable: Bool = false,
+        pacing: PacingForecast? = nil,
+        monthSeries: [PanelDayPoint] = [],
+        accounts: [AccountDisplay] = []
     ) {
         self.percent = percent
         self.todayTokens = todayTokens
@@ -91,6 +145,13 @@ public struct ProviderDisplay: Equatable, Sendable {
         self.source = source
         self.resetsAt = resetsAt
         self.fetchedAt = fetchedAt
+        self.windows = windows
+        self.monthTokens = monthTokens
+        self.monthCostUsd = monthCostUsd
+        self.monthHistoryAvailable = monthHistoryAvailable
+        self.pacing = pacing
+        self.monthSeries = monthSeries
+        self.accounts = accounts
     }
 
     /// Estado inicial (nada ciclo ainda): sem dado — some da string do menu.

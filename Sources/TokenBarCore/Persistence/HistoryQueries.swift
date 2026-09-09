@@ -194,6 +194,52 @@ extension AppDatabase {
         }
     }
 
+    /// Pontos diários para o `PacingEngine` (F4 Task 1) — [(dia, total)] da
+    /// janela, um ponto por dia COM dados (gaps ficam de fora; o engine não
+    /// faz zero-fill e usa a data real de cada ponto no eixo x). `day` é o
+    /// início do dia no calendar do banco (mesma fonte do `day` persistido),
+    /// ordenado ascendente. Provider/conta sem histórico → array vazio (o
+    /// engine devolve nil — <2 pontos, sem chute). Consumido pela Task 2 (UI).
+    public func pacingInput(
+        provider: ProviderID, account: AccountID, days: Int, now: Date = Date()
+    ) throws -> [(day: Date, total: Int64)] {
+        let rows: [(day: String, total: Int64)] = try writer.read { db in
+            try Row.fetchAll(
+                db, sql: """
+                    SELECT day,
+                           SUM(input_tokens + output_tokens + cache_read_tokens + cache_write_tokens) AS tokens
+                    FROM daily_agg
+                    WHERE day >= ? AND provider = ? AND account = ?
+                    GROUP BY day ORDER BY day
+                    """,
+                arguments: StatementArguments([
+                    windowStartDay(days: days, now: now), provider.rawValue, account.key,
+                ])
+            ).map { (day: $0["day"], total: $0["tokens"] ?? 0) }
+        }
+        return rows.compactMap { row in
+            // Parse "yyyy-MM-dd" no calendar do banco (mesmo fuso do
+            // dayString do rollover); linha malformada é descartada — nunca
+            // inventa data.
+            guard let day = Self.date(fromDayString: row.day, calendar: calendar) else { return nil }
+            return (day: day, total: row.total)
+        }
+    }
+
+    /// Inverso do `AppDatabase.dayString` — "yyyy-MM-dd" → início do dia no
+    /// calendar injetado. Internal p/ os testes (@testable).
+    static func date(fromDayString string: String, calendar: Calendar) -> Date? {
+        let parts = string.split(separator: "-")
+        guard parts.count == 3,
+              let y = Int(parts[0]), let m = Int(parts[1]), let d = Int(parts[2])
+        else { return nil }
+        var comps = DateComponents()
+        comps.year = y
+        comps.month = m
+        comps.day = d
+        return calendar.date(from: comps)
+    }
+
     /// Eventos crus da janela — fonte do export CSV/JSON (30d fixo por ora).
     /// Ordenação estável (ts, id) → export determinístico para um DB imutável.
     public func eventsForExport(

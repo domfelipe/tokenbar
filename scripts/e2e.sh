@@ -1,10 +1,12 @@
 #!/bin/bash
-# E2E v3 (F3): corpus sintético + mock server (Codex/Z.ai) → app real com os 4
+# E2E v4 (F4): corpus sintético + mock server (Codex/Z.ai) → app real com os 4
 # providers (C/X/G/Z) → menu bar correto, live update, degradação graciosa,
-# orçamento de recursos (agora COM o banco SQLite aberto) + persistência:
-# history CLI consistente com o heartbeat, migração de cursors.json legado
-# (F2) sem re-scan e selfcheck com history7d. Prova do Goal E2E: todos os
-# checks PASS + exit 0.
+# orçamento de recursos (COM o banco SQLite aberto) + persistência + painel
+# rico/multi-conta: heartbeat v3 com os campos ADITIVOS da F4 (monthTokens/
+# monthCostUsd/pacing) consistentes, e o ciclo multi-conta cobrindo contas
+# registradas (registro programático — mesmo caminho do Red Team caso 5),
+# toggle/remove e uma frota de 30 contas dentro do orçamento. Prova do Goal
+# E2E: todos os checks PASS + exit 0.
 #
 # Verdade de referência (padrão F1): selfcheck — a MESMA pipeline do app sobre
 # o MESMO corpus no MESMO dia — para os providers locais (C/G). Para os
@@ -33,6 +35,22 @@
 #       caso 3);
 #   (c) selfcheck v3: com o DB do próprio tmp aberto, history7d presente com
 #       os tokens do corpus (pin do fix do review T4).
+# Pacing/mês (F4, aditivo no heartbeat v3):
+#   (d) sonda selfcheck com sessões Codex sintéticas em 2 dias: pacing PRESENTE
+#       (projectedFraction == fração da janela crítica 42%; .session não
+#       projeta sobre agregados diários → flat, sem esgotamento inventado) —
+#       enquanto Z.ai (janela 81% com reset, ZERO histórico diário) e Claude
+#       (sem janela) OMITEM o campo — a honestidade "<2 pontos → sem chute"
+#       provada nos dois sentidos;
+#   (e) app real: monthTokens/monthCostUsd do claude consistentes com o
+#       history7d do MESMO payload (30d ⊇ 7d ⊇ corpus < 48h → iguais).
+# Multi-conta (F4): contas CLAUDE com dir própria (ingest local — ZERO request
+# extra ao mock; as provas de rede da seção 7 já fecharam): registro
+# programático via sqlite3 (fonte do ciclo é o registry, guard de overlap é da
+# UI — Red Team caso 5), agregado = soma exata sem duplicação, toggle ativa
+# tira a conta do ciclo, frota de 30 contas coberta num ciclo só dentro do
+# orçamento, heartbeat SEM paths/ids de conta (higiene §9) e remoção devolve
+# o display ao layout F2.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -233,6 +251,49 @@ h=p.get(\"history7d\")
 exit(0 if h and h[\"tokens\"]>=p[\"todayTokens\"]>0 and (h.get(\"costUsd\") or 0)>0 else 1)'"
 
 # ---------------------------------------------------------------------------
+# 3.1 (F4-d) Sonda de pacing: sessões Codex sintéticas em 2 DIAS (formato
+#     rollout §1.5 — event_msg/token_count com last_token_usage) + Claude
+#     VAZIO. O selfcheck roda com o mock NO AR, então a janela crítica do
+#     codex é a session 42% do mock. Provas simétricas de honestidade do
+#     PacingEngine:
+#       - codex: 2 pontos diários + janela com fração → pacing PRESENTE; mas
+#         janela .session não projeta sobre agregados diários → FLAT
+#         (projectedFraction == 0.42, exhaustedIn/deficitPct null — nada de
+#         esgotamento inventado);
+#       - zai: tem fração 81% e resetsAt, mas ZERO histórico diário (api-only)
+#         → pacing AUSENTE (<2 pontos → sem chute);
+#       - claude: sem janela com fração → pacing AUSENTE.
+#     O DB do selfcheck é o dele (/tmp/tokenbar-selfcheck) — o hwm de lá retém
+#     os 2 dias entre rodadas; a sonda é estável (flat independe do dia).
+# ---------------------------------------------------------------------------
+PACING_DIR="$TMP/codex-pacing"
+EMPTY_CLAUDE="$TMP/empty-claude"
+mkdir -p "$PACING_DIR/$(date -u +%Y/%m/%d)" "$EMPTY_CLAUDE"
+NOW_TS="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+OLD_TS="$(date -u -v-24H +%Y-%m-%dT%H:%M:%S.000Z)"
+cat > "$PACING_DIR/$(date -u +%Y/%m/%d)/rollout-pacing.jsonl" <<EOF
+{"timestamp":"$OLD_TS","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":900,"output_tokens":100,"cached_input_tokens":0,"cache_write_input_tokens":0}}}}
+{"timestamp":"$NOW_TS","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":400,"output_tokens":100,"cached_input_tokens":0,"cache_write_input_tokens":0}}}}
+EOF
+SC_PACING="$(env "${SELF_ENV[@]}" TOKENBAR_CODEX_DIR="$PACING_DIR" swift run -c release tokenbar selfcheck "$EMPTY_CLAUDE")"
+say "selfcheck sonda pacing: $SC_PACING"
+check "sonda pacing: codex COM 2 dias de histórico → pacing presente e FLAT (projectedFraction=0.42, sem esgotamento inventado)" \
+  "echo \"\$SC_PACING\" | python3 -c '
+import json,sys
+p=json.load(sys.stdin)[\"providers\"][\"codex\"].get(\"pacing\")
+exit(0 if p and p[\"projectedFraction\"]==0.42 and p[\"exhaustedIn\"] is None and p[\"deficitPct\"] is None else 1)'"
+check "sonda pacing: zai COM fração+reset mas ZERO histórico diário → pacing AUSENTE (sem chute)" \
+  "echo \"\$SC_PACING\" | python3 -c '
+import json,sys
+p=json.load(sys.stdin)[\"providers\"][\"zai\"]
+exit(0 if p.get(\"pacing\") is None and p.get(\"percent\")==81 else 1)'"
+check "sonda pacing: claude sem janela com fração → pacing AUSENTE" \
+  "echo \"\$SC_PACING\" | python3 -c '
+import json,sys
+p=json.load(sys.stdin)[\"providers\"][\"claude\"]
+exit(0 if p.get(\"pacing\") is None else 1)'"
+
+# ---------------------------------------------------------------------------
 # 3.5 Erro HTTP persistente ANTES do app subir: mock em modo 500 → selfcheck
 #     diagnostica o token "http" nos API-driven (mesmo caminho de
 #     UsageHTTPError.http que o app pega sob 500). Volta p/ "ok" em seguida
@@ -271,6 +332,23 @@ check "heartbeat: percent API-driven do mock (codex=42, zai=81)" \
 check "heartbeat v2: authState ok e fetchedAt fresco nos API-driven" \
   "[ \"\$(json_field '$STATE/state.json' \"['providers']['codex']['authState']\")\" = 'ok' ] && [ \"\$(json_field '$STATE/state.json' \"['providers']['zai']['authState']\")\" = 'ok' ] && [ \"\$(json_field '$STATE/state.json' \"['providers']['zai']['fetchedAt']\")\" != '1970-01-01T00:00:00Z' ]"
 
+# 5.1 (F4-e) Campos ADITIVOS do heartbeat v3 no app real: monthTokens/
+#     monthCostUsd do claude presentes e consistentes com o history7d do
+#     MESMO payload (corpus < 48h → janela 30d == janela 7d); codex — que tem
+#     fração do mock mas NÃO tem histórico diário no app (sessions vazio) —
+#     OMITE pacing (a omissão honesta provada também no payload do app).
+check "heartbeat v4: claude monthTokens/monthCostUsd consistentes com history7d (30d == 7d com corpus < 48h)" \
+  "python3 -c '
+import json,sys
+p=json.load(open(sys.argv[1]))[\"providers\"][\"claude\"]
+h7=p[\"history7d\"]
+exit(0 if p.get(\"monthTokens\")==h7[\"tokens\"] and p.get(\"monthCostUsd\")==h7.get(\"costUsd\") and (h7.get(\"costUsd\") or 0)>0 else 1)' '$STATE/state.json'"
+check "heartbeat v4: codex sem histórico diário → pacing AUSENTE no app (fração 42% não vira forecast)" \
+  "python3 -c '
+import json,sys
+p=json.load(open(sys.argv[1]))[\"providers\"][\"codex\"]
+exit(0 if p.get(\"pacing\") is None and p[\"percent\"]==42 else 1)' '$STATE/state.json'"
+
 # Baseline de requests p/ o check de retry storm: tudo que o APP pedir além
 # do burst inicial (1 por provider) na janela inteira até a degradação conta.
 BASE_REQ="$(wc -l < "$MOCK_LOG" | tr -d ' ')"
@@ -282,7 +360,10 @@ BEFORE_TOTAL="$(json_field "$STATE/state.json" "['providers']['claude']['todayTo
 LINE='{"type":"assistant","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'","message":{"usage":{"input_tokens":111,"output_tokens":222}}}'
 echo "$LINE" >> "$(ls "$CORPUS"/session-0/*.jsonl | head -1)"
 UPDATED=0
-for _ in $(seq 1 10); do
+# Espera POR CONTEÚDO com folga: sob load pós-suíte pesada o ciclo
+# (FSEvents → debounce 3s → ingest) já passou de 10s (flake observado 1×);
+# 25 iterações mantêm a semântica (conteúdo, não sleep fixo) com headroom.
+for _ in $(seq 1 25); do
   sleep 1
   AFTER_TOTAL="$(json_field "$STATE/state.json" "['providers']['claude']['todayTokens']")"
   if [ "$AFTER_TOTAL" != "MISSING" ] && [ "$AFTER_TOTAL" -ge "$((BEFORE_TOTAL + 333))" ] 2>/dev/null; then
@@ -306,7 +387,7 @@ LINE2='{"type":"assistant","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'","m
 echo "$LINE2" >> "$(ls "$CORPUS"/session-1/*.jsonl | head -1)"
 DEGRADED=0
 LAST_UPDATED="$(json_field "$STATE/state.json" "['updatedAt']")"
-for _ in $(seq 1 10); do
+for _ in $(seq 1 25); do
   sleep 1
   NEW_TOTAL="$(json_field "$STATE/state.json" "['providers']['claude']['todayTokens']")"
   NEW_UPDATED="$(json_field "$STATE/state.json" "['updatedAt']")"
@@ -468,7 +549,7 @@ APP_PID=$!
 # Espera o app NOVO publicar: updatedAt mudou + ambos os locais presentes
 # (publish é por provider — o claude sozinho não prova o restore do gemini).
 MIGRATED=0
-for _ in $(seq 1 30); do
+for _ in $(seq 1 60); do
   MIG_C_NOW="$(json_field "$STATE/state.json" "['providers']['claude']['todayTokens']" 2>/dev/null)"
   MIG_G_NOW="$(json_field "$STATE/state.json" "['providers']['gemini']['todayTokens']" 2>/dev/null)"
   [ -f "$SUPPORT/claude-cursors.json.migrated" ] \
@@ -490,7 +571,7 @@ check "migração: NÃO retroage no banco novo (history 7d vazio — backfill fo
 LINE3='{"type":"assistant","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":100,"output_tokens":200}}}'
 echo "$LINE3" >> "$(ls "$CORPUS"/session-0/*.jsonl | head -1)"
 MIG_UPDATED=0
-for _ in $(seq 1 10); do
+for _ in $(seq 1 25); do
   sleep 1
   NEW_C="$(json_field "$STATE/state.json" "['providers']['claude']['todayTokens']")"
   if [ "$NEW_C" != "MISSING" ] && [ "$NEW_C" -eq "$((MIG_T1 + 300))" ] 2>/dev/null; then MIG_UPDATED=1; break; fi
@@ -510,10 +591,12 @@ env "${COMMON_ENV[@]}" TOKENBAR_E2E_DIR="$STATE" \
   "build/TokenBar.app/Contents/MacOS/tokenbar" &
 APP_PID=$!
 RERUN=0
-for _ in $(seq 1 30); do
+for i in $(seq 1 120); do
   RERUN_C="$(json_field "$STATE/state.json" "['providers']['claude']['todayTokens']" 2>/dev/null)"
+  RERUN_U="$(json_field "$STATE/state.json" "['updatedAt']" 2>/dev/null)"
   [ "$RERUN_C" != "MISSING" ] && [ "$RERUN_C" -eq "$((MIG_T1 + 300))" ] 2>/dev/null \
-    && [ "$(json_field "$STATE/state.json" "['updatedAt']" 2>/dev/null)" != "$RERUN_LAST_UPDATED" ] && RERUN=1 && break
+    && [ "$RERUN_U" != "$RERUN_LAST_UPDATED" ] && RERUN=1 && break
+  [ $((i % 10)) = 0 ] && say "re-run diagnóstico t+${i}s: claude=$RERUN_C updatedAt=$RERUN_U (esperado claude=$((MIG_T1 + 300)); inicial=$RERUN_LAST_UPDATED; app vivo=$(kill -0 $APP_PID 2>/dev/null && echo sim || echo NAO))"
   sleep 1
 done
 check "re-run: idempotente — claude $RERUN_C == $((MIG_T1 + 300)) no 3º launch" "[ '$RERUN' = '1' ]"
@@ -533,6 +616,144 @@ CPU2="$(ps -o %cpu= -p $APP_PID | tr -d ' ')"
 check "pós-migração: processo vivo" "kill -0 $APP_PID"
 check "pós-migração: memória própria (phys_footprint) ${FOOT_RAW2:-MISSING} ≤ 40MB com DB aberto" "[ '${FOOT_KB2:-999999}' -le 40960 ]"
 check "pós-migração: cpu ${CPU2:-MISSING}% ≤ 0.5%" "python3 -c \"exit(0 if float('${CPU2:-99}'.replace(',','.')) <= 0.5 else 1)\""
+
+# ---------------------------------------------------------------------------
+# 10. (F4) Multi-conta no ciclo do app real. Contas CLAUDE com dir própria
+#     (ingest local — ZERO request extra ao mock, que está morto desde a
+#     seção 7). Registro PROGRAMÁTICO via sqlite3: a fonte do ciclo é o
+#     registry (tabela accounts), o guard de overlap mora na UI — caminho
+#     documentado no Red Team F4 caso 5. Provas: agregado = soma EXATA (sem
+#     duplicação; hwm/cursor por conta), eventos stampados por conta no DB,
+#     toggle ativa tira a conta do ciclo, frota de 30 contas coberta num
+#     ciclo só dentro do orçamento, heartbeat sem vazamento de paths/ids e
+#     remoção devolve o display ao layout F2 (prune de caches por conta).
+# ---------------------------------------------------------------------------
+say "F4: corpus da 2ª conta + credencial sintética"
+CORPUS2="$TMP/corpus-second"
+swift run -c release genfixtures --out "$CORPUS2" --sessions 2 --lines 60 --seed 9 >/dev/null
+cat > "$CRED/second-cred.json" <<'EOF'
+{"OPENAI_API_KEY": null, "auth_mode": "api_key", "tokens": {"access_token": "fake-token-e2e-second"}}
+EOF
+# Verdade de referência da 2ª conta (mesma pipeline, corpus só dela): o
+# todayTokens que UMA ingest fresca da conta deve somar ao display.
+SC2="$(env "${SELF_ENV[@]}" swift run -c release tokenbar selfcheck "$CORPUS2" | python3 -c "import json,sys;print(json.load(sys.stdin)['providers']['claude']['todayTokens'])")"
+say "SC2 (corpus 2ª conta, todayTokens): $SC2"
+check "corpus da 2ª conta tem eventos HOJE (SC2 > 0 — conta deve somar hoje)" "[ '$SC2' -gt 0 ]"
+
+# Mutação no registry por baixo do app vivo: .timeout (dot-command, SEM
+# stdout — PRAGMA imprimiria o próprio valor e corromperia os checks) +
+# escritor concorrente do app em WAL (busy ok).
+sql() { sqlite3 "$SUPPORT_DB" ".timeout 10000" "$1"; }
+
+BEFORE_B="$(json_field "$STATE/state.json" "['providers']['claude']['todayTokens']")"
+sql "INSERT INTO accounts (provider, account_id, label, kind, active, credential_path, directory_path)
+     VALUES ('claude','acct-e2e-b','E2E Second','oauth',1,'$CRED/second-cred.json','$CORPUS2');"
+check "F4: conta registrada programaticamente no registry (1 linha)" \
+  "[ \"\$(sql \"SELECT COUNT(*) FROM accounts WHERE provider='claude'\")\" = '1' ]"
+LINE4='{"type":"assistant","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'","message":{"usage":{"input_tokens":111,"output_tokens":222}}}'
+echo "$LINE4" >> "$(ls "$CORPUS"/session-0/*.jsonl | head -1)"
+B_OK=0
+for _ in $(seq 1 30); do
+  sleep 1
+  NOW_B="$(json_field "$STATE/state.json" "['providers']['claude']['todayTokens']")"
+  [ "$NOW_B" != "MISSING" ] && [ "$NOW_B" -eq "$((BEFORE_B + 333 + SC2))" ] 2>/dev/null && B_OK=1 && break
+done
+check "F4 multi-conta: ciclo cobre as DUAS contas — agregado exato ($NOW_B == $BEFORE_B + 333 + $SC2, sem duplicação)" "[ '$B_OK' = '1' ]"
+check "F4 multi-conta: eventos stampados POR CONTA no DB (2 contas no claude)" \
+  "[ \"\$(sql \"SELECT COUNT(DISTINCT account) FROM usage_events WHERE provider='claude'\")\" = '2' ]"
+check "F4 multi-conta: daily_agg da conta registrada presente (namespace próprio)" \
+  "[ \"\$(sql \"SELECT COUNT(*) FROM daily_agg WHERE provider='claude' AND account='acct-e2e-b'\")\" -ge 1 ]"
+check "F4 multi-conta: cursor POR CONTA (chave cursors:claude:acct-e2e-b no settings)" \
+  "[ -n \"\$(sql \"SELECT value FROM settings WHERE key='cursors:claude:acct-e2e-b'\")\" ]"
+check "F4 heartbeat: monthTokens ≥ history7d com 2 contas (agregado DB; custo presente — 30d ⊇ 7d; sem backfill F3, todayTokens é ledger e não participa)" \
+  "python3 -c '
+import json,sys
+p=json.load(open(sys.argv[1]))[\"providers\"][\"claude\"]
+m=p.get(\"monthTokens\"); h=(p.get(\"history7d\") or {}).get(\"tokens\")
+exit(0 if m is not None and h is not None and m>=h and (p.get(\"monthCostUsd\") or 0)>0 else 1)' '$STATE/state.json'"
+
+say "F4: toggle ativa OFF → conta sai do ciclo; registro permanece"
+sql "UPDATE accounts SET active=0 WHERE provider='claude' AND account_id='acct-e2e-b';"
+BEFORE_OFF="$(json_field "$STATE/state.json" "['providers']['claude']['todayTokens']")"
+LINE5='{"type":"assistant","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'","message":{"usage":{"input_tokens":37,"output_tokens":74}}}'
+echo "$LINE5" >> "$(ls "$CORPUS"/session-1/*.jsonl | head -1)"
+OFF_OK=0
+# Agregado = SOMA das contas cicladas: a conta inativa SAI do display (o
+# correto — mesma semântica F2), então o esperado é o canônico (BEFORE_OFF
+# menos a parte SC2 da conta) + o append de 111.
+EXPECTED_OFF=$((BEFORE_OFF - SC2 + 111))
+for _ in $(seq 1 30); do
+  sleep 1
+  NOW_OFF="$(json_field "$STATE/state.json" "['providers']['claude']['todayTokens']")"
+  [ "$NOW_OFF" != "MISSING" ] && [ "$NOW_OFF" -eq "$EXPECTED_OFF" ] 2>/dev/null && OFF_OK=1 && break
+done
+check "F4 toggle: conta inativa sai do agregado ($NOW_OFF == $EXPECTED_OFF — canônico + append, sem a parte da conta)" "[ '$OFF_OK' = '1' ]"
+check "F4 toggle: registro PERMANECE (linha intacta com active=0)" \
+  "[ \"\$(sql \"SELECT active FROM accounts WHERE provider='claude' AND account_id='acct-e2e-b'\")\" = '0' ]"
+
+say "F4: frota de 30 contas CLAUDE (137 tokens cada) — ciclo único, orçamento"
+FLEET="$TMP/fleet"
+FLEET_NOW="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+INSERTS=""
+for i in $(seq -w 1 30); do
+  mkdir -p "$FLEET/dir-$i/session-0"
+  printf '{"type":"assistant","timestamp":"%s","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":100,"output_tokens":37}}}\n' "$FLEET_NOW" \
+    > "$FLEET/dir-$i/session-0/session-fleet-$i.jsonl"
+  [ -n "$INSERTS" ] && INSERTS="$INSERTS,"
+  INSERTS="$INSERTS('claude','acct-fleet-$i','Fleet $i','oauth',1,'$CRED/second-cred.json','$FLEET/dir-$i')"
+done
+sql "INSERT INTO accounts (provider, account_id, label, kind, active, credential_path, directory_path) VALUES $INSERTS;"
+check "F4 frota: 31 contas registradas (canônica não está na tabela)" \
+  "[ \"\$(sql \"SELECT COUNT(*) FROM accounts WHERE provider='claude'\")\" = '31' ]"
+BEFORE_FLEET="$(json_field "$STATE/state.json" "['providers']['claude']['todayTokens']")"
+LINE6='{"type":"assistant","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'","message":{"usage":{"input_tokens":60,"output_tokens":90}}}'
+echo "$LINE6" >> "$(ls "$CORPUS"/session-0/*.jsonl | head -1)"
+FLEET_START="$(date +%s)"
+FLEET_OK=0
+for _ in $(seq 1 30); do
+  sleep 1
+  NOW_FLEET="$(json_field "$STATE/state.json" "['providers']['claude']['todayTokens']")"
+  [ "$NOW_FLEET" != "MISSING" ] && [ "$NOW_FLEET" -eq "$((BEFORE_FLEET + 150 + 30 * 137))" ] 2>/dev/null && FLEET_OK=1 && break
+done
+FLEET_SECS=$(( $(date +%s) - FLEET_START ))
+say "F4 frota: ciclo cobriu 31 contas em ${FLEET_SECS}s (limite do loop: 30s)"
+check "F4 frota: UM ciclo cobre as 31 contas — soma exata ($NOW_FLEET == $BEFORE_FLEET + 150 + 4110) em ${FLEET_SECS}s" "[ '$FLEET_OK' = '1' ]"
+check "F4 frota: 30 contas com eventos no DB (local + B + 30 da frota = 32 namespaces)" \
+  "[ \"\$(sql \"SELECT COUNT(DISTINCT account) FROM usage_events WHERE provider='claude'\")\" = '32' ]"
+
+PAYLOAD_BYTES="$(wc -c < "$STATE/state.json" | tr -d ' ')"
+check "F4 heartbeat: higiene — payload de ${PAYLOAD_BYTES}B ≤ 64KB SEM paths/ids de conta (grep TMP/acct- vazio)" \
+  "[ '$PAYLOAD_BYTES' -le 65536 ] && ! grep -qF '$TMP' '$STATE/state.json' && ! grep -q 'acct-' '$STATE/state.json'"
+
+say "F4: orçamento de recursos com 31 contas (10s de acomodação pós-ingest)"
+sleep 10
+FOOT_RAW4="$(vmmap --summary "$APP_PID" 2>/dev/null | awk '/Physical footprint:/ {print $3; exit}')"
+FOOT_KB4="$(python3 -c "
+import sys
+v=sys.argv[1]; n=float(v[:-1]); u=v[-1].upper()
+print(int(n*{'K':1,'M':1024,'G':1024**2}.get(u,1)))" "${FOOT_RAW4:-0K}" 2>/dev/null || echo 999999)"
+CPU4="$(ps -o %cpu= -p $APP_PID | tr -d ' ')"
+check "F4 orçamento: processo vivo com 31 contas" "kill -0 $APP_PID"
+check "F4 orçamento: memória própria (phys_footprint) ${FOOT_RAW4:-MISSING} ≤ 40MB com 31 contas" "[ '${FOOT_KB4:-999999}' -le 40960 ]"
+check "F4 orçamento: cpu ${CPU4:-MISSING}% ≤ 0.5% com 31 contas" "python3 -c \"exit(0 if float('${CPU4:-99}'.replace(',','.')) <= 0.5 else 1)\""
+
+say "F4: remoção de todas as contas → display volta ao layout F2 (prune)"
+sql "DELETE FROM accounts WHERE provider='claude';"
+BEFORE_RM="$(json_field "$STATE/state.json" "['providers']['claude']['todayTokens']")"
+LINE7='{"type":"assistant","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'","message":{"usage":{"input_tokens":40,"output_tokens":80}}}'
+echo "$LINE7" >> "$(ls "$CORPUS"/session-1/*.jsonl | head -1)"
+RM_OK=0
+# Mesma semântica do toggle: removidas não ciclizam → esperado = canônico
+# (BEFORE_RM menos os 30×137 da frota) + append de 120.
+EXPECTED_RM=$((BEFORE_RM - 30 * 137 + 120))
+for _ in $(seq 1 30); do
+  sleep 1
+  NOW_RM="$(json_field "$STATE/state.json" "['providers']['claude']['todayTokens']")"
+  [ "$NOW_RM" != "MISSING" ] && [ "$NOW_RM" -eq "$EXPECTED_RM" ] 2>/dev/null && RM_OK=1 && break
+done
+check "F4 remoção: contas removidas saem do ciclo ($NOW_RM == $EXPECTED_RM — só a canônica)" "[ '$RM_OK' = '1' ]"
+check "F4 remoção: registry vazio e DB não duplicou (eventos da frota permanecem, só-histórico)" \
+  "[ \"\$(sql \"SELECT COUNT(*) FROM accounts WHERE provider='claude'\")\" = '0' ]"
 
 say "concluído: $FAILURES falha(s)"
 [ "$FAILURES" = "0" ] && exit 0 || exit 1

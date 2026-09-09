@@ -1,0 +1,36 @@
+[rt] app pid 94895 — lab: /tmp/t4-rt-lab
+[rt] FAIL: RT4 setup: app de pé com claude 33 (sem credenciais reais, rede morta)
+[rt] FAIL: RT4: 3 contas hostis registradas (2 FIFO + 1 /dev/null)
+[rt] RT4: ciclo pós-contas hostis terminou em 27s (hang = loop estoura)
+[rt] FAIL: RT4: ciclo cobriu contas FIFO/dev/null SEM hang (claude MISSING == 203 = 66 local + 137 conta)
+[rt] FAIL: RT4: processo vivo (nenhum fetch bloqueado, nenhum crash)
+[rt] FAIL: RT4: codex/zai do lab seguem .missing (FIFO → nil, sem request, sem rede)
+[rt] PASS: RT4: claude da conta devnull cicliza (fetchedAt fresco: MISSING)
+[rt] FAIL: RT4: 2º ciclo idem — degradação finita e repetível (claude MISSING == 213)
+[rt] concluído: 1 PASS / 6 FAIL
+[rt] app pid 95908 — lab: /tmp/t4-rt-lab
+[rt] PASS: RT4 setup: app de pé com claude 33 (sem credenciais reais, rede morta)
+[rt] PASS: RT4: 3 contas hostis registradas (2 FIFO + 1 /dev/null)
+[rt] RT4: ciclo pós-contas hostis terminou em 4s (hang = loop estoura)
+[rt] PASS: RT4: ciclo cobriu contas FIFO/dev/null SEM hang (claude 203 == 203 = 66 local + 137 conta)
+[rt] PASS: RT4: processo vivo (nenhum fetch bloqueado, nenhum crash)
+[rt] PASS: RT4: codex/zai do lab seguem .missing (FIFO → nil, sem request, sem rede)
+[rt] PASS: RT4: claude da conta devnull cicliza (fetchedAt fresco: 2026-09-08T23:08:57Z)
+[rt] PASS: RT4: 2º ciclo idem — degradação finita e repetível (claude 213 == 213)
+[rt] concluído: 7 PASS / 0 FAIL
+
+== RT7: ticker do countdown com painel aberto por 10 min (footprint estável) ==
+app pid 5197 (release, lab /tmp/t4-qa-lab)
+click no item → updatedAt 2026-09-08T23:38:38Z → 2026-09-08T23:39:06Z (menuDidOpen OK: painel aberto)
+t+0s phys_footprint=25.3M rss=89712KB
+t+60s phys_footprint=25.2M rss=83840KB
+t+120s phys_footprint=25.3M rss=83616KB
+t+180s phys_footprint=25.3M rss=83328KB
+t+240s phys_footprint=25.2M rss=83264KB
+t+300s phys_footprint=25.3M rss=83408KB
+t+360s phys_footprint=25.2M rss=82640KB
+t+420s phys_footprint=25.2M rss=83984KB
+t+480s phys_footprint=25.2M rss=70096KB
+t+540s phys_footprint=25.1M rss=68112KB
+t+600s phys_footprint=25.1M rss=67824KB
+processo vivo após 10 min: SIM

@@ -36,8 +36,18 @@ public protocol UsageEventPersisting: Sendable {
 
 /// Chave da marca d'água de um arquivo na tabela `settings`. A chave é
 /// opaca (nunca parseada — lookup exato), então `:` no path é inofensivo.
-func highWaterKey(provider: ProviderID, path: String) -> String {
-    "hwm:\(provider.rawValue):\(path)"
+///
+/// F4 multi-conta: contas registradas (key != "local") ganham namespace
+/// próprio — `hwm:<provider>:<accountKey>:<path>` — para duas contas
+/// apontarem corpora distintos do mesmo provider sem disputar marca d'água.
+/// A conta DEFAULT (nil/"local") mantém a chave legada `hwm:<provider>:<path>`
+/// (obrigação dura F2/F3: cursores e hwm de always-existing installs não
+/// mudam de lugar — mudar re-ingeriria o dia inteiro).
+func highWaterKey(provider: ProviderID, accountKey: String?, path: String) -> String {
+    if let accountKey, accountKey != "local" {
+        return "hwm:\(provider.rawValue):\(accountKey):\(path)"
+    }
+    return "hwm:\(provider.rawValue):\(path)"
 }
 
 extension AppDatabase: UsageEventPersisting {
@@ -45,7 +55,10 @@ extension AppDatabase: UsageEventPersisting {
         provider: ProviderID, path: String, events: [UsageEvent],
         endOffset: UInt64, resetToZero: Bool
     ) throws {
-        let hwmKey = highWaterKey(provider: provider, path: path)
+        // Namespace da marca d'água vem do PRÓPRIO evento (o ingester da
+        // instância stampou a conta) — lote vazio usa o namespace legado.
+        let hwmKey = highWaterKey(
+            provider: provider, accountKey: events.first?.account.key, path: path)
         try writer.write { db in
             if resetToZero {
                 try db.execute(sql: "DELETE FROM settings WHERE key = ?", arguments: [hwmKey])
@@ -148,8 +161,13 @@ extension AppDatabase: UsageEventPersisting {
     /// mostram o grupo; nunca um modelo inventado (spec: "nunca chute").
     static let unknownModel = "unknown"
 
-    /// Marca d'água atual de um path (testes; nil = nada persistido).
-    public func highWater(provider: ProviderID, path: String) throws -> UInt64? {
-        try setting(forKey: highWaterKey(provider: provider, path: path)).flatMap { UInt64($0) }
+    /// Marca d'água atual de um path (testes; nil = nada persistido). A conta
+    /// default ("local"/nil) usa a chave legada; contas registradas o namespace
+    /// próprio — mesma regra do `persistBatch`.
+    public func highWater(
+        provider: ProviderID, path: String, accountKey: String? = nil
+    ) throws -> UInt64? {
+        try setting(forKey: highWaterKey(provider: provider, accountKey: accountKey, path: path))
+            .flatMap { UInt64($0) }
     }
 }

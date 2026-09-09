@@ -77,7 +77,7 @@ final class ClaudeUsageProviderConformanceTests {
     @Test func conformsToUsageProviderBasics() async {
         let provider: any UsageProvider = makeProvider()
         #expect(provider.id == .claude)
-        #expect(provider.capabilities == [.localIngest])
+        #expect(provider.capabilities == [.localIngest, .multiAccount])  // F4: contas com dir própria
         let accounts = await provider.discoverAccounts()
         #expect(accounts == [localRef])
     }

@@ -31,9 +31,19 @@ public final class ClaudeProvider: Sendable, UsageProvider {
     /// cunhar label próprio — a UI trata "janela local" de forma uniforme.
     public static let localDailyWindowLabel = "Hoje"
 
-    public var account: AccountID { AccountID(provider: .claude, key: "local") }
+    public var account: AccountID { AccountID(provider: .claude, key: accountKey) }
 
-    public var accountRef: AccountRef { AccountRef(id: account, label: "local") }
+    public var accountRef: AccountRef { AccountRef(id: account, label: accountKey == "local" ? "local" : label) }
+
+    /// Key da conta que ESTA instância serve ("local" na instância canônica;
+    /// contas registradas recebem instância própria no wiring — F4).
+    public let accountKey: String
+    /// Label de exibição da conta registrada (igual ao key em instâncias locais).
+    private let label: String
+    /// Registry multi-conta (F4): presente na instância canônica, alimenta a
+    /// descoberta MERGE (auto + registradas, dedupe por key). `nil` = sem
+    /// registry (testes unitários/comportamento F2).
+    private let accounts: AccountRegistry?
 
     private let projectsDirectory: URL
     private let offsetStore: any FileOffsetStoring
@@ -51,7 +61,10 @@ public final class ClaudeProvider: Sendable, UsageProvider {
         offsetStore: any FileOffsetStoring,
         calendar: Calendar,
         ledgerSnapshotStore: (any LedgerSnapshotStoring)? = nil,
-        persisting: (any UsageEventPersisting)? = nil
+        persisting: (any UsageEventPersisting)? = nil,
+        accountKey: String = "local",
+        label: String = "local",
+        accounts: AccountRegistry? = nil
     ) {
         self.projectsDirectory = projectsDirectory
         self.offsetStore = offsetStore
@@ -59,7 +72,10 @@ public final class ClaudeProvider: Sendable, UsageProvider {
         self.persisting = persisting
         self.ledger = TokenLedger(calendar: calendar)
         self.calendar = calendar
-        let account = AccountID(provider: .claude, key: "local")
+        self.accountKey = accountKey
+        self.label = label
+        self.accounts = accounts
+        let account = AccountID(provider: .claude, key: accountKey)
         self.ingester = TranscriptIngester { line, modified in
             ClaudeLineParser(account: account, project: nil)
                 .parse(line: line, fileModificationDate: modified)
@@ -78,11 +94,22 @@ public final class ClaudeProvider: Sendable, UsageProvider {
 
     public var id: ProviderID { .claude }
 
-    /// F1 é só ingest local; `.apiUsage`/`.credits` chegam com o modo OAuth.
-    public var capabilities: ProviderCapabilities { [.localIngest] }
+    /// F4: `.multiAccount` — contas registradas (outra raiz de projetos, ex.
+    /// segundo CLAUDE_CONFIG_DIR) ganham pipeline próprio no wiring. F1 é só
+    /// ingest local; `.apiUsage`/`.credits` chegam com o modo OAuth.
+    public var capabilities: ProviderCapabilities { [.localIngest, .multiAccount] }
 
+    /// Descoberta MERGE (F4): a conta local canônica + as contas ATIVAS do
+    /// registry (dedupe por key — registrada com key já visível não repete).
+    /// Falha de leitura do registry → só as auto-descobertas (degrada honesta).
     public func discoverAccounts() async -> [AccountRef] {
-        [accountRef]
+        var refs = [accountRef]
+        guard let accounts else { return refs }
+        let registered = (try? accounts.activeAccounts(provider: .claude)) ?? []
+        for entry in registered where !refs.contains(where: { $0.id.key == entry.accountKey }) {
+            refs.append(AccountRef(id: AccountID(provider: .claude, key: entry.accountKey), label: entry.label))
+        }
+        return refs
     }
 
     /// Snapshot no modo local (spec §5 regra 2): janela diária com fração

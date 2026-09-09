@@ -10,13 +10,19 @@ import TokenBarProviders
 /// (`claude-cursors.json`, …) quando o DB não abre. OBRIGAÇÃO DURA F2:
 /// compartilhar um store cruzaria providers (o rollover zera todos os paths
 /// do store injetado). Fábrica injetada (testes/selfcheck) tem precedência.
+///
+/// F4 multi-conta: as fábricas recebem a chave da conta (`String?`, nil =
+/// conta default/provider-scoped). Conta default mantém o nome/layout F2
+/// (`claude-cursors.json`, `cursors:claude`); contas registradas ganham
+/// namespace próprio (`claude-<accountKey>-cursors.json` /
+/// `cursors:claude:<accountKey>` — ver `DBOffsetStore`).
 public struct ProviderCoordinatorConfig: Sendable {
     public let environment: [String: String]
     public let home: URL
     public let supportDirectory: URL
     public let e2eDirectory: URL?
-    public let makeOffsetStore: @Sendable (ProviderID) -> any FileOffsetStoring
-    public let makeLedgerSnapshotStore: @Sendable (ProviderID) -> (any LedgerSnapshotStoring)?
+    public let makeOffsetStore: @Sendable (ProviderID, String?) -> any FileOffsetStoring
+    public let makeLedgerSnapshotStore: @Sendable (ProviderID, String?) -> (any LedgerSnapshotStoring)?
     /// `false` quando o chamador injetou fábrica própria (testes/selfcheck) —
     /// nesse caso a store de cursores em SQLite NÃO substitui a injetada.
     let usesDefaultOffsetStore: Bool
@@ -26,8 +32,8 @@ public struct ProviderCoordinatorConfig: Sendable {
         home: URL,
         supportDirectory: URL,
         e2eDirectory: URL? = nil,
-        makeOffsetStore: (@Sendable (ProviderID) -> any FileOffsetStoring)? = nil,
-        makeLedgerSnapshotStore: (@Sendable (ProviderID) -> (any LedgerSnapshotStoring)?)? = nil
+        makeOffsetStore: (@Sendable (ProviderID, String?) -> any FileOffsetStoring)? = nil,
+        makeLedgerSnapshotStore: (@Sendable (ProviderID, String?) -> (any LedgerSnapshotStoring)?)? = nil
     ) {
         self.environment = environment
         self.home = home
@@ -38,18 +44,20 @@ public struct ProviderCoordinatorConfig: Sendable {
             self.makeOffsetStore = makeOffsetStore
         } else {
             let support = supportDirectory
-            self.makeOffsetStore = { id in
+            self.makeOffsetStore = { id, accountKey in
                 try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
-                return JSONFileOffsetStore(url: support.appendingPathComponent("\(id.rawValue)-cursors.json"))
+                let name = accountKey.map { "\(id.rawValue)-\($0)-cursors.json" } ?? "\(id.rawValue)-cursors.json"
+                return JSONFileOffsetStore(url: support.appendingPathComponent(name))
             }
         }
         if let makeLedgerSnapshotStore {
             self.makeLedgerSnapshotStore = makeLedgerSnapshotStore
         } else {
             let support = supportDirectory
-            self.makeLedgerSnapshotStore = { id in
+            self.makeLedgerSnapshotStore = { id, accountKey in
                 try? FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
-                return JSONLedgerSnapshotStore(url: support.appendingPathComponent("\(id.rawValue)-ledger.json"))
+                let name = accountKey.map { "\(id.rawValue)-\($0)-ledger.json" } ?? "\(id.rawValue)-ledger.json"
+                return JSONLedgerSnapshotStore(url: support.appendingPathComponent(name))
             }
         }
     }
@@ -60,13 +68,23 @@ public struct ProviderCoordinatorConfig: Sendable {
 /// protocolo) + fetchUsage (sem rede quando não há credencial). Publica no
 /// `SnapshotStore` (render gate) e escreve o heartbeat v2.
 ///
+/// F4 multi-conta: o ciclo itera a conta canônica ("local", layout F2
+/// preservado) + TODAS as contas ATIVAS do registry (ruling F4-MULTIACCOUNT:
+/// troca efetiva de credencial multi-provider é F5 — aqui cada conta
+/// registrada ganha uma INSTÂNCIA de provider própria com credencial/dir do
+/// registro lidos read-only, cursor/ledger/hwm por conta). Agregado do
+/// provider = tokens somados + janela crítica da conta de maior fração
+/// (decisão registrada: pior caso visível, mesmo critério D5 do menu bar).
+///
 /// Concorrência:
 /// - M1 por provider: `inFlight` (check+set atômico — classe @MainActor)
 ///   torna os 3 caminhos de ingest (scheduler, FSEvents+debounce, fallback
 ///   poll, refresh manual) single-flight POR provider; dois ingests sobrepostos
 ///   leriam os mesmos cursores e duplicariam o dia no ledger.
 /// - Scheduler apenas para os API-driven (Codex, Z.ai) — Claude/Gemini são
-///   file-driven: FSEvents + debounce + fallback poll de 15 min.
+///   file-driven: FSEvents + debounce + fallback poll de 15 min. Contas
+///   registradas de providers file-driven ciclizam na cadência do provider
+///   (o ciclo por provider cobre todas as contas).
 /// - Menu aberto: fire imediato (throttle 10 s) + `noteMenuOpened()` reafirmado
 ///   a cada ciclo enquanto aberto; `noteResult(ok)` devolve ao ocioso — a
 ///   spec §7 veda 2 fires simultâneos e exige os intervalos do scheduler.
@@ -85,6 +103,9 @@ public final class ProviderCoordinator {
     public let scheduler: AdaptiveScheduler
     private let config: ProviderCoordinatorConfig
     private let registry: ProviderRegistry
+    /// Calendar do ciclo (rollover do ledger, janelas e pacing) — o mesmo
+    /// injetado nos providers no init.
+    private let calendar: Calendar
     /// Banco aberto no init (F3); `nil` = degradação F2 (sem persistência e
     /// sem custo: `todayCostUsd` do display fica `nil` — nunca chutado).
     /// Retido além do wiring dos providers para a consulta do custo do dia.
@@ -92,18 +113,36 @@ public final class ProviderCoordinator {
     /// Exposição só-LEITURA do banco p/ a UI de F3 (linha 7d do painel,
     /// analytics, export). Queries rodam FORA da MainActor no chamador.
     public var historyDatabase: AppDatabase? { database }
+    /// Registry multi-conta (F4): CRUD da tabela `accounts`. `nil` quando o
+    /// banco não abriu (degradação F2) — a UI esconde "+ Add account" (sem DB
+    /// não há onde registrar; honesto, não desabilitado por engano).
+    public let accountRegistry: AccountRegistry?
     /// Support directory (o export grava em `<support>/exports`).
     public var supportDirectory: URL { config.supportDirectory }
 
     /// Dirs observados por FSEvents (file-driven): Claude projects, Gemini tmp.
     private let watcherDirectories: [ProviderID: URL]
-    /// Cursor semeado por provider = `nextCursor` do ciclo anterior (contrato:
-    /// nunca cursor de outro provider nem construído fora daqui).
-    private var cursorSeeds: [ProviderID: IngestCursor] = [:]
+    /// Resoluções de wiring reutilizadas pelas instâncias de conta (F4).
+    private let defaultClaudeDirectory: URL
+    private let defaultCodexSessionsDirectory: URL
+    private let defaultCodexBaseURL: URL
+    private let defaultZaiCredentialsURL: URL
+
+    /// Cursor semeado por (provider, conta) = `nextCursor` do ciclo anterior
+    /// (contrato: nunca cursor de outro provider/conta nem construído fora).
+    private var cursorSeeds: [ProviderID: [String: IngestCursor]] = [:]
     private var offsetStores: [ProviderID: any FileOffsetStoring] = [:]
+    /// Stores por conta (F4), criados lazily e retidos — o ledger da instância
+    /// de conta é estado do dia; recriar a instância zeraria o "hoje".
+    private var accountOffsetStores: [ProviderID: [String: any FileOffsetStoring]] = [:]
+    private var accountLedgerStores: [ProviderID: [String: (any LedgerSnapshotStoring)?]] = [:]
+    private var accountInstances: [ProviderID: [String: any UsageProvider]] = [:]
     /// Estado de exibição por provider — inclui os que ainda não têm dado
     /// (heartbeat v2 lista todos os registrados).
     private var displays: [ProviderID: ProviderDisplay] = [:]
+    /// Último estado bom POR CONTA (F4): a conta degradada mantém o último
+    /// total/janelas bons — nunca dado errado, mesmo padrão do provider.
+    private var perAccountDisplays: [ProviderID: [String: ProviderDisplay]] = [:]
     /// Token do último erro de ciclo por provider (selfcheck; tokenizado).
     private var cycleErrors: [ProviderID: String] = [:]
 
@@ -123,6 +162,7 @@ public final class ProviderCoordinator {
         let env = config.environment
         let home = config.home
         let calendar = Calendar.current
+        self.calendar = calendar
 
         // F3: banco SQLite (schema spec §6) na support directory — o
         // TOKENBAR_SUPPORT_DIR do AppState isola app/e2e. Falha de abertura
@@ -139,6 +179,7 @@ public final class ProviderCoordinator {
             at: config.supportDirectory.appendingPathComponent(AppDatabase.databaseName),
             calendar: calendar)
         self.database = database
+        self.accountRegistry = database.map(AccountRegistry.init)
         if let database {
             // Migração dos cursores legados F1/F2 (JSON → settings), uma vez
             // por arquivo (idempotente); o live store vira DBOffsetStore.
@@ -154,6 +195,7 @@ public final class ProviderCoordinator {
         // primeira fase ("store fresco"). Com DB aberto e fábrica DEFAULT,
         // o store vivo é o DBOffsetStore (settings); fábrica injetada
         // (testes/selfcheck) tem precedência; sem DB → JSON legado (F2).
+        // Conta default = key nil → chave legada `cursors:<provider>`.
         let stores: [ProviderID: any FileOffsetStoring]
         if let database, config.usesDefaultOffsetStore {
             stores = [
@@ -163,18 +205,18 @@ public final class ProviderCoordinator {
             ]
         } else {
             stores = [
-                .claude: config.makeOffsetStore(.claude),
-                .codex: config.makeOffsetStore(.codex),
-                .gemini: config.makeOffsetStore(.gemini),
+                .claude: config.makeOffsetStore(.claude, nil),
+                .codex: config.makeOffsetStore(.codex, nil),
+                .gemini: config.makeOffsetStore(.gemini, nil),
             ]
         }
         offsetStores = stores
         // Snapshot do dia por provider (restart mid-day, Red Team F2 caso 7):
         // mesmo diretório dos cursores; Z.ai não tem ingest → sem snapshot.
         let ledgerStores: [ProviderID: any LedgerSnapshotStoring] = [
-            .claude: config.makeLedgerSnapshotStore(.claude),
-            .codex: config.makeLedgerSnapshotStore(.codex),
-            .gemini: config.makeLedgerSnapshotStore(.gemini),
+            .claude: config.makeLedgerSnapshotStore(.claude, nil),
+            .codex: config.makeLedgerSnapshotStore(.codex, nil),
+            .gemini: config.makeLedgerSnapshotStore(.gemini, nil),
         ].compactMapValues { $0 }
 
         let claudeDirectory = ClaudeTranscriptLocator.resolve(environment: env, home: home).projectsDirectory
@@ -184,16 +226,20 @@ public final class ProviderCoordinator {
             offsetStore: stores[.claude]!,
             calendar: calendar,
             ledgerSnapshotStore: ledgerStores[.claude],
-            persisting: database
+            persisting: database,
+            accounts: accountRegistry
         )
+        let codexSessionsDirectory = CodexProvider.resolveSessionsDirectory(environment: env, home: home)
+        let codexBaseURL = CodexProvider.resolveBaseURL(environment: env)
         let codex = CodexProvider(
-            sessionsDirectory: CodexProvider.resolveSessionsDirectory(environment: env, home: home),
+            sessionsDirectory: codexSessionsDirectory,
             authReader: CodexAuthReader.resolve(environment: env, home: home),
-            client: UsageHTTPClient(baseURL: CodexProvider.resolveBaseURL(environment: env)),
+            client: UsageHTTPClient(baseURL: codexBaseURL),
             offsetStore: stores[.codex]!,
             calendar: calendar,
             ledgerSnapshotStore: ledgerStores[.codex],
-            persisting: database
+            persisting: database,
+            accounts: accountRegistry
         )
         let gemini = GeminiProvider(
             geminiDirectory: geminiDirectory,
@@ -205,13 +251,19 @@ public final class ProviderCoordinator {
         let zaiReader = ZaiCredentialReader.resolve(environment: env, home: home)
         let zai = ZaiProvider(
             credentialReader: zaiReader,
-            client: UsageHTTPClient(baseURL: ZaiProvider.resolveBaseURL(environment: env, regionHint: zaiReader.read()?.regionBaseURL))
+            client: UsageHTTPClient(baseURL: ZaiProvider.resolveBaseURL(environment: env, regionHint: zaiReader.read()?.regionBaseURL)),
+            accounts: accountRegistry
         )
         registry = ProviderRegistry(providers: [claude, codex, gemini, zai])
         watcherDirectories = [.claude: claudeDirectory, .gemini: geminiDirectory.appendingPathComponent("tmp", isDirectory: true)]
         for id in watcherDirectories.keys {
             debouncers[id] = Debouncer(quiesce: Self.debounceQuiesce, clock: ContinuousClock())
         }
+        // Resoluções reutilizadas pelas instâncias de conta registrada (F4).
+        defaultClaudeDirectory = claudeDirectory
+        defaultCodexSessionsDirectory = codexSessionsDirectory
+        defaultCodexBaseURL = codexBaseURL
+        defaultZaiCredentialsURL = zaiReader.credentialsFileURL
     }
 
     // MARK: - Ciclo de vida
@@ -278,103 +330,369 @@ public final class ProviderCoordinator {
         }
     }
 
-    /// Um ciclo do provider: ingest local + fetchUsage → display → publish →
-    /// noteResult (o scheduler decide o intervalo). Skip-if-busy: ciclo em
-    /// curso deste provider → este vira não-op (o próximo tick re-ingere).
+    /// Provider tem suporte a multi-conta (F4)? A UI usa p/ mostrar o botão
+    /// "+ Add account" (provider sem suporte → botão oculto, plan T3).
+    public func supportsMultiAccount(_ id: ProviderID) -> Bool {
+        registry.provider(for: id)?.capabilities.contains(.multiAccount) ?? false
+    }
+
+    /// Raiz de scan canônica do provider (conta default) — insumo do guard de
+    /// overlap do registro de contas (review T3: dir de conta sobrepondo a
+    /// raiz canônica dobraria o histórico provider-wide de forma persistente).
+    /// `nil` = provider sem ingest local (nada a proteger).
+    public func canonicalScanRoot(for id: ProviderID) -> URL? {
+        switch id {
+        case .claude: return defaultClaudeDirectory
+        case .codex: return defaultCodexSessionsDirectory
+        case .gemini: return watcherDirectories[.gemini]
+        default: return nil
+        }
+    }
+
+    /// Um ciclo do provider: descoberta MERGE de contas → por conta (ingest
+    /// local + fetchUsage) → agregado → publish → noteResult. Skip-if-busy:
+    /// ciclo em curso deste provider → este vira não-op (o próximo tick
+    /// re-ingere). Erro de conta registrada degrada A CONTA (badge na linha),
+    /// nunca o provider — ok do scheduler vem da conta canônica (F2 compat).
     func cycle(provider id: ProviderID) async {
         guard let provider = registry.provider(for: id) else { return }
         guard !inFlight.contains(id) else { return }
         inFlight.insert(id)
         defer { inFlight.remove(id) }
 
-        var ok = true
-        var errorToken: String?
+        // Descoberta MERGE (1×/ciclo — "refresh de contas no ciclo"): auto +
+        // registry, dedupe por key (contrato do protocolo; rótulos vêm daqui).
+        let discovered = await provider.discoverAccounts()
+        let registered = (try? accountRegistry?.activeAccounts(provider: id)) ?? []
 
-        // Conta: a descoberta quando visível; fallback é a conta local canônica
-        // que todo provider F2 atende (sem credencial → snapshot degradado,
-        // nunca rede — spec §5).
-        let accounts = await provider.discoverAccounts()
-        let account = accounts.first ?? AccountRef(id: AccountID(provider: id, key: "local"), label: "local")
+        // Alvos do ciclo: a conta canônica SEMPRE (F2: snapshot degradado
+        // mesmo sem credencial — spec §5) + as registradas ativas com key
+        // própria (dedupe por key com a canônica).
+        var targets: [(instance: any UsageProvider, ref: AccountRef, entry: RegisteredAccount?)] = []
+        let defaultRef = discovered.first { $0.id.key == "local" }
+            ?? AccountRef(id: AccountID(provider: id, key: "local"), label: "local")
+        targets.append((provider, defaultRef, nil))
+        for entry in registered where entry.accountKey != "local" {
+            if let instance = accountInstance(provider: id, entry: entry) {
+                targets.append((instance, AccountRef(id: AccountID(provider: id, key: entry.accountKey), label: entry.label), entry))
+            }
+        }
+        pruneAccountCaches(provider: id, liveKeys: Set(["local"] + registered.map(\.accountKey)))
 
-        // 1) Ingest local (Claude/Codex/Gemini): semeia do nextCursor PRÓPRIO
-        // do ciclo anterior; primeira vez, do store fresco (contrato de cursor).
-        if provider.capabilities.contains(.localIngest) {
-            let seed = cursorSeeds[id] ?? IngestCursor(fileOffsets: offsetStores[id]?.cursors() ?? [:])
-            do {
-                let batch = try await provider.ingestLocal(account, from: seed)
-                cursorSeeds[id] = batch.nextCursor
-                var display = displays[id] ?? .empty
-                display.todayTokens = batch.providerTotals[id] ?? 0
-                // Custo do dia (F3): soma de cost_usd dos eventos de hoje,
-                // direto do DB — 1 leitura indexada por CICLO (o render do
-                // menu bar segue sem tocar no banco; gate da F1). Falha de
-                // leitura → nil (painel fica só com tokens, honesto).
-                if let database {
-                    display.todayCostUsd = try? database.todayCostUSD(provider: id)
-                    // Histórico 7d (F3 Task 3): 1 query indexada por CICLO —
-                    // FORA da MainActor (SQLite não roda na main), chega via
-                    // await. Falha de leitura → mantém o último valor bom no
-                    // painel (nunca zera o histórico por um erro transitório)
-                    // e o heartbeat v3 OMITE o history7d (flag abaixo).
-                    let week = await Task.detached(priority: .utility) {
-                        try? database.weekTotal(provider: id)
-                    }.value
-                    if let week {
-                        display.weekTokens = week.tokens
-                        display.weekCostUsd = week.costUSD
-                        display.weekHistoryAvailable = true
-                    } else {
-                        display.weekHistoryAvailable = false
-                    }
+        let database = self.database
+
+        // Fase 1 — INGEST POR CONTA (F4): só a conta canônica e registradas
+        // com dir própria (conta API-only não re-ingere o corpus compartilhado).
+        // Erro de uma conta não derruba as demais (degrada sozinha).
+        var accountDisplays: [AccountDisplay] = []
+        var primaryOK = true
+        var primaryErrorToken: String?
+        for target in targets {
+            let key = target.ref.id.key
+            var display = perAccountDisplays[id]?[key] ?? ProviderDisplay.empty
+            var ok = true
+            var errorToken: String?
+
+            if ingestsLocal(instance: target.instance, entry: target.entry) {
+                let seed = cursorSeeds[id]?[key]
+                    ?? IngestCursor(fileOffsets: accountOffsetStore(provider: id, key: key).cursors())
+                do {
+                    let batch = try await target.instance.ingestLocal(target.ref, from: seed)
+                    cursorSeeds[id, default: [:]][key] = batch.nextCursor
+                    display.todayTokens = batch.providerTotals[id] ?? 0
+                    // Mesmo padrão F2: ingest saudável carimba o ciclo.
+                    display.fetchedAt = Date()
+                } catch {
+                    // Mantém o último total bom da conta (nunca dado errado).
+                    ok = false
+                    errorToken = Self.errorToken(error)
                 }
-                display.fetchedAt = Date()
-                displays[id] = display
-            } catch {
-                // Mantém o último total bom (nunca dado errado). Provider sem
-                // display nenhum ainda entra no payload — o heartbeat v2 lista
-                // TODOS os registrados, e o token de erro não pode se perder
-                // num provider que nunca conseguiu dado (regressão T8).
-                ok = false
-                errorToken = Self.errorToken(error)
-                if displays[id] == nil { displays[id] = .empty }
+            }
+            perAccountDisplays[id, default: [:]][key] = display
+            if target.entry == nil {
+                // ok do provider = ok da conta canônica (F2 compat: scheduler,
+                // backoff e cicloErrors como antes).
+                primaryOK = ok
+                primaryErrorToken = errorToken
             }
         }
 
-        // 2) FetchUsage: local-only nunca gera rede; API sem credencial degrada
-        // (`.missing`) sem request; erro de rede → último snapshot bom fica.
-        do {
-            let snapshot = try await provider.fetchUsage(account)
-            let critical = criticalWindow(in: snapshot.windows)
-            var display = displays[id] ?? .empty
-            display.percent = critical?.usedFraction.map { $0 * 100 }
-            display.resetsAt = critical?.resetsAt
-            display.authState = snapshot.authState
-            display.source = snapshot.source
-            display.fetchedAt = snapshot.fetchedAt
-            displays[id] = display
-        } catch {
-            ok = false
-            errorToken = errorToken ?? Self.errorToken(error)
-            // Idem: provider API-driven com o primeiro ciclo em erro (rede
-            // morta, 401, 500…) NÃO some do diagnóstico — entra vazio com o
-            // token do erro anexado (regressão T8: zai sumia do heartbeat v2).
-            if displays[id] == nil { displays[id] = .empty }
+        // Fase 2 — Histórico provider-wide (F3/F4): DEPOIS da ingest (as
+        // queries de 7d/30d/custo têm que ver o dia corrente recém-persistido
+        // — ordem F2/F3 preservada) e SÓ para providers com ingest local —
+        // API-only (zai) nunca persistiu diários: sem leitura, heartbeat
+        // OMITE history (comportamento F3). 1 conjunto de queries por CICLO,
+        // FORA da MainActor; daily_agg soma contas, então 7d/30d/série já são
+        // agregados; o input de PACING é POR CONTA. Falha → nil → o painel
+        // mantém o último valor bom (padrão F3).
+        let loadsHistory = provider.capabilities.contains(.localIngest)
+        let pacingKeys = targets
+            .filter { ingestsLocal(instance: $0.instance, entry: $0.entry) }
+            .map(\.ref.id.key)
+        let stats: HistoryStats? = loadsHistory
+            ? await Task.detached(priority: .utility) { () -> HistoryStats? in
+                guard let database else { return nil }
+                let week = try? database.weekTotal(provider: id)
+                let month = try? database.weekTotal(provider: id, days: 30)
+                let series = (try? database.dailySeries(provider: id, days: 30)) ?? []
+                let todayCost = try? database.todayCostUSD(provider: id)
+                var pacingByAccount: [String: [(day: Date, total: Int64)]] = [:]
+                for key in pacingKeys {
+                    pacingByAccount[key] = (try? database.pacingInput(
+                        provider: id, account: AccountID(provider: id, key: key), days: 30)) ?? []
+                }
+                return HistoryStats(
+                    week: week, month: month, series: series,
+                    todayCost: todayCost, pacingByAccount: pacingByAccount)
+            }.value
+            : nil
+
+        // Fase 3 — FetchUsage POR CONTA: local-only nunca gera rede; API sem
+        // credencial degrada (`.missing`) sem request; erro de rede → último
+        // snapshot bom da conta fica.
+        for target in targets {
+            let key = target.ref.id.key
+            var display = perAccountDisplays[id]?[key] ?? ProviderDisplay.empty
+            var ok = true
+            var errorToken: String?
+
+            do {
+                let snapshot = try await target.instance.fetchUsage(target.ref)
+                let critical = criticalWindow(in: snapshot.windows)
+                display.percent = critical?.usedFraction.map { $0 * 100 }
+                display.resetsAt = critical?.resetsAt
+                display.windows = snapshot.windows
+                // Forecast de pacing contra a janela crítica DA CONTA, com o
+                // input diário da PRÓPRIA conta (daily_agg por conta). Sem
+                // janela com fração/reset conhecidos → nil (sem chute).
+                let pacingInput = stats?.pacingByAccount[key] ?? []
+                display.pacing = critical.flatMap {
+                    PacingEngine.forecast(
+                        dailySums: pacingInput,
+                        window: $0,
+                        now: Date(),
+                        calendar: calendar)
+                }
+                display.authState = snapshot.authState
+                display.source = snapshot.source
+                display.fetchedAt = snapshot.fetchedAt
+            } catch {
+                ok = false
+                errorToken = errorToken ?? Self.errorToken(error)
+            }
+
+            perAccountDisplays[id, default: [:]][key] = display
+            // Conta inválida (path registrado inexistente) → badge na linha;
+            // a conta segue no ciclo e degrada sozinha (sem derrubar o resto).
+            let invalid = Self.hasInvalidPath(entry: target.entry)
+            accountDisplays.append(AccountDisplay(
+                key: key,
+                label: target.ref.label,
+                active: target.entry?.active ?? true,
+                invalidCredential: invalid,
+                display: display))
+
+            if target.entry == nil {
+                // A conta canônica manda: ingest (fase 1) E fetch (fase 3)
+                // precisam ter sucesso — como no caminho único F2/F3.
+                primaryOK = primaryOK && ok
+                primaryErrorToken = primaryErrorToken ?? errorToken
+            }
         }
 
-        if let errorToken {
-            cycleErrors[id] = errorToken
+        var aggregate = Self.aggregateAccountsDisplay(accountDisplays, base: displays[id] ?? .empty)
+        // Histórico provider-wide por cima do agregado (mesma semântica F3:
+        // com DB e provider de ingest, valor do ciclo — query falha → nil/flag
+        // false; sem DB ou API-only, o campo nem é tocado).
+        if loadsHistory, database != nil {
+            aggregate.todayCostUsd = stats?.todayCost
+            if let stats {
+                if let week = stats.week {
+                    aggregate.weekTokens = week.tokens
+                    aggregate.weekCostUsd = week.costUSD
+                    aggregate.weekHistoryAvailable = true
+                } else {
+                    aggregate.weekHistoryAvailable = false
+                }
+                if let month = stats.month {
+                    aggregate.monthTokens = month.tokens
+                    aggregate.monthCostUsd = month.costUSD
+                    aggregate.monthHistoryAvailable = true
+                } else {
+                    aggregate.monthHistoryAvailable = false
+                }
+                aggregate.monthSeries = stats.series.map {
+                    PanelDayPoint(day: $0.day, tokens: $0.tokens, costUSD: $0.costUSD)
+                }
+            } else {
+                aggregate.weekHistoryAvailable = false
+                aggregate.monthHistoryAvailable = false
+            }
+        }
+        displays[id] = aggregate
+
+        if let primaryErrorToken {
+            cycleErrors[id] = primaryErrorToken
         } else {
             cycleErrors.removeValue(forKey: id)
         }
         publish()
 
         let pressure = displays[id]?.percent.map { $0 / 100 }  // 0...1 p/ scheduler
-        await scheduler.noteResult(provider: id, ok: ok, pressure: pressure)
+        await scheduler.noteResult(provider: id, ok: primaryOK, pressure: pressure)
         // Menu aberto: reafirma cadência de 60 s — exceto sob pressão (30 s
         // vence o menu, spec §7).
         if isMenuOpen, (pressure ?? 0) < 0.8 {
             await scheduler.noteMenuOpened()
         }
+    }
+
+    // MARK: - Multi-conta (F4)
+
+    /// A conta alvo ingere local? Canônica de provider com `.localIngest`
+    /// sempre; registrada só com `directory_path` próprio (conta API-only não
+    /// re-ingere o corpus compartilhado — evita dupla contagem por conta).
+    private func ingestsLocal(instance: any UsageProvider, entry: RegisteredAccount?) -> Bool {
+        guard instance.capabilities.contains(.localIngest) else { return false }
+        if let entry { return !entry.directoryPath.isEmpty }
+        return true
+    }
+
+    /// Path registrado inválido (badge de erro na linha da conta):
+    /// credencial inexistente OU NÃO-REGULAR (FIFO/device/diretório — Red
+    /// Team F4 caso 4: o reader nunca vai conseguir ler; o badge é honesto
+    /// ANTES de a conta degradar no ciclo); diretório de ingest inexistente
+    /// ou não-diretório.
+    static func hasInvalidPath(entry: RegisteredAccount?) -> Bool {
+        guard let entry else { return false }
+        if !FileKind.isRegularFile(atPath: entry.credentialPath) { return true }
+        if !entry.directoryPath.isEmpty, !FileKind.isDirectory(atPath: entry.directoryPath) {
+            return true
+        }
+        return false
+    }
+
+    /// Instância de provider da conta registrada — criada uma vez e retida
+    /// (ledger/cursores são estado do dia; recriar zeraria o "hoje"). Conta
+    /// sem suporte (gemini e futuros) → nil.
+    private func accountInstance(provider id: ProviderID, entry: RegisteredAccount) -> (any UsageProvider)? {
+        if let cached = accountInstances[id]?[entry.accountKey] { return cached }
+        guard let built = makeAccountProvider(id, entry) else { return nil }
+        accountInstances[id, default: [:]][entry.accountKey] = built
+        return built
+    }
+
+    private func makeAccountProvider(_ id: ProviderID, _ entry: RegisteredAccount) -> (any UsageProvider)? {
+        let key = entry.accountKey
+        // Dir vazia = conta API-only: a instância aponta pro dir default mas
+        // NUNCA ingere (`ingestsLocal` nega) — só fetchUsage com a credencial.
+        let directory = entry.directoryPath.isEmpty
+            ? nil : URL(fileURLWithPath: entry.directoryPath, isDirectory: true)
+        switch id {
+        case .claude:
+            return ClaudeProvider(
+                projectsDirectory: directory ?? defaultClaudeDirectory,
+                offsetStore: accountOffsetStore(provider: id, key: key),
+                calendar: calendar,
+                ledgerSnapshotStore: accountLedgerStore(provider: id, key: key),
+                persisting: database,
+                accountKey: key,
+                label: entry.label)
+        case .codex:
+            return CodexProvider(
+                sessionsDirectory: directory ?? defaultCodexSessionsDirectory,
+                authReader: CodexAuthReader(authFileURL: URL(filePath: entry.credentialPath)),
+                client: UsageHTTPClient(baseURL: defaultCodexBaseURL),
+                offsetStore: accountOffsetStore(provider: id, key: key),
+                calendar: calendar,
+                ledgerSnapshotStore: accountLedgerStore(provider: id, key: key),
+                persisting: database,
+                accountKey: key,
+                label: entry.label)
+        case .zai:
+            let reader = ZaiCredentialReader(
+                configFileURL: URL(filePath: entry.credentialPath),
+                credentialsFileURL: defaultZaiCredentialsURL)
+            return ZaiProvider(
+                credentialReader: reader,
+                client: UsageHTTPClient(baseURL: ZaiProvider.resolveBaseURL(
+                    environment: config.environment,
+                    regionHint: reader.read()?.regionBaseURL)),
+                accountKey: key,
+                label: entry.label)
+        default:
+            return nil
+        }
+    }
+
+    /// Store de cursores POR CONTA (F4): DB aberto + fábrica default →
+    /// `DBOffsetStore` com namespace `cursors:<provider>:<key>` (a conta
+    /// default usa a chave legada `cursors:<provider>`); senão a fábrica
+    /// (default JSON `<provider>-<key>-cursors.json`).
+    private func accountOffsetStore(provider id: ProviderID, key: String) -> any FileOffsetStoring {
+        if let cached = accountOffsetStores[id]?[key] { return cached }
+        let store: any FileOffsetStoring
+        if let database, config.usesDefaultOffsetStore {
+            store = DBOffsetStore(database: database, provider: id, accountKey: key)
+        } else {
+            store = config.makeOffsetStore(id, key)
+        }
+        accountOffsetStores[id, default: [:]][key] = store
+        return store
+    }
+
+    private func accountLedgerStore(provider id: ProviderID, key: String) -> (any LedgerSnapshotStoring)? {
+        if let cached = accountLedgerStores[id]?[key] { return cached }
+        let store = config.makeLedgerSnapshotStore(id, key)
+        accountLedgerStores[id, default: [:]][key] = store
+        return store
+    }
+
+    /// Contas removidas do registry perdem instância/stores/seeds (higiene de
+    /// memória; recriar do zero é seguro — re-ingest do corpus reconstrói).
+    private func pruneAccountCaches(provider id: ProviderID, liveKeys: Set<String>) {
+        for (key, _) in accountInstances[id] ?? [:] where !liveKeys.contains(key) {
+            accountInstances[id]?.removeValue(forKey: key)
+            accountOffsetStores[id]?.removeValue(forKey: key)
+            accountLedgerStores[id]?.removeValue(forKey: key)
+            cursorSeeds[id]?.removeValue(forKey: key)
+            perAccountDisplays[id]?.removeValue(forKey: key)
+        }
+    }
+
+    /// Agregado multi-conta (puro, testável): tokens SOMADOS entre as contas;
+    /// janelas/percent/resetsAt/pacing/auth/fonte da conta com a MAIOR fração
+    /// de janela crítica (pior caso visível — mesmo critério D5 do menu bar;
+    /// empate vence a primeira, ordem do ciclo: canônica primeiro). Nenhuma
+    /// fração conhecida → primeira conta (modo local, comportamento F2).
+    /// `fetchedAt` = o mais recente. Histórico provider-wide é aplicado pelo
+    /// ciclo por cima. Com UMA conta o resultado equivale ao caminho anterior.
+    static func aggregateAccountsDisplay(
+        _ accounts: [AccountDisplay], base previous: ProviderDisplay
+    ) -> ProviderDisplay {
+        guard !accounts.isEmpty else { return previous }
+        var result = previous
+        result.todayTokens = accounts.reduce(0) { $0 + $1.display.todayTokens }
+
+        var critical: AccountDisplay?
+        var bestFraction = -1.0
+        for account in accounts {
+            guard let fraction = criticalWindow(in: account.display.windows)?.usedFraction,
+                  fraction > bestFraction else { continue }
+            bestFraction = fraction
+            critical = account
+        }
+        let source = critical ?? accounts[0]
+        let criticalWindowValue = criticalWindow(in: source.display.windows)
+        result.windows = source.display.windows
+        result.percent = criticalWindowValue?.usedFraction.map { $0 * 100 }
+        result.resetsAt = criticalWindowValue?.resetsAt
+        result.pacing = source.display.pacing
+        result.authState = source.display.authState
+        result.source = source.display.source
+        result.fetchedAt = accounts.map(\.display.fetchedAt).max() ?? previous.fetchedAt
+        result.accounts = accounts
+        return result
     }
 
     // MARK: - Menu (spec §7: fire imediato com throttle; reafirmar enquanto aberto)
@@ -429,4 +747,23 @@ public final class ProviderCoordinator {
         case nil: return String(describing: type(of: error))
         }
     }
+}
+
+/// Conjunto de leituras de histórico de UM ciclo (F4): 7d/30d totals + série
+/// diária do chart + custo do dia + input de pacing POR CONTA. Atravessa a
+/// fronteira do `Task.detached` — tudo Sendable (tuplas de Sendable são
+/// Sendable). Cada leitura falha INDEPENDENTEMENTE (nil → painel mantém o
+/// último valor bom / heartbeat omite — padrão F3).
+private struct HistoryStats: Sendable {
+    /// `nil` = query 7d falhou → flag do heartbeat omite.
+    var week: AppDatabase.WeekTotal?
+    /// `nil` = query 30d falhou (o 7d pode ter vindo) → idem.
+    var month: AppDatabase.WeekTotal?
+    var series: [AppDatabase.DailySeriesRow]
+    /// `nil` = query falhou (com DB aberto) → custo do dia some do painel
+    /// (mesmo padrão F2/F3: nunca 0 fake).
+    var todayCost: Double?
+    /// Input do PacingEngine por chave de conta (daily_agg por conta; contas
+    /// sem ingest ficam de fora — engine recebe vazio e devolve nil).
+    var pacingByAccount: [String: [(day: Date, total: Int64)]]
 }

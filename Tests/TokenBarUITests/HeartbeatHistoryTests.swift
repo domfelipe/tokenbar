@@ -207,8 +207,8 @@ struct HeartbeatHistoryTests {
             home: root,
             supportDirectory: support,
             e2eDirectory: e2e,
-            makeOffsetStore: { _ in MemOffsetStore() },
-            makeLedgerSnapshotStore: { _ in nil }
+            makeOffsetStore: { _, _ in MemOffsetStore() },
+            makeLedgerSnapshotStore: { _, _ in nil }
         ))
         await coordinator.refreshAllNow()
 

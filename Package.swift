@@ -23,7 +23,15 @@ let package = Package(
             resources: [.copy("Resources/pricing.json")]
         ),
         .target(name: "TokenBarProviders", dependencies: ["TokenBarCore"]),
-        .target(name: "TokenBarUI", dependencies: ["TokenBarCore", "TokenBarProviders"]),
+        // `Resources/` (F4 Task 2): SVGs autorais dos logos — cópia PURA
+        // (`.copy`, nunca `.process`: sem asset catalog/actool, CLT-safe),
+        // carregados via NSImage (macOS 14 lê SVG). `Bundle.module` só passa
+        // a existir neste target quando ele declara resources.
+        .target(
+            name: "TokenBarUI",
+            dependencies: ["TokenBarCore", "TokenBarProviders"],
+            resources: [.copy("Resources")]
+        ),
         .executableTarget(
             name: "tokenbar",
             dependencies: ["TokenBarCore", "TokenBarProviders", "TokenBarUI"]
