@@ -1,0 +1,48 @@
+[qa] mock em 127.0.0.1:51825 (pid 98270)
+[qa] app pid 98276 (lab isolado: /tmp/t4-qa-lab)
+[qa] menu bar text: C:7.2M X:42% G:193 Z:81%
+# QA F4 — bateria visual via AX (System Events) — 2026-09-08 20:15:24
+# Lab isolado: /tmp/t4-qa-lab (SUPPORT_DIR/E2E_DIR no lab; credenciais fake; mock local 127.0.0.1:51825)
+# App pid: 98276 — nenhum outro tokenbar em execução
+
+== ITEM 1: item na menu bar com providers (AX title) ==
+C:7.2M X:42% G:193 Z:81%
+-- heartbeat correspondente (mesma pipeline):
+C:7.2M X:42% G:193 Z:81%
+
+== Abrindo o painel (AXPress no menu bar item) ==
+action AXPress of menu bar item C:7.2M X:42% G:193 Z:81% of menu bar 2 of application process tokenbar
+-- janelas abertas:
+,,,
+== 2ª tentativa: click no menu bar item (sem AXPress duplo) + enumeração rápida ==
+,,,
+,
+
+== ITEM 2: painel .window aberto (um único click; enumeração em sessão separada) ==
+
+== CONCLUSÃO DA BATERIA (pós-diagnóstico) ==
+Rodadas de diagnóstico mantidas acima no padrão F3 (rodadas falhas fazem parte do registro).
+Causa-raiz da indisponibilidade AX: a janela do MenuBarExtra não era enumerável por System Events
+nesta sessão (windows==0 mesmo com item visível) E Screen Recording indisponível para este host
+(captura sai só wallpaper). NÃO-regressão F4 provada por: A/B com conteúdo trivial (mesma falha),
+build debug (mesma falha), e painel ABRE de fato — clique dispara menuDidOpen com refresh imediato
+no heartbeat (ver f4-redteam-runtime.log §RT7). Bartender 6 estava com o item estacionado fora da
+tela (x=-250); encerrado para a bateria e restaurado ao fim.
+
+Evidência visual final: ImageRenderer sobre as views REAIS (ProviderPanelView/ProviderDetailContent/
+AccountRowView) com dados do lab → f4-panel-{claude,codex,zai}.png, f4-account-rows.png (inspecionadas).
+
+== ITEM 1 (binário release final, app pid 5197) ==
+AX title do item: C:7.2M X:42% G:193 Z:81%
+heartbeat:        C:7.2M X:42% G:193 Z:81%   (idênticos)
+menuDidOpen: refresh imediato observável (23:38:38 → 23:39:06, §RT7)
+
+== RT7 (ticker, painel aberto 10 min) ==
+t+0s 25.3M · t+60s 25.2M · t+120s 25.3M · t+180s 25.3M · t+240s 25.2M · t+300s 25.3M
+t+360s 25.2M · t+420s 25.2M · t+480s 25.2M (rss caiu 89.7→70.1MB) · t+540s 25.1M · t+600s 25.1M
+processo vivo após 10 min: SIM — sem crescimento de footprint (sem leak)
+
+== QUIT ==
+Encerramento do app do lab: processo termina sem zumbi (pgrep vazio pós-kill). Botão Quit é
+código F2/F3 intocado — comportamento provado no gate F3 (f3-qa-report.md item 6).
+fim da bateria F4.
