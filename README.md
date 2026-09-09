@@ -2,7 +2,9 @@
 
 Native macOS menu bar app that keeps your AI coding usage visible — light enough to never think about it.
 
-**Status: F3** — everything from F2 (Codex, Gemini CLI, Z.ai on top of the F1 Claude local core) plus a local SQLite history: estimated cost per model, 7-day totals in the panel, an Analytics window and CSV/JSON export. Full roadmap: `docs/specs/2026-09-02-design.md` (pt-BR).
+**Status: F4** — everything from F3 (Codex, Gemini CLI, Z.ai, Claude local core; SQLite history with estimated cost, Analytics window and CSV/JSON export) plus the rich panel: provider tabs with logos, usage-window bars with reset countdown, honest pacing estimate, today/30-day costs with an in-panel 30-day chart, and multi-account support ("+ Add account", toggle/remove, worst-case aggregation). Full roadmap: `docs/specs/2026-09-02-design.md` (pt-BR).
+
+> **Trademark notice:** Provider logos are simplified original marks; trademarks belong to their owners — used for identification only, not affiliated.
 
 ## What you see (F2)
 
@@ -18,6 +20,13 @@ Order is fixed C · X · G · Z; providers without data stay hidden.
 Open the panel for a line per provider (percent + reset time, or today's tokens with estimated cost), the **7-day history line** (`7d: X tok ~$Y`), **Analytics…**, **Export history…**, **Refresh now** and **Quit TokenBar** (⌘Q).
 
 Behavior highlights: adaptive scheduler (idle 5 min, menu 60 s, pressure ≥ 80% → 30 s, error backoff ×2 capped at 30 min, zero network during sleep) · graceful degradation (API down → last good state, local providers keep counting; restart mid-day keeps today's totals; database unavailable → app runs in F2 mode, never crashes) · per-provider cursors + day snapshot, self-healing against truncation and corrupted state.
+
+## Rich panel & multi-account (F4)
+
+- **Tabs, not lines.** The panel is a tab per provider (original simplified logo + short name). The selected tab shows: usage-window bars (`Weekly 74% used`, `Renews in 6d 16h` — past reset shows `Renewed`, never a negative countdown), today/30-day estimated cost (`Today ~$0.08 · 30d ~$2.10 · 8.9G tok`), a 30-day tokens-per-day chart (daily aggregates only) and "updated Xs ago".
+- **Pacing is honest or absent.** When a provider has a quota window AND at least two days of local history, the panel estimates whether the current pace exhausts the window (`Estimated — exhausts in 2h 44m`, always labeled "estimate — not a guarantee"). No history, unknown reset or unknown fraction → no line at all; session windows project flat (daily aggregates cannot resolve them).
+- **Multi-account.** Providers that support it (Claude, Codex, Z.ai) get "Add account…" — a label, a credential file (read-only, never logged) and an optional data directory (own corpus; empty = API-only). Registered accounts cycle alongside the default account with isolated cursors/high-water marks per account. The panel lists accounts (toggle active/inactive, context-menu remove) and the provider total is the SUM of accounts while windows show the worst-case (most-pressed) account. Directories overlapping an existing scan root are blocked at registration — they would double-count history permanently. Invalid paths degrade the account alone with an "invalid path" badge.
+- **Logos** are simplified original artwork used for identification; see the trademark notice above. Providers without artwork fall back to their letter tile.
 
 ## History, cost & export (F3)
 
