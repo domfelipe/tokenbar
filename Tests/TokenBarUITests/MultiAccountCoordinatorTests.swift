@@ -186,7 +186,7 @@ struct MultiAccountCoordinatorTests {
         #expect(claudeEntry["error"] == nil, "erro de conta registrada não vira erro do provider")
     }
 
-    @Test("toggle ativa: conta inativa sai do ciclo e do agregado; reativa volta")
+    @Test("toggle ativa pela VIEW-MODEL: conta inativa sai do ciclo e do agregado; reativa volta")
     func inactiveAccountLeavesCycle() async throws {
         let fixture = try Fixture.make()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
@@ -198,18 +198,119 @@ struct MultiAccountCoordinatorTests {
         await coordinator.refreshAllNow()
         #expect(coordinator.store.providers[.claude]?.todayTokens == 43)
 
-        let registry = try #require(coordinator.accountRegistry)
-        try registry.setActive(false, provider: .claude, accountKey: work.accountKey)
+        // Caminho da UI (fix review final F4): o toggle da linha passa pelo
+        // AccountsModel — nunca pelo registry direto. O app conecta o refresh
+        // do ciclo no `onMutation` (AppState); o teste refresca explícito.
+        let model = AccountsModel(
+            registry: try #require(coordinator.accountRegistry),
+            multiAccountProviders: [.claude])
+        var mutations = 0
+        model.onMutation = { mutations += 1 }
+
+        model.setActive(false, account: work)
+        #expect(mutations == 1, "toggle passou pelo model (onMutation dispara o refresh)")
         await coordinator.refreshAllNow()
 
         let display = try #require(coordinator.store.providers[.claude])
         #expect(display.todayTokens == 33, "só a conta canônica cicliza")
         #expect(display.accounts.map(\.key) == ["local"])
 
-        try registry.setActive(true, provider: .claude, accountKey: work.accountKey)
+        model.setActive(true, account: work)
         try fixture.writeLine("5", to: fixture.workDir)
         await coordinator.refreshAllNow()
         #expect(coordinator.store.providers[.claude]?.todayTokens == 48, "reativação retoma a conta")
+    }
+
+    /// Fix do review final F4 (BLOQUEANTE): a seção de contas montada só com
+    /// `display.accounts` (só ATIVAS) fazia a linha da conta desativada sumir
+    /// — toggle de reativação e "Remove account" desapareciam JUNTOS, e o
+    /// re-add era bloqueado pelo guard de overlap: conta presa no banco. Pin:
+    /// toggle-off → linha permanece (badge "inactive", display vazio) com o
+    /// registro ancorando toggle/remove; reativar → volta ao ciclo.
+    @Test("painel união registry ⊕ ciclo: toggle-off mantém a linha (inactive) e remove alcançável; reativar volta")
+    func inactiveRowStaysVisibleAndManageable() async throws {
+        let fixture = try Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        try fixture.writeLine("33", to: fixture.localDir)
+        try fixture.writeLine("10", to: fixture.workDir)
+
+        let coordinator = makeCoordinator(fixture)
+        let work = try registerWork(coordinator, fixture)
+        let model = AccountsModel(
+            registry: try #require(coordinator.accountRegistry),
+            multiAccountProviders: [.claude])
+        await coordinator.refreshAllNow()
+
+        // As linhas que `accountsSection` renderiza (união do view-model).
+        func rows() -> [AccountDisplay] {
+            ProviderPanelModel.accountRows(
+                cycled: coordinator.store.providers[.claude]?.accounts ?? [],
+                registered: model.accounts(for: .claude))
+        }
+        #expect(rows().count == 2, "antes do toggle: as duas contas, ativas")
+        #expect(ProviderPanelModel.showsAccountsSection(
+            rows: rows(), registeredCount: model.accounts(for: .claude).count))
+
+        model.setActive(false, account: work)
+        await coordinator.refreshAllNow()
+
+        // O ciclo deixa de trazer a conta, mas a LINHA permanece pela união.
+        #expect(coordinator.store.providers[.claude]?.accounts.map(\.key) == ["local"],
+                "ciclo: conta inativa sai")
+        let unionRows = rows()
+        #expect(unionRows.count == 2, "painel: a linha da inativa NÃO some")
+        let inactiveRow = unionRows.first { $0.key == work.accountKey }
+        #expect(inactiveRow?.active == false, "badge 'inactive' na linha")
+        #expect(inactiveRow?.display == .empty, "nada inventado p/ conta fora do ciclo")
+        #expect(inactiveRow?.label == "Work")
+        #expect(ProviderPanelModel.showsAccountsSection(
+            rows: unionRows, registeredCount: model.accounts(for: .claude).count),
+            "seção segue visível: toggle de reativação acessível")
+        #expect(model.accounts(for: .claude).contains { $0.accountKey == work.accountKey },
+                "registro ancora toggle (reativar) e Remove na linha")
+
+        // Remove alcançável na linha inativa: sai da união, volta ao layout F2.
+        model.remove(work)
+        await coordinator.refreshAllNow()
+        #expect(model.accounts(for: .claude).isEmpty)
+        #expect(rows().map(\.key) == ["local"])
+        #expect(coordinator.store.providers[.claude]?.todayTokens == 33)
+    }
+
+    // MARK: - União registry ⊕ ciclo (painel — fix review final, pura)
+
+    @Test("união registry ⊕ ciclo: sem duplicata; inativa vira linha com badge; regra de visibilidade da seção")
+    func accountRowsUnionSemantics() {
+        let local = AccountDisplay(
+            key: "local", label: "local", active: true, invalidCredential: false,
+            display: ProviderDisplay(todayTokens: 33))
+        let workCycled = AccountDisplay(
+            key: "acct-w", label: "Work", active: true, invalidCredential: false,
+            display: ProviderDisplay(todayTokens: 10))
+        let workInactive = RegisteredAccount(
+            provider: .claude, accountKey: "acct-w", label: "Work", kind: "oauth",
+            active: false, credentialPath: "/tmp/work.json", directoryPath: "")
+
+        // Conta presente nos DOIS lados → união não duplica (resolvida pelo
+        // ciclo; comportamento anterior preservado bit-a-bit).
+        let allCycled = ProviderPanelModel.accountRows(
+            cycled: [local, workCycled], registered: [workInactive])
+        #expect(allCycled == [local, workCycled])
+
+        // Fora do ciclo (inativa) → linha persiste com o estado do registro.
+        let union = ProviderPanelModel.accountRows(cycled: [local], registered: [workInactive])
+        #expect(union.count == 2)
+        #expect(union[0] == local, "cicladas intactas, ordem preservada")
+        #expect(union[1].key == "acct-w")
+        #expect(!union[1].active, "badge 'inactive'")
+        #expect(union[1].display == .empty, "nada inventado p/ conta fora do ciclo")
+        #expect(union[1].label == "Work")
+
+        // Visibilidade: >1 linha mostra; conta única ATIVA é ruído (decisão
+        // F4-MULTIACCOUNT); única conta INATIVA segue alcançável.
+        #expect(ProviderPanelModel.showsAccountsSection(rows: union, registeredCount: 1))
+        #expect(!ProviderPanelModel.showsAccountsSection(rows: [local], registeredCount: 0))
+        #expect(ProviderPanelModel.showsAccountsSection(rows: [local], registeredCount: 1))
     }
 
     /// Red Team F4 caso 3 (porção automatizável): 30 contas registradas no

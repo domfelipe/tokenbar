@@ -173,4 +173,43 @@ public enum ProviderPanelModel {
         case .invalid: return "auth invalid"
         }
     }
+
+    // MARK: - Multi-conta (união registry ⊕ ciclo)
+
+    /// Linhas da seção de contas: UNIÃO do ciclo com o registry (fix do review
+    /// final F4). O ciclo só itera contas ATIVAS — montar a seção só com
+    /// `display.accounts` fazia a linha de uma conta desativada SUMIR (o
+    /// toggle de reativação e o "Remove account" desapareciam juntos, e o
+    /// re-add era bloqueado pelo guard de overlap: conta presa no banco).
+    /// Contrato do README/`AccountRegistry.setActive` ("o registro permanece
+    /// para reativação"): toda linha ciclada segue como veio; conta registrada
+    /// fora do ciclo entra com o estado do REGISTRO (`active == false` → badge
+    /// "inactive") e display vazio (nada inventado). Ordem: cicladas primeiro
+    /// (comportamento anterior preservado bit-a-bit), depois as só-registro na
+    /// ordem do registry (label).
+    public static func accountRows(
+        cycled: [AccountDisplay], registered: [RegisteredAccount]
+    ) -> [AccountDisplay] {
+        var rows = cycled
+        let cycledKeys = Set(cycled.map(\.key))
+        for account in registered where !cycledKeys.contains(account.accountKey) {
+            rows.append(AccountDisplay(
+                key: account.accountKey,
+                label: account.label,
+                active: account.active,
+                invalidCredential: false,
+                display: .empty))
+        }
+        return rows
+    }
+
+    /// A seção de contas aparece quando há MAIS DE UMA linha (decisão
+    /// F4-MULTIACCOUNT: conta única ativa é ruído — as janelas já estão no
+    /// topo) OU quando existe QUALQUER conta registrada — uma única conta
+    /// INATIVA precisa continuar alcançável para reativação/remoção.
+    public static func showsAccountsSection(
+        rows: [AccountDisplay], registeredCount: Int
+    ) -> Bool {
+        rows.count > 1 || registeredCount > 0
+    }
 }

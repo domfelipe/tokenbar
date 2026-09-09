@@ -12,7 +12,7 @@
 |---|------|-----------|------------|-----|-----------|
 | 1 | Pacing com DB adversarial (negativos, Int64.max, 1 ponto, timestamps futuros) | PASS | P3 (camadas documentadas) | — (engine cobre) | `hostileTotalsStayFinite`, `allNegativeTotalsYieldNil`, `singlePointYieldsNil`, `resetInPastIsFlat`, `hostileFractionsDegrade`, `distantResetSaturates`, `hostileDailyAggRowsAreDiscarded` |
 | 2 | Countdown com resetsAt no passado/nil/anômalo | PASS | — | — | `pastResetsShowRenewed`, `anomalousResetsStayFinite`, `windowRowsClampAdversarialInput`, `pacingAndUpdatedAdversarial` |
-| 3 | 30 contas registradas no mesmo provider → ciclo cobre todas | PASS | — | — | `thirtyAccountsAllCycleInOnePass` (unidade) + E2E v4 §10 (runtime: 31 contas cobertas em 4–5 s, 16.9–17.3 MB, cpu 0.0%) |
+| 3 | 30 contas registradas no mesmo provider → ciclo cobre todas | PASS | — | — | `thirtyAccountsAllCycleInOnePass` (unidade) + E2E v4 §10 (runtime: 31 contas cobertas em 4 s, 16.8M, cpu 0.0%) |
 | 4 | Add Account com paths inválidos (permissão negada, /dev/null, FIFO, symlink quebrado) | **FALHA → FIXED (P2)** | **P2** | `FileKind.isRegularFile` guardando os 3 readers + `hasInvalidPath` + warning no form | `RedTeamF4ProviderTests` (FIFO/dir/device/dangling → nil), `fileKindClassification`, `hostileCredentialPathsDegradeToNil`, runtime §RT4 |
 | 5 | Overlap: registro programático BYPASSANDO o form | PASS (comportamento documentado) | P3 | Defesa em profundidade: `AccountsModel.add` revalida e lança `directoryOverlaps` | `programmaticOverlapIsBlocked`, `programmaticOverlapDoublesDocumented` (residual), E2E §10 (caminho programático usado como setup) |
 | 6 | Heartbeat com 30 contas: sem credencial/paths vazados, payload razoável | PASS | — | — | `heartbeatWithThirtyAccountsLeaksNothing` + E2E §10 (798 B, grep paths/acct- vazio) |
@@ -45,7 +45,7 @@
 
 **Unidade (`thirtyAccountsAllCycleInOnePass`):** 30 contas Claude (137 tokens cada, dir própria) + canônica → UM ciclo cobre as 31 (soma exata 4143, 31 linhas por conta no display, 31 namespaces no `daily_agg`); remoção em LOTE volta ao layout F2 (33); remoção no-op é idempotente.
 
-**Runtime (E2E v4 §10, app real):** frota de 30 contas CLAUDE registrada por sqlite3 (ingest local — zero request extra; as provas de rede da §7 já tinham fechado) → "UM ciclo cobre as 31 contas — soma exata (6603818 == 6599558 + 150 + 4110) em 4s" (limite do loop 30 s). Orçamento pós-ingest: phys_footprint **16.9–17.3 MB** ≤ 40 MB, cpu **0.0%** ≤ 0.5%.
+**Runtime (E2E v4 §10, app real):** frota de 30 contas CLAUDE registrada por sqlite3 (ingest local — zero request extra; as provas de rede da §7 já tinham fechado) → "UM ciclo cobre as 31 contas — soma exata (7095607 == 7091347 + 150 + 4110) em 4s" (limite do loop 30 s). Orçamento pós-ingest: phys_footprint **16.8M** ≤ 40 MB, cpu **0.0%** ≤ 0.5%.
 
 ## Caso 4 — Add Account com paths inválidos: FALHA → FIXED (P2, o achado da fase)
 

@@ -243,34 +243,43 @@ struct ProviderDetailContent: View {
 
     // MARK: Contas (F4 multi-conta)
 
-    /// Seção de contas: uma linha por conta quando o provider tem MAIS DE UMA
-    /// conta ativa no ciclo (decisão F4-MULTIACCOUNT: com uma conta só, a
-    /// seção é ruído — as janelas já estão no topo). Toggle liga/desliga a
-    /// conta; context menu remove; path inexistente ganha badge de erro.
+    /// Seção de contas: uma linha por conta, montada pela UNIÃO registry ⊕
+    /// ciclo (`ProviderPanelModel.accountRows`) — ATIVA ou INATIVA (o ciclo só
+    /// traz as ativas; sem a união, desativar fazia a linha — e com ela o
+    /// toggle de reativação e o Remove — sumirem juntos). Visível com >1 linha
+    /// ou qualquer conta registrada (conta única INATIVA segue alcançável).
+    /// Toggle liga/desliga a conta; context menu remove; badges: "inactive",
+    /// "invalid path", auth/local.
     @ViewBuilder
     private var accountsSection: some View {
-        if let accounts, display.accounts.count > 1 {
-            Divider()
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Accounts")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                ForEach(display.accounts) { account in
-                    AccountRowView(
-                        provider: provider,
-                        account: account,
-                        now: now,
-                        model: accounts)
-                }
-                if let addAccountAction {
-                    Button {
-                        addAccountAction(provider)
-                    } label: {
-                        Label("Add account…", systemImage: "plus.circle")
-                            .font(.caption)
+        if let accounts {
+            let registered = accounts.accounts(for: provider)
+            let rows = ProviderPanelModel.accountRows(
+                cycled: display.accounts, registered: registered)
+            if ProviderPanelModel.showsAccountsSection(
+                rows: rows, registeredCount: registered.count) {
+                Divider()
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Accounts")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    ForEach(rows) { account in
+                        AccountRowView(
+                            provider: provider,
+                            account: account,
+                            now: now,
+                            model: accounts)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Add account for \(MenuBarContent.displayName(for: provider))")
+                    if let addAccountAction {
+                        Button {
+                            addAccountAction(provider)
+                        } label: {
+                            Label("Add account…", systemImage: "plus.circle")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Add account for \(MenuBarContent.displayName(for: provider))")
+                    }
                 }
             }
         }
@@ -290,7 +299,15 @@ struct AccountRowView: View {
             HStack(spacing: 5) {
                 Text(account.label)
                     .font(.callout)
-                if account.invalidCredential {
+                if !account.active {
+                    // Conta registrada fora do ciclo (fix review final): badge
+                    // "inactive" — a linha (e com ela toggle/Remove) permanece.
+                    Text("inactive")
+                        .font(.caption2)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Capsule().fill(Color.orange.opacity(0.25)))
+                } else if account.invalidCredential {
                     Text("invalid path")
                         .font(.caption2)
                         .foregroundStyle(.white)
