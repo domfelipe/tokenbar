@@ -82,6 +82,14 @@ public final class AccountsModel {
         provider: ProviderID, label: String, credentialPath: String, directoryPath: String
     ) throws -> RegisteredAccount {
         guard let registry else { throw AccountRegistryError.emptyCredentialPath }
+        // Defesa em profundidade (Red Team F4 caso 5): o guard de overlap é da
+        // UI/formulário, mas TODO add que passa pelo app valida de novo aqui —
+        // dir sobreposta dobraria o agregado e o histórico provider-wide de
+        // forma PERSISTENTE. O registry puro (Core) segue sem o guard por não
+        // conhecer as raízes canônicas — documentado no decisoes-f4.
+        if directoryOverlaps(provider: provider, directoryPath: directoryPath) {
+            throw AccountsModelError.directoryOverlaps
+        }
         let account = try registry.add(
             provider: provider, label: label, credentialPath: credentialPath,
             directoryPath: directoryPath)
@@ -103,6 +111,12 @@ public final class AccountsModel {
         reload()
         onMutation?()
     }
+}
+
+/// Erro de operação de conta bloqueada na camada de app (F4): o overlap é
+/// validado no `AccountsModel.add` (defesa em profundidade além do form).
+public enum AccountsModelError: Error, Equatable, Sendable {
+    case directoryOverlaps
 }
 
 /// Validação do formulário de add-account (F4) — PURA e headless (testável
@@ -140,6 +154,10 @@ public enum AddAccountForm {
             result.blocking.append("Credential file is required.")
         } else if !FileManager.default.fileExists(atPath: trimmedCredential) {
             result.warnings.append("Credential file does not exist yet — the account will show an error badge until it does.")
+        } else if !FileKind.isRegularFile(atPath: trimmedCredential) {
+            // Red Team F4 caso 4: FIFO/device não são credencial legível — o
+            // reader degrada nil; avisa na hora em vez de badge silencioso.
+            result.warnings.append("Credential path is not a regular file — the account will not be able to read it.")
         }
         if !trimmedDirectory.isEmpty {
             // Overlap BLOQUEIA (não é warning): dirs sobrepostas dobram o

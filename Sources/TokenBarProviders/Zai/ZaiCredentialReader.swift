@@ -1,4 +1,5 @@
 import Foundation
+import TokenBarCore
 
 /// Credencial Z.ai resolvida dos arquivos locais do ZCode — mantida em memória,
 /// nunca logada (spec §9): este arquivo não tem print/log e nunca vai ter.
@@ -70,8 +71,11 @@ public struct ZaiCredentialReader: Sendable {
 
     /// `credentials.json` é JSON PLANO com chaves contendo dois-pontos
     /// (`oauth:zai:access_token`, spec §2.2) — decoder tolerante por chave.
+    /// Guard Red Team F4 (caso 4): só ARQUIVO REGULAR é lido (FIFO bloquearia
+    /// `open()` para sempre — hang do ciclo; device/dir degradam `nil`).
     static func readOAuthToken(at url: URL) -> String? {
-        guard let data = try? Data(contentsOf: url),
+        guard FileKind.isRegularFile(atPath: url.path),
+              let data = try? Data(contentsOf: url),
               let file = try? Self.decoder.decode(FlatCredentials.self, from: data)
         else { return nil }
         return file.accessToken
@@ -82,8 +86,10 @@ public struct ZaiCredentialReader: Sendable {
     /// `builtin:bigmodel-coding-plan` (CN). A primeira entrada COM apiKey define
     /// chave E região (pareamento); sem apiKey em nenhuma, a primeira região
     /// vista serve de hint para o fallback OAuth (spec §2.7: região errada → 404/401).
+    /// Guard Red Team F4: idem `readOAuthToken` — só regular file.
     static func readConfig(at url: URL) -> (apiKey: String?, regionBaseURL: URL?)? {
-        guard let data = try? Data(contentsOf: url),
+        guard FileKind.isRegularFile(atPath: url.path),
+              let data = try? Data(contentsOf: url),
               let file = try? Self.decoder.decode(ConfigFile.self, from: data)
         else { return nil }
         let entries = [file.provider?.zai, file.provider?.bigmodel]

@@ -52,6 +52,19 @@ struct MultiAccountCoordinatorTests {
                 try (line + "\n").write(to: url, atomically: true, encoding: .utf8)
             }
         }
+
+        /// `count` dirs de frota sob o root (cada uma com exatamente 137
+        /// tokens hoje: 100 in + 37 out, modelo precificado) — Red Team caso 3.
+        func makeFleetDirs(count: Int) throws -> [URL] {
+            var dirs: [URL] = []
+            for index in 0..<count {
+                let dir = root.appendingPathComponent("fleet-\(index)", isDirectory: true)
+                try writeLine("100", to: dir, file: "f-\(index).jsonl")
+                try writeLine("37", to: dir, file: "f-\(index)-b.jsonl")
+                dirs.append(dir)
+            }
+            return dirs
+        }
     }
 
     private func makeCoordinator(_ fixture: Fixture) -> ProviderCoordinator {
@@ -197,6 +210,86 @@ struct MultiAccountCoordinatorTests {
         try fixture.writeLine("5", to: fixture.workDir)
         await coordinator.refreshAllNow()
         #expect(coordinator.store.providers[.claude]?.todayTokens == 48, "reativação retoma a conta")
+    }
+
+    /// Red Team F4 caso 3 (porção automatizável): 30 contas registradas no
+    /// MESMO provider — UM ciclo cobre todas (31 alvos), soma exata, estado
+    /// por conta no DB e remoção em lote devolve o display ao F2. A porção de
+    /// sistema (tempo/memória/UI com o app real) é do E2E §10 e do QA.
+    @Test("frota de 30 contas: um ciclo cobre todas com soma exata; remoção em lote poda")
+    func thirtyAccountsAllCycleInOnePass() async throws {
+        let fixture = try Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        try fixture.writeLine("33", to: fixture.localDir)  // canônica: 33
+        let fleet = try fixture.makeFleetDirs(count: 30)   // 137 tokens cada
+        let credential = fixture.workCredential.path
+
+        let coordinator = makeCoordinator(fixture)
+        let registry = try #require(coordinator.accountRegistry)
+        for (index, dir) in fleet.enumerated() {
+            _ = try registry.add(
+                provider: .claude, label: "Fleet \(index)", credentialPath: credential,
+                directoryPath: dir.path)
+        }
+        #expect(try registry.activeAccounts(provider: .claude).count == 30)
+
+        await coordinator.refreshAllNow()
+
+        // 33 + 30×137 = 4143 — um ciclo só, sem duplicação nem conta faltando.
+        let display = try #require(coordinator.store.providers[.claude])
+        #expect(display.todayTokens == 33 + 30 * 137)
+        #expect(display.accounts.count == 31)
+        #expect(display.accounts.filter { $0.display.todayTokens == 137 }.count == 30)
+
+        let db = try #require(coordinator.historyDatabase)
+        #expect(
+            Set(try db.dailyAggRows(provider: .claude).map(\.account)).count == 31,
+            "31 namespaces de conta no DB (canônica + frota)")
+
+        // Remoção no-op é idempotente; remoção em LOTE devolve o display ao F2.
+        try registry.remove(provider: .claude, accountKey: "acct-inexistente")
+        for account in try registry.accounts(provider: .claude) {
+            try registry.remove(provider: .claude, accountKey: account.accountKey)
+        }
+        await coordinator.refreshAllNow()
+        #expect(coordinator.store.providers[.claude]?.todayTokens == 33)
+        #expect(coordinator.store.providers[.claude]?.accounts.map(\.key) == ["local"])
+    }
+
+    /// Red Team F4 caso 5 (residual documentado, decisão 7 de decisoes-f4):
+    /// registro programático BYPASSANDO o form/AccountsModel — o registry puro
+    /// NÃO bloqueia dirs sobrepostas (não conhece raízes canônicas) e o mesmo
+    /// corpus passa a contar 2× no agregado E no DB. Sem crash, cursor/hwm por
+    /// conta não colidem (namespaces disjuntos) — a dobragem é o comportamento
+    /// registrado; nenhum caminho de usuário alcança (form + AccountsModel
+    /// bloqueiam; E2E §10 usa exatamente este caminho para o setup).
+    @Test("overlap programático (bypass do form): dobragem documentada, sem crash")
+    func programmaticOverlapDoublesDocumented() async throws {
+        let fixture = try Fixture.make()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        try fixture.writeLine("33", to: fixture.localDir)
+        try fixture.writeLine("10", to: fixture.workDir)
+
+        let coordinator = makeCoordinator(fixture)
+        let registry = try #require(coordinator.accountRegistry)
+        let credential = fixture.workCredential.path
+        // Duas contas, MESMA dir (o form teria bloqueado a 2ª).
+        _ = try registry.add(
+            provider: .claude, label: "A", credentialPath: credential,
+            directoryPath: fixture.workDir.path)
+        _ = try registry.add(
+            provider: .claude, label: "B", credentialPath: credential,
+            directoryPath: fixture.workDir.path)
+
+        await coordinator.refreshAllNow()
+
+        let display = try #require(coordinator.store.providers[.claude])
+        #expect(display.todayTokens == 33 + 10 + 10, "dobragagem: o corpus da dir conta por conta (33+10+10)")
+        #expect(display.accounts.count == 3)
+        // Sem colisão de namespaces: cada conta tem seu próprio cursor/hwm —
+        // o dado NÃO dobra dentro de uma mesma conta em ciclos seguintes.
+        await coordinator.refreshAllNow()
+        #expect(coordinator.store.providers[.claude]?.todayTokens == 53, "2º ciclo não re-dobra (hwm por conta)")
     }
 
     // MARK: - Agregado puro

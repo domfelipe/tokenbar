@@ -143,39 +143,58 @@ struct ProviderDetailView: View {
     let addAccountAction: ((ProviderID) -> Void)?
 
     var body: some View {
+        // Conteúdo extraído em `ProviderDetailContent` (testabilidade: o
+        // ImageRenderer não compõe ScrollView — a evidência visual do QA F4
+        // renderiza o conteúdo direto). Comportamento idêntico.
         ScrollView(.vertical) {
-            VStack(alignment: .leading, spacing: 10) {
-                header
-                ForEach(rows) { row in
-                    WindowBarRow(row: row)
-                }
-                if let pacing = ProviderPanelModel.pacingText(display.pacing, now: now) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(pacing)
-                        Text(ProviderPanelModel.pacingDisclaimer)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                if let costs = ProviderPanelModel.costsText(
-                    todayCostUsd: display.todayCostUsd,
-                    monthCostUsd: display.monthCostUsd,
-                    monthTokens: display.monthTokens)
-                {
-                    Text(costs)
-                        .font(.callout)
-                        .textSelection(.enabled)
-                }
-                if !display.monthSeries.isEmpty {
-                    monthChart
-                }
-                accountsSection
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 2)
+            ProviderDetailContent(
+                provider: provider, display: display, now: now,
+                accounts: accounts, addAccountAction: addAccountAction)
         }
         .frame(maxHeight: 300)  // painel não cresce sem limite (orçamento)
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// Conteúdo do detalhe do provider (header, barras, pacing, custos, chart,
+/// contas) — extraído do ScrollView para composição fora de janela.
+struct ProviderDetailContent: View {
+    let provider: ProviderID
+    let display: ProviderDisplay
+    let now: Date
+    let accounts: AccountsModel?
+    let addAccountAction: ((ProviderID) -> Void)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            header
+            ForEach(rows) { row in
+                WindowBarRow(row: row)
+            }
+            if let pacing = ProviderPanelModel.pacingText(display.pacing, now: now) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(pacing)
+                    Text(ProviderPanelModel.pacingDisclaimer)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if let costs = ProviderPanelModel.costsText(
+                todayCostUsd: display.todayCostUsd,
+                monthCostUsd: display.monthCostUsd,
+                monthTokens: display.monthTokens)
+            {
+                Text(costs)
+                    .font(.callout)
+                    .textSelection(.enabled)
+            }
+            if !display.monthSeries.isEmpty {
+                monthChart
+            }
+            accountsSection
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 2)
     }
 
     private var rows: [ProviderPanelModel.WindowRow] {

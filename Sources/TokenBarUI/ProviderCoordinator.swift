@@ -558,13 +558,17 @@ public final class ProviderCoordinator {
         return true
     }
 
-    /// Path registrado inexistente (credencial, ou diretório quando declarado)
-    /// → badge de erro na linha da conta.
+    /// Path registrado inválido (badge de erro na linha da conta):
+    /// credencial inexistente OU NÃO-REGULAR (FIFO/device/diretório — Red
+    /// Team F4 caso 4: o reader nunca vai conseguir ler; o badge é honesto
+    /// ANTES de a conta degradar no ciclo); diretório de ingest inexistente
+    /// ou não-diretório.
     static func hasInvalidPath(entry: RegisteredAccount?) -> Bool {
         guard let entry else { return false }
-        if !FileManager.default.fileExists(atPath: entry.credentialPath) { return true }
-        if !entry.directoryPath.isEmpty,
-           !FileManager.default.fileExists(atPath: entry.directoryPath) { return true }
+        if !FileKind.isRegularFile(atPath: entry.credentialPath) { return true }
+        if !entry.directoryPath.isEmpty, !FileKind.isDirectory(atPath: entry.directoryPath) {
+            return true
+        }
         return false
     }
 

@@ -68,9 +68,15 @@ struct AccountsModelTests {
         #expect(!result.isAddable)
         #expect(result.blocking.contains("Credential file is required."))
 
+        // Arquivo regular existente → passa LIMPO (diretório/regular-ness
+        // errada avisa — Red Team F4 caso 4).
+        let regular = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rt-cred-\(UUID().uuidString).json")
+        try? Data("{}".utf8).write(to: regular)
+        defer { try? FileManager.default.removeItem(at: regular) }
         let ok = AddAccountForm.validate(
             label: "Work",
-            credentialPath: FileManager.default.temporaryDirectory.path,
+            credentialPath: regular.path,
             directoryPath: "")
         #expect(ok.isAddable)
         #expect(ok.warnings.isEmpty)
@@ -109,11 +115,15 @@ struct AccountsModelTests {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let roots = [canonical.path]
-        let credential = sibling.path  // existe → sem warning de credencial
+        // Credencial REGULAR (arquivo na irmã) — existe e é regular → sem
+        // warning de credencial; um DIRETÓRIO como credencial agora avisa
+        // "not a regular file" (Red Team F4 caso 4).
+        let credential = sibling.appendingPathComponent("cred.json")
+        try Data("{}".utf8).write(to: credential)
 
         func validate(directory: String) -> AddAccountForm.Validation {
             AddAccountForm.validate(
-                label: "Work", credentialPath: credential,
+                label: "Work", credentialPath: credential.path,
                 directoryPath: directory, existingScanRoots: roots)
         }
 
