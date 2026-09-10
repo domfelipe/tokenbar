@@ -9,11 +9,12 @@ import TokenBarCore
 /// sem crash, heartbeat v2 escrito com os 4 providers, credencial nunca vaza.
 ///
 /// Não toca no App Support real: stores de cursor em memória via fábrica.
-/// Providers registrados pelo wiring default (T4: +cursor/openrouter sobre os
-/// 4 canônicos; T5 adiciona os 4 restantes). O heartbeat v2 lista todos.
+/// Providers registrados pelo wiring default (F5 Tasks 4–5: +6 sobre os 4
+/// canônicos). O heartbeat v2 lista todos os registrados.
 enum F5RegisteredProviders {
     static let all: Set<String> = [
-        "claude", "codex", "gemini", "zai", "cursor", "openrouter",
+        "claude", "codex", "gemini", "zai",
+        "cursor", "openrouter", "alibaba", "antigravity", "deepseek", "grok",
     ]
 }
 

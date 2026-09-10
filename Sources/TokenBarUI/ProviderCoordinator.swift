@@ -309,7 +309,26 @@ public final class ProviderCoordinator {
             credentialReader: OpenRouterCredentialReader(environment: env),
             client: UsageHTTPClient(baseURL: OpenRouterProvider.resolveBaseURL(environment: env)),
             accounts: accountRegistry)
-        registry = ProviderRegistry(providers: [claude, codex, gemini, zai, cursor, openrouter])
+        let alibaba = AlibabaProvider(
+            credentialReader: AlibabaCredentialReader(environment: env),
+            client: UsageHTTPClient(baseURL: AlibabaProvider.resolveBaseURL(environment: env)),
+            accounts: accountRegistry)
+        let antigravity = AntigravityProvider(
+            credentialReader: AntigravityCredentialReader.resolve(environment: env, home: home),
+            client: UsageHTTPClient(baseURL: AntigravityProvider.defaultBaseURL),
+            accounts: accountRegistry)
+        let deepseek = DeepSeekProvider(
+            credentialReader: DeepSeekCredentialReader(environment: env),
+            client: UsageHTTPClient(baseURL: DeepSeekProvider.defaultBaseURL),
+            accounts: accountRegistry)
+        let grok = GrokProvider(
+            credentialReader: GrokCredentialReader.resolve(environment: env, home: home),
+            client: UsageHTTPClient(baseURL: GrokProvider.defaultBaseURL),
+            accounts: accountRegistry)
+        registry = ProviderRegistry(providers: [
+            claude, codex, gemini, zai,
+            cursor, openrouter, alibaba, antigravity, deepseek, grok,
+        ])
         watcherDirectories = [.claude: claudeDirectory, .gemini: geminiDirectory.appendingPathComponent("tmp", isDirectory: true)]
         for id in watcherDirectories.keys {
             debouncers[id] = Debouncer(quiesce: Self.debounceQuiesce, clock: ContinuousClock())
@@ -703,6 +722,36 @@ public final class ProviderCoordinator {
                 credentialReader: OpenRouterCredentialReader(
                     keyFileURL: URL(filePath: entry.credentialPath)),
                 client: UsageHTTPClient(baseURL: OpenRouterProvider.resolveBaseURL(environment: config.environment)),
+                accountKey: key,
+                label: entry.label)
+        case .alibaba:
+            return AlibabaProvider(
+                credentialReader: AlibabaCredentialReader(
+                    environment: [:],
+                    keyFileURL: URL(filePath: entry.credentialPath)),
+                client: UsageHTTPClient(baseURL: AlibabaProvider.resolveBaseURL(environment: config.environment)),
+                accountKey: key,
+                label: entry.label)
+        case .antigravity:
+            return AntigravityProvider(
+                credentialReader: AntigravityCredentialReader(
+                    credentialsFileURL: URL(filePath: entry.credentialPath)),
+                client: UsageHTTPClient(baseURL: AntigravityProvider.defaultBaseURL),
+                accountKey: key,
+                label: entry.label)
+        case .deepseek:
+            return DeepSeekProvider(
+                credentialReader: DeepSeekCredentialReader(
+                    environment: [:],
+                    keyFileURL: URL(filePath: entry.credentialPath)),
+                client: UsageHTTPClient(baseURL: DeepSeekProvider.defaultBaseURL),
+                accountKey: key,
+                label: entry.label)
+        case .grok:
+            return GrokProvider(
+                credentialReader: GrokCredentialReader(
+                    authFileURL: URL(filePath: entry.credentialPath)),
+                client: UsageHTTPClient(baseURL: GrokProvider.defaultBaseURL),
                 accountKey: key,
                 label: entry.label)
         default:
