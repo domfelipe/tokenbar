@@ -73,5 +73,13 @@ struct TokenBarApp: App {
             Text(appState.store.menuBarText)
         }
         .menuBarExtraStyle(.window)
+
+        // F5 Task 3: janela de ajustes (⌘,) — launch at login, intervalos de
+        // refresh, alertas e providers do menu bar. O SettingsModel é criado
+        // no AppState com as partes do coordinator (engine de alertas,
+        // scheduler, gateway, banco).
+        Settings {
+            SettingsView(model: appState.settingsModel)
+        }
     }
 }

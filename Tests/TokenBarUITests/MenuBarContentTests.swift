@@ -235,3 +235,56 @@ struct MenuBarContentTests {
         #expect(Set(zai.keys) == ["menuBar", "percent", "todayTokens", "authState", "fetchedAt", "error"])
     }
 }
+
+// MARK: - Visibilidade de providers no texto (F5 Task 3)
+
+/// Checkbox da janela de Settings: provider fora do conjunto NÃO aparece no
+/// texto do menu bar/linhas mesmo com dados; default = todos (comportamento
+/// de quem nunca abriu settings). O gate da F1 segue: mudança que não altera
+/// a string não re-renderiza o label.
+struct MenuBarVisibilityTests {
+    private func contentWithAllProviders() -> [ProviderID: ProviderDisplay] {
+        [
+            .claude: ProviderDisplay(percent: 20.0, todayTokens: 12_400),
+            .codex: ProviderDisplay(percent: 62.4, todayTokens: 999),
+            .gemini: ProviderDisplay(todayTokens: 3_100, source: .localOnly),
+            .zai: ProviderDisplay(percent: 17.0),
+        ]
+    }
+
+    @Test
+    func defaultVisibilityKeepsEverything() {
+        let content = MenuBarContent(providers: contentWithAllProviders())
+        #expect(content.displayString() == "C:20% X:62% G:3.1k Z:17%")
+    }
+
+    @Test
+    func hiddenProviderWithDataDisappearsFromText() {
+        var visible = Set(ProviderID.allCases)
+        visible.remove(.codex)
+        visible.remove(.zai)
+        let content = MenuBarContent(
+            providers: contentWithAllProviders(), visibleProviders: visible)
+        #expect(content.displayString() == "C:20% G:3.1k")
+        // Linhas do painel/legado respeitam o mesmo conjunto.
+        #expect(content.menuLines(now: Date()).allSatisfy { !$0.hasPrefix("X ") && !$0.hasPrefix("Z ") })
+    }
+
+    @Test
+    func hidingEverythingShowsTB() {
+        let content = MenuBarContent(
+            providers: contentWithAllProviders(), visibleProviders: [])
+        #expect(content.displayString() == "TB")
+    }
+
+    @Test
+    func hidingProviderWithoutDataChangesNothing() {
+        var providers = contentWithAllProviders()
+        providers[.copilot] = ProviderDisplay()  // sem dados: nunca aparece
+        let all = MenuBarContent(providers: providers)
+        let withoutCopilot = MenuBarContent(
+            providers: providers, visibleProviders: Set(ProviderID.allCases).subtracting([.copilot]))
+        // Mesma string exibida → o render gate NÃO re-renderiza o label.
+        #expect(all.displayString() == withoutCopilot.displayString())
+    }
+}

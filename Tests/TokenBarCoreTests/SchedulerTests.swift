@@ -465,4 +465,130 @@ struct SchedulerTests {
         await scheduler.pauseForSleep()
         await scheduler.resumeFromSleep()
     }
+
+    // MARK: - Intervalos vivos (F5 Task 3 — janela de Settings)
+
+    @Test func setIdleIntervalChangesCadenceWithoutRestart() async throws {
+        let clock = VirtualClock()
+        let scheduler = AdaptiveScheduler(clock: clock, random: { 0 })
+        let recorder = FireRecorder()
+        await scheduler.register(provider: .codex) {
+            await recorder.start()
+            await recorder.finish()
+        }
+        try await settle()
+        #expect(await scheduler.idleInterval == .seconds(300))
+
+        clock.advance(by: .seconds(300))
+        try await settle()
+        #expect(await recorder.started == 1, "primeiro fire no default de 5 min")
+
+        // Settings trocou o intervalo ocioso para 120 s: o loop vivo reinicia
+        // e o próximo sleep já usa o novo valor.
+        await scheduler.setIdleInterval(.seconds(120))
+        #expect(await scheduler.idleInterval == .seconds(120))
+        try await settle()
+        clock.advance(by: .seconds(119))
+        try await settle()
+        #expect(await recorder.started == 1, "119 s < 120 s: ainda não")
+
+        clock.advance(by: .seconds(1))
+        try await settle()
+        #expect(await recorder.started == 2, "cadência ociosa nova: 120 em 120 s")
+
+        clock.advance(by: .seconds(120))
+        try await settle()
+        #expect(await recorder.started == 3)
+    }
+
+    @Test func successDecaysToTheNewIdleIntervalAfterEdit() async throws {
+        let clock = VirtualClock()
+        let scheduler = AdaptiveScheduler(clock: clock, random: { 0 })
+        let recorder = FireRecorder()
+        await scheduler.register(provider: .codex) {
+            await recorder.start()
+            await recorder.finish()
+        }
+        try await settle()
+        clock.advance(by: .seconds(300))
+        try await settle()
+
+        // Menu aberto (60 s) e depois a Settings muda o OCIOSO para 900 s.
+        await scheduler.noteMenuOpened()
+        try await settle()
+        await scheduler.setIdleInterval(.seconds(900))
+        try await settle()
+        clock.advance(by: .seconds(60))
+        try await settle()
+        #expect(await recorder.started == 2, "menu continua na cadência de 60 s")
+
+        // Menu fechou: o sucesso decai para o intervalo ocioso NOVO.
+        await scheduler.noteResult(provider: .codex, ok: true, pressure: nil)
+        try await settle()
+        clock.advance(by: .seconds(899))
+        try await settle()
+        #expect(await recorder.started == 2)
+        clock.advance(by: .seconds(1))
+        try await settle()
+        #expect(await recorder.started == 3, "decaiu para o ocioso editado (900 s)")
+    }
+
+    @Test func setMenuIntervalAppliesToOpenMenuCadence() async throws {
+        let clock = VirtualClock()
+        let scheduler = AdaptiveScheduler(clock: clock, random: { 0 })
+        let recorder = FireRecorder()
+        await scheduler.register(provider: .codex) {
+            await recorder.start()
+            await recorder.finish()
+        }
+        try await settle()
+        clock.advance(by: .seconds(300))
+        try await settle()
+
+        await scheduler.noteMenuOpened()
+        try await settle()
+        await scheduler.setMenuInterval(.seconds(45))
+        try await settle()
+        #expect(await scheduler.menuInterval == .seconds(45))
+
+        clock.advance(by: .seconds(44))
+        try await settle()
+        #expect(await recorder.started == 1)
+
+        clock.advance(by: .seconds(1))
+        try await settle()
+        #expect(await recorder.started == 2, "painel aberto na nova cadência de 45 s")
+    }
+
+    @Test func initialIntervalsFromConstructorReflectPersistedSettings() async throws {
+        let clock = VirtualClock()
+        // Launch (F5 Task 3): o coordinator passa os segundos lidos da tabela
+        // `settings` na criação — aqui direto em segundos.
+        let scheduler = AdaptiveScheduler(
+            clock: clock, random: { 0 },
+            idleInterval: .seconds(900), menuInterval: .seconds(30))
+        let recorder = FireRecorder()
+        await scheduler.register(provider: .codex) {
+            await recorder.start()
+            await recorder.finish()
+        }
+        try await settle()
+        #expect(await scheduler.idleInterval == .seconds(900))
+
+        clock.advance(by: .seconds(899))
+        try await settle()
+        #expect(await recorder.started == 0)
+        clock.advance(by: .seconds(1))
+        try await settle()
+        #expect(await recorder.started == 1, "arranca com o intervalo persistido")
+    }
+
+    @Test func intervalSettersIgnoreZeroAndNegative() async throws {
+        let clock = VirtualClock()
+        let scheduler = AdaptiveScheduler(clock: clock, random: { 0 })
+        await scheduler.setIdleInterval(.zero)
+        await scheduler.setMenuInterval(.seconds(-5))
+        #expect(await scheduler.idleInterval == .seconds(300))
+        #expect(await scheduler.menuInterval == .seconds(60))
+    }
 }

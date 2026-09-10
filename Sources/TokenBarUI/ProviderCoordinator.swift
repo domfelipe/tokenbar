@@ -130,16 +130,24 @@ public final class ProviderCoordinator {
     /// permissão de notificação EXPLICITAMENTE (ruling F5-NOTIF).
     public let alertEngine: AlertEngine
     /// Gateway de notificações: injetado (testes) ou real, criado LAZY.
-    private var cachedGateway: (any NotificationSending)?
-    var notifications: any NotificationSending {
+    /// PÚBLICO para a janela de Settings (T3) pedir a autorização no toggle
+    /// de alertas — acessá-lo NÃO pede permissão (ruling F5-NOTIF: só o
+    /// toggle chama `requestAuthorization()`).
+    public var notifications: any NotificationSending {
         if let injected = config.notificationGateway { return injected }
         if let cachedGateway { return cachedGateway }
         let real = UserNotificationGateway()
         cachedGateway = real
         return real
     }
+    private var cachedGateway: (any NotificationSending)?
     /// Support directory (o export grava em `<support>/exports`).
     public var supportDirectory: URL { config.supportDirectory }
+    /// Providers visíveis no TEXTO do menu bar (F5 Task 3) — carregado da
+    /// tabela `settings` no init e mantido vivo pela janela de Settings via
+    /// `applyMenuBarVisibility` (a persistência fica com o SettingsModel).
+    public private(set) var menuBarVisibleProviders: Set<ProviderID> =
+        AppSettingsStore.defaultVisibleProviders
 
     /// Dirs observados por FSEvents (file-driven): Claude projects, Gemini tmp.
     private let watcherDirectories: [ProviderID: URL]
@@ -178,7 +186,6 @@ public final class ProviderCoordinator {
     public init(config: ProviderCoordinatorConfig, scheduler: AdaptiveScheduler? = nil) {
         self.config = config
         self.store = SnapshotStore()
-        self.scheduler = scheduler ?? AdaptiveScheduler(clock: ContinuousClock())
 
         let env = config.environment
         let home = config.home
@@ -193,7 +200,10 @@ public final class ProviderCoordinator {
         // SupportDirectory.resolve e as fábricas default também criam, mas o
         // selfcheck passa um dir próprio com fábricas injetadas — sem o
         // createDirectory aqui o DB dele NUNCA abria e o history7d ficava
-        // sempre omitido (review T4, Important).
+        // sempre omitido (review T4, Important). Aberto ANTES do scheduler
+        // (F5 Task 3): os intervalos persistidos na tabela `settings` são o
+        // estado inicial do scheduler — sem restart quando a Settings troca
+        // (setters vivos do actor aplicam na hora).
         try? FileManager.default.createDirectory(
             at: config.supportDirectory, withIntermediateDirectories: true)
         let database = try? AppDatabase.open(
@@ -204,6 +214,17 @@ public final class ProviderCoordinator {
         // Motor de alertas (F5 T2): config + dedupe lidos do banco (settings);
         // sem DB → só memória (degrada honesta, default DESLIGADO — F5-NOTIF).
         alertEngine = AlertEngine(database: database)
+
+        // F5 Task 3: preferências do usuário no launch — scheduler com os
+        // intervalos persistidos (foreground/menu e background/ocioso) e o
+        // texto do menu bar com a visibilidade persistida.
+        let settings = AppSettingsStore(database: database)
+        self.scheduler = scheduler ?? AdaptiveScheduler(
+            clock: ContinuousClock(),
+            idleInterval: Duration.seconds(settings.loadIdleIntervalSeconds()),
+            menuInterval: Duration.seconds(settings.loadMenuIntervalSeconds()))
+        menuBarVisibleProviders = settings.loadVisibleProviders()
+
         if let database {
             // Migração dos cursores legados F1/F2 (JSON → settings), uma vez
             // por arquivo (idempotente); o live store vira DBOffsetStore.
@@ -762,6 +783,18 @@ public final class ProviderCoordinator {
         }
     }
 
+    // MARK: - Settings vivas (F5 Task 3)
+
+    /// Janela de Settings trocou os providers visíveis no texto do menu bar:
+    /// estado vivo + republish imediato (o render gate da F1 cuida de só
+    /// re-renderizar quando a string exibida muda de fato). Persistência fica
+    /// com o SettingsModel (tabela `settings`); aqui é só o estado em runtime.
+    public func applyMenuBarVisibility(_ visible: Set<ProviderID>) {
+        guard menuBarVisibleProviders != visible else { return }
+        menuBarVisibleProviders = visible
+        publish()
+    }
+
     // MARK: - Menu (spec §7: fire imediato com throttle; reafirmar enquanto aberto)
 
     public func menuDidOpen() {
@@ -793,7 +826,10 @@ public final class ProviderCoordinator {
     // MARK: - Saídas
 
     private func publish() {
-        store.apply(MenuBarContent(providers: displays))
+        // F5 Task 3: o texto do menu bar respeita a visibilidade escolhida
+        // na Settings (default = todos).
+        store.apply(MenuBarContent(
+            providers: displays, visibleProviders: menuBarVisibleProviders))
         if let e2eDirectory = config.e2eDirectory {
             E2EHeartbeat.write(menuBarText: store.menuBarText, providers: displays, directory: e2eDirectory)
         }

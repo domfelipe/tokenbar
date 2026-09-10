@@ -144,7 +144,7 @@ public actor AlertEngine {
 
     public init(database: AppDatabase?) {
         self.database = database
-        self.config = Self.loadConfig(database: database)
+        self.config = Self.readConfig(database: database)
         if let database,
            let raw = try? database.setting(forKey: Self.stateKey),
            let state = Self.decodeState(raw)
@@ -178,7 +178,11 @@ public actor AlertEngine {
         persistConfig()
     }
 
-    private static func loadConfig(database: AppDatabase?) -> AlertConfig {
+    /// Leitura DA CONFIG persistida (sem tocar no estado de dedupe) —
+    /// PÚBLICA para a janela de Settings (F5 Task 3) carregar os valores no
+    /// init síncrono do modelo de UI: a decodificação JSON de `alerts:*` tem
+    /// UMA fonte só (esta), nunca reimplementada na UI.
+    public static func readConfig(database: AppDatabase?) -> AlertConfig {
         guard let database else { return .default }
         let decoder = JSONDecoder()
         var enabled = AlertConfig.default.enabled

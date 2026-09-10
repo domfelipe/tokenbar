@@ -153,11 +153,11 @@ public struct ProviderPanelView: View {
                     { refreshAction() }
                     .keyboardShortcut("r", modifiers: .command)
             }
-            // Settings ⌘, — DESABILITADO até a Task 3 (janela de ajustes
-            // ainda não existe); a linha já nasce no lugar da referência.
-            MenuRowView(
-                icon: "gearshape", title: "Settings…", shortcut: "⌘,",
-                isEnabled: false, action: {})
+            // Settings ⌘, (F5 Task 3): abre a scene `Settings` do app via
+            // \.openSettings (a scene vive no TokenBarApp; ativa o app antes —
+            // menu bar apps são accessory). Em renders de teste a ação do
+            // sistema é no-op.
+            SettingsMenuRow()
             if let aboutAction {
                 MenuRowView(icon: "info.circle", title: "About TokenBar") { aboutAction() }
             }

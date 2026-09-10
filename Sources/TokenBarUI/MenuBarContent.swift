@@ -182,6 +182,12 @@ public struct ProviderDisplay: Equatable, Sendable {
 /// Conteúdo consolidado do menu bar — estado POR provider (F2). A string de
 /// exibição segue a tabela de siglas D5, ordem fixa C, X, G, Z; provider sem
 /// dado (sem % e sem tokens) some da string.
+///
+/// F5 Task 3: `visibleProviders` filtra QUAIS providers aparecem no texto
+/// (janela de Settings → checkboxes; persistência na tabela `settings`, lida
+/// pelo coordinator). Default = todos — comportamento idêntico ao de quem
+/// nunca abriu settings. O gate da F1 segue valendo: visibilidade que não
+/// muda a string exibida (provider escondido sem dados) não re-renderiza.
 public struct MenuBarContent: Equatable, Sendable {
     /// Tabela de siglas D5 — codex é "X" (não colide com claude).
     public static let siglas: [ProviderID: String] = [
@@ -198,11 +204,18 @@ public struct MenuBarContent: Equatable, Sendable {
     ]
 
     public let providers: [ProviderID: ProviderDisplay]
+    /// Providers presentes no texto do menu bar/linhas (Task 3). Vazio é
+    /// escolha válida → displayString fica "TB".
+    public let visibleProviders: Set<ProviderID>
 
     public static let empty = MenuBarContent(providers: [:])
 
-    public init(providers: [ProviderID: ProviderDisplay]) {
+    public init(
+        providers: [ProviderID: ProviderDisplay],
+        visibleProviders: Set<ProviderID> = Set(ProviderID.allCases)
+    ) {
         self.providers = providers
+        self.visibleProviders = visibleProviders
     }
 
     /// Conveniência de migração (F1/totais crus): só tokens, sem janela.
@@ -219,14 +232,17 @@ public struct MenuBarContent: Equatable, Sendable {
     }
 
     /// Pares (id, display) com dado, na ordem fixa de exibição (C, X, G, Z;
-    /// demais ids atrás, alfabético).
+    /// demais ids atrás, alfabético). Respeita `visibleProviders` (Task 3):
+    /// provider fora do conjunto NÃO entra no texto do menu bar nem nas
+    /// linhas — some por escolha do usuário, não por falta de dado.
     public func orderedProviders() -> [(id: ProviderID, display: ProviderDisplay)] {
         var order: [ProviderID: Int] = [:]
         let allIDs: [ProviderID] = Self.displayOrder + ProviderID.allCases.sorted { $0.rawValue < $1.rawValue }
         for (index, id) in allIDs.enumerated() {
             if order[id] == nil { order[id] = index }  // primeira ocorrência vence
         }
-        let active = providers.compactMap { (id: $0.key, display: $0.value) }.filter { $0.display.hasData }
+        let active = providers.compactMap { (id: $0.key, display: $0.value) }
+            .filter { $0.display.hasData && visibleProviders.contains($0.id) }
         let sorted = active.sorted { lhs, rhs in
             let lhsIndex = order[lhs.id] ?? Int.max
             let rhsIndex = order[rhs.id] ?? Int.max
