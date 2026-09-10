@@ -32,8 +32,18 @@ struct MenuBarContentTests {
         #expect(MenuBarContent.sigla(for: .codex) == "X")
         #expect(MenuBarContent.sigla(for: .gemini) == "G")
         #expect(MenuBarContent.sigla(for: .zai) == "Z")
-        // Fora da tabela: fallback prefix(1) maiúsculo (herança F1).
+        // F5 (ruling F5-SIGLAS): cursor=U, openrouter=O, qwen/alibaba=Q,
+        // antigravity=V, deepseek=D, grok=K — G conflita com gemini; todas
+        // únicas (docs/specs/f5-providers.md + decisões F5 na T7).
+        #expect(MenuBarContent.sigla(for: .cursor) == "U")
         #expect(MenuBarContent.sigla(for: .openrouter) == "O")
+        #expect(MenuBarContent.sigla(for: .alibaba) == "Q")
+        #expect(MenuBarContent.sigla(for: .antigravity) == "V")
+        #expect(MenuBarContent.sigla(for: .deepseek) == "D")
+        #expect(MenuBarContent.sigla(for: .grok) == "K")
+        // Tabela toda sem colisão de siglas.
+        let all = Set(MenuBarContent.siglas.values)
+        #expect(all.count == MenuBarContent.siglas.count)
     }
 
     // MARK: - String do menu bar

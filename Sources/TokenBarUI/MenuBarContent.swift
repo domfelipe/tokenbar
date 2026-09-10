@@ -189,9 +189,14 @@ public struct ProviderDisplay: Equatable, Sendable {
 /// nunca abriu settings. O gate da F1 segue valendo: visibilidade que não
 /// muda a string exibida (provider escondido sem dados) não re-renderiza.
 public struct MenuBarContent: Equatable, Sendable {
-    /// Tabela de siglas D5 — codex é "X" (não colide com claude).
+    /// Tabela de siglas D5 — codex é "X" (não colide com claude). F5 (ruling
+    /// F5-SIGLAS): cursor=U, openrouter=O, qwen/alibaba=Q, antigravity=V,
+    /// deepseek=D, grok=K (G conflita com gemini; A conflita com a ordem
+    /// alfabética dos demais — tabela estendida em docs/decisoes-f5).
     public static let siglas: [ProviderID: String] = [
         .claude: "C", .codex: "X", .gemini: "G", .zai: "Z",
+        .cursor: "U", .openrouter: "O", .alibaba: "Q",
+        .antigravity: "V", .deepseek: "D", .grok: "K",
     ]
 
     /// Ordem fixa de exibição; ids fora da tabela (cursor/openrouter/copilot)
@@ -201,6 +206,8 @@ public struct MenuBarContent: Equatable, Sendable {
     /// Nome completo p/ as linhas do painel (menu, não menu bar).
     public static let displayNames: [ProviderID: String] = [
         .claude: "Claude", .codex: "Codex", .gemini: "Gemini", .zai: "Z.ai",
+        .cursor: "Cursor", .openrouter: "OpenRouter", .alibaba: "Qwen",
+        .antigravity: "Antigravity", .deepseek: "DeepSeek", .grok: "Grok",
     ]
 
     public let providers: [ProviderID: ProviderDisplay]

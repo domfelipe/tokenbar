@@ -297,9 +297,19 @@ public final class ProviderCoordinator {
         let zai = ZaiProvider(
             credentialReader: zaiReader,
             client: UsageHTTPClient(baseURL: ZaiProvider.resolveBaseURL(environment: env, regionHint: zaiReader.read()?.regionBaseURL)),
-            accounts: accountRegistry
-        )
-        registry = ProviderRegistry(providers: [claude, codex, gemini, zai])
+            accounts: accountRegistry)
+        // Providers F5 (Tasks 4–5): todos API-only com degradação local-first
+        // (sem credencial → discoverAccounts [] + snapshot .missing — some da
+        // barra, nunca erro). Isolamento: quebra de um NÃO afeta os demais.
+        let cursor = CursorProvider(
+            credentialReader: .resolve(environment: env, home: home),
+            client: UsageHTTPClient(baseURL: CursorProvider.resolveBaseURL(environment: env)),
+            accounts: accountRegistry)
+        let openrouter = OpenRouterProvider(
+            credentialReader: OpenRouterCredentialReader(environment: env),
+            client: UsageHTTPClient(baseURL: OpenRouterProvider.resolveBaseURL(environment: env)),
+            accounts: accountRegistry)
+        registry = ProviderRegistry(providers: [claude, codex, gemini, zai, cursor, openrouter])
         watcherDirectories = [.claude: claudeDirectory, .gemini: geminiDirectory.appendingPathComponent("tmp", isDirectory: true)]
         for id in watcherDirectories.keys {
             debouncers[id] = Debouncer(quiesce: Self.debounceQuiesce, clock: ContinuousClock())
@@ -678,6 +688,21 @@ public final class ProviderCoordinator {
                 client: UsageHTTPClient(baseURL: ZaiProvider.resolveBaseURL(
                     environment: config.environment,
                     regionHint: reader.read()?.regionBaseURL)),
+                accountKey: key,
+                label: entry.label)
+        case .cursor:
+            return CursorProvider(
+                credentialReader: CursorCredentialReader(
+                    databaseFileURL: nil,
+                    tokenFileURL: URL(filePath: entry.credentialPath)),
+                client: UsageHTTPClient(baseURL: CursorProvider.resolveBaseURL(environment: config.environment)),
+                accountKey: key,
+                label: entry.label)
+        case .openrouter:
+            return OpenRouterProvider(
+                credentialReader: OpenRouterCredentialReader(
+                    keyFileURL: URL(filePath: entry.credentialPath)),
+                client: UsageHTTPClient(baseURL: OpenRouterProvider.resolveBaseURL(environment: config.environment)),
                 accountKey: key,
                 label: entry.label)
         default:

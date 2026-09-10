@@ -80,6 +80,10 @@ public struct UserNotificationGateway: NotificationSending {
         case .cursor: return "Cursor"
         case .openrouter: return "OpenRouter"
         case .copilot: return "Copilot"
+        case .alibaba: return "Qwen"
+        case .antigravity: return "Antigravity"
+        case .deepseek: return "DeepSeek"
+        case .grok: return "Grok"
         }
     }
 

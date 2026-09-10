@@ -9,6 +9,14 @@ import TokenBarCore
 /// sem crash, heartbeat v2 escrito com os 4 providers, credencial nunca vaza.
 ///
 /// Não toca no App Support real: stores de cursor em memória via fábrica.
+/// Providers registrados pelo wiring default (T4: +cursor/openrouter sobre os
+/// 4 canônicos; T5 adiciona os 4 restantes). O heartbeat v2 lista todos.
+enum F5RegisteredProviders {
+    static let all: Set<String> = [
+        "claude", "codex", "gemini", "zai", "cursor", "openrouter",
+    ]
+}
+
 @MainActor
 struct ProviderCoordinatorTests {
     private struct Fixture {
@@ -100,7 +108,7 @@ struct ProviderCoordinatorTests {
         #expect(json["menuBarText"] as? String == "TB")  // sem dado → nada na string
 
         let providers = try #require(json["providers"] as? [String: Any])
-        #expect(Set(providers.keys) == ["claude", "codex", "gemini", "zai"])
+        #expect(Set(providers.keys) == F5RegisteredProviders.all)
 
         let keys = ["menuBar", "percent", "todayTokens", "authState", "fetchedAt"]
         for id in providers.keys {
@@ -162,7 +170,7 @@ struct ProviderCoordinatorTests {
 
         let data = try Data(contentsOf: fixture.e2eDirectory.appendingPathComponent("state.json"))
         let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-        #expect((json["providers"] as? [String: Any])?.count == 4)
+        #expect((json["providers"] as? [String: Any])?.count == F5RegisteredProviders.all.count)
         #expect(json["menuBarText"] as? String == "TB")
     }
 
@@ -197,8 +205,8 @@ struct ProviderCoordinatorTests {
         let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         let providers = try #require(json["providers"] as? [String: Any])
 
-        // TODOS os 4 registrados continuam no payload — inclusive o zai em erro.
-        #expect(Set(providers.keys) == ["claude", "codex", "gemini", "zai"])
+        // TODOS os registrados continuam no payload — inclusive o zai em erro.
+        #expect(Set(providers.keys) == F5RegisteredProviders.all)
 
         // O zai degradado entra vazio (sem dado inventado) com o erro tokenizado
         // no diagnóstico — nunca mensagem crua com URL (spec §9).
@@ -293,7 +301,7 @@ struct ProviderCoordinatorTests {
         let data = try Data(contentsOf: fixture.e2eDirectory.appendingPathComponent("state.json"))
         let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         let providers = try #require(json["providers"] as? [String: Any])
-        #expect(Set(providers.keys) == ["claude", "codex", "gemini", "zai"])
+        #expect(Set(providers.keys) == F5RegisteredProviders.all)
 
         // Sem DB, ingest local continua funcionando: display do dia correto
         // (ledger), apenas sem persistência.

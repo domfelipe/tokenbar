@@ -50,18 +50,58 @@ public struct UsageHTTPClient: Sendable {
     ///   provider; aqui só se valida que o corpo de um 2xx é JSON válido.
     /// - Throws: `UsageHTTPError` (`.network` | `.http(status:)` | `.decode` | `.unauthorized`).
     public func getJSON(path: String, bearer: String?, headers: [String: String] = [:]) async throws -> Data {
-        var request = URLRequest(url: baseURL.appending(path: path))
-        request.httpMethod = "GET"
+        try await getJSON(url: baseURL.appending(path: path), bearer: bearer, headers: headers)
+    }
+
+    /// Variante por URL ABSOLUTA — para endpoints com query string na própria
+    /// URI (F5: Alibaba `data/api.json?action=...`, Grok `billing?format=...`),
+    /// onde `appending(path:)` percent-encodaria `?`/`&` e quebraria a rota.
+    public func getJSON(url: URL, bearer: String?, headers: [String: String] = [:]) async throws -> Data {
+        try await run(request(url: url, method: "GET", bearer: bearer, headers: headers, body: nil, contentType: nil))
+    }
+
+    /// POST com corpo cru (F5 Tasks 4–5: Alibaba/Antigravity exigem POST;
+    /// contrato de erro e single-attempt idênticos ao GET — nunca retry).
+    public func postJSON(
+        path: String, bearer: String?, headers: [String: String] = [:],
+        body: Data, contentType: String = "application/json") async throws -> Data
+    {
+        try await postJSON(url: baseURL.appending(path: path), bearer: bearer, headers: headers, body: body, contentType: contentType)
+    }
+
+    /// Variante por URL ABSOLUTA do POST (mesma razão do `getJSON(url:)`).
+    public func postJSON(
+        url: URL, bearer: String?, headers: [String: String] = [:],
+        body: Data, contentType: String = "application/json") async throws -> Data
+    {
+        try await run(request(url: url, method: "POST", bearer: bearer, headers: headers, body: body, contentType: contentType))
+    }
+
+    private func request(
+        url: URL, method: String, bearer: String?, headers: [String: String],
+        body: Data?, contentType: String?) -> URLRequest
+    {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = timeoutIntervalSeconds
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let contentType {
+            request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        }
         if let bearer {
             request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
         }
         for (field, value) in headers {
             request.setValue(value, forHTTPHeaderField: field)
         }
+        request.httpBody = body
+        return request
+    }
 
+    /// Uma única tentativa (spec §5 regra 3): mapeia transporte/HTTP, valida
+    /// JSON do corpo 2xx e devolve os bytes — sem retry interno.
+    private func run(_ request: URLRequest) async throws -> Data {
         let data: Data
         let response: URLResponse
         do {
