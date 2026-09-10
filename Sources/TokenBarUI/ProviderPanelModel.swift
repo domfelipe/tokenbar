@@ -1,7 +1,7 @@
 import Foundation
 import TokenBarCore
 
-/// Ponto diário da série 30d de um provider (chart do painel rico, F4) —
+/// Ponto diário da série 30d de um provider (chart do painel) —
 /// no máximo 30 pontos por provider (`daily_agg`, nunca eventos crus). `day`
 /// é "yyyy-MM-dd" (ordenação do SQL = cronológica; categoria no chart).
 public struct PanelDayPoint: Identifiable, Equatable, Sendable {
@@ -18,13 +18,18 @@ public struct PanelDayPoint: Identifiable, Equatable, Sendable {
     public var id: String { day }
 }
 
-/// View-model do painel rico (F4 Task 2) — TODA a lógica de estado/texto,
-/// sem SwiftUI: seleção de aba, linha de janela (`WindowBarRow`), countdown
-/// relativo, pacing condicional, custos hoje/30d, badge de auth e "updated
-/// Xs ago". Funções puras com `now`/dados injetados — testável headless; a
-/// renderização (`ProviderPanelView`) só desenha.
+/// View-model do painel — TODA a lógica de estado/texto, sem SwiftUI: seleção
+/// de aba, linha de janela (`WindowBarRow` com a faixa de pacing na barra),
+/// countdown relativo, meta de pacing, KPIs do dashboard, linhas de detalhe,
+/// chart diário, badge de auth e "Updated just now". Funções puras com
+/// `now`/dados injetados — testável headless; a renderização
+/// (`ProviderPanelView`) só desenha.
 ///
-/// Strings em EN (Global Constraints — UI strings EN).
+/// DESIGN F5 (ruling F5-DESIGN): formato/textos portados 1:1 da referência
+/// MIT (CodexBar `UsagePaceText`/`UsageFormatter`/`InlineUsageDashboardContent`)
+/// — ver NOTICE na raiz. Dados SEMPRE do motor local (UsageWindow,
+/// HistoryQueries, PacingEngine); segmento ausente = linha/célula omitida
+/// ("—" só onde a referência usa "—"). Strings em EN (Global Constraints).
 public enum ProviderPanelModel {
     // MARK: - Abas
 
@@ -74,6 +79,12 @@ public enum ProviderPanelModel {
     /// Estado puro de uma linha de janela do painel. `fraction` é 0...1
     /// (saturado) ou `nil` = desconhecida (modo local — sem barra, sem
     /// porcentagem inventada).
+    ///
+    /// Faixa de pacing (F5, port de `UsageProgressBar`): `paceStripePercent`
+    /// marca ONDE a projeção atual termina (saturada em 0...100) e
+    /// `paceIsDeficit` pinta a faixa de vermelho (projeção estoura a janela)
+    /// ou verde (cabe no ritmo) — MESMA semântica da referência. A faixa só
+    /// existe na janela CRÍTICA (âncora do `PacingEngine`).
     public struct WindowRow: Identifiable, Equatable, Sendable {
         public let id: String
         public let kind: WindowKind
@@ -84,11 +95,21 @@ public enum ProviderPanelModel {
         /// "Renews in 6d 16h"; `nil` quando a janela não tem `resetsAt`
         /// (janela sem reset → só contagem, Global Constraints).
         public let countdownText: String?
+        /// Posição da faixa de pacing em % da barra (0...100); `nil` = sem
+        /// forecast (a faixa não aparece — nada de chute).
+        public let paceStripePercent: Double?
+        /// `true` = projeção estoura a janela (`deficitPct` do engine) →
+        /// faixa vermelha; `false` = verde.
+        public let paceIsDeficit: Bool
     }
 
-    /// Uma linha por janela do snapshot, na ordem do provider.
-    public static func windowRows(windows: [UsageWindow], now: Date) -> [WindowRow] {
-        windows.enumerated().map { index, window in
+    /// Uma linha por janela do snapshot, na ordem do provider. O pacing
+    /// (quando existe) é da janela CRÍTICA — a faixa vai nessa linha.
+    public static func windowRows(
+        windows: [UsageWindow], now: Date, pacing: PacingForecast? = nil
+    ) -> [WindowRow] {
+        let criticalFraction = criticalWindowFraction(pacing: pacing, windows: windows)
+        return windows.enumerated().map { index, window in
             let fraction = window.usedFraction.map { min(max($0, 0), 1) }
             let usageText: String
             if let fraction {
@@ -97,13 +118,47 @@ public enum ProviderPanelModel {
                 usageText = "\(kindTitle(window.kind)) window"
             }
             let countdown = window.resetsAt.map { renewText(from: now, to: $0) }
+            // A faixa de pacing pertence à janela-âncora (mesma fração da
+            // crítica; empate → primeira, igual ao `criticalWindow` do menu).
+            var stripe: Double?
+            var isDeficit = false
+            if let pacing, let projected = projectedFractionSaturated(pacing),
+               let fraction, fraction == criticalFraction
+            {
+                stripe = (projected * 100).rounded()
+                isDeficit = pacing.deficitPct != nil
+            }
             return WindowRow(
                 id: "\(window.kind.rawValue)#\(index)",
                 kind: window.kind,
                 fraction: fraction,
                 usageText: usageText,
-                countdownText: countdown)
+                countdownText: countdown,
+                paceStripePercent: stripe,
+                paceIsDeficit: isDeficit)
         }
+    }
+
+    /// Fração da janela crítica (maior fração; empate → primeira) — a âncora
+    /// do `PacingEngine`. `nil` quando nenhuma janela tem fração.
+    private static func criticalWindowFraction(
+        pacing: PacingForecast?, windows: [UsageWindow]
+    ) -> Double? {
+        guard pacing != nil else { return nil }
+        var best: Double?
+        for window in windows {
+            guard let fraction = window.usedFraction else { continue }
+            let clamped = min(max(fraction, 0), 1)
+            if best == nil || clamped > best! { best = clamped }
+        }
+        return best
+    }
+
+    /// `projectedFraction` saturado em 0...1 (a faixa vive DENTRO da barra;
+    /// projeção > 100% encosta no fim — o vermelho conta o resto na meta).
+    private static func projectedFractionSaturated(_ pacing: PacingForecast) -> Double? {
+        guard pacing.projectedFraction.isFinite else { return nil }
+        return min(max(pacing.projectedFraction, 0), 1)
     }
 
     /// Título estável da janela pelo `kind` (não pelo label do provider — o
@@ -116,55 +171,53 @@ public enum ProviderPanelModel {
         }
     }
 
-    // MARK: - Pacing
+    // MARK: - Pacing (meta da linha, formato da referência)
 
-    /// Disclaimer curto da linha de pacing (padrão do referencial: honesto).
-    public static let pacingDisclaimer = "estimate — not a guarantee"
-
-    /// Texto do pacing quando existe forecast: "Estimated — exhausts in 2h
-    /// 44m"; forecast sem esgotamento (taxa flat/queda) → "Estimated —
-    /// should last until renew". `nil` = sem forecast (menos de 2 pontos de
-    /// dados, janela sem reset/fração) → linha NÃO aparece (sem chute).
+    /// Meta da linha de janela com forecast — port de `UsagePaceText`:
+    /// - déficit: "69% in deficit · Exhausts in 2h 44m" (etá válido);
+    ///   etá inválido/zero com déficit → só o déficit (nada a prometer);
+    /// - folga: "N% in reserve · Lasts until reset" (projeção < 100%);
+    /// - no ritmo: "On pace · Lasts until reset".
+    /// `nil` = sem forecast (menos de 2 pontos, janela sem reset/fração) →
+    /// linha NÃO aparece (sem chute).
     public static func pacingText(_ forecast: PacingForecast?, now: Date) -> String? {
         guard let forecast else { return nil }
-        if let exhaustedIn = forecast.exhaustedIn, exhaustedIn > 0 {
-            let at = now.addingTimeInterval(exhaustedIn)
-            return "Estimated — exhausts in " + countdownText(from: now, to: at)
+        let projected = forecast.projectedFraction
+        if let deficit = forecast.deficitPct, deficit > 0 {
+            let label = "\(Int(deficit.rounded()))% in deficit"
+            if let exhaustedIn = forecast.exhaustedIn, exhaustedIn > 0 {
+                let at = now.addingTimeInterval(exhaustedIn)
+                return label + " · Exhausts in " + countdownText(from: now, to: at)
+            }
+            return label
         }
-        return "Estimated — should last until renew"
-    }
-
-    // MARK: - Custos
-
-    /// "Today ~$0.08 · 30d ~$2.10 · 8.9G tok" — segmentos omitidos quando
-    /// sem dado (custo `nil` = sem preço computável — NULL ≠ 0; tokens 0 =
-    /// sem histórico na janela). Tudo sem dado → `nil` (linha some).
-    public static func costsText(
-        todayCostUsd: Double?, monthCostUsd: Double?, monthTokens: Int64
-    ) -> String? {
-        var segments: [String] = []
-        if let today = todayCostUsd { segments.append("Today " + formatEstimatedUSD(today)) }
-        if let month = monthCostUsd { segments.append("30d " + formatEstimatedUSD(month)) }
-        if monthTokens > 0 { segments.append(abbrevTokens(monthTokens) + " tok") }
-        guard !segments.isEmpty else { return nil }
-        return segments.joined(separator: " · ")
+        if projected.isFinite, projected > 0, projected < 0.995 {
+            let reserve = Int(((1 - projected) * 100).rounded())
+            if reserve > 0 { return "\(reserve)% in reserve · Lasts until reset" }
+        }
+        return "On pace · Lasts until reset"
     }
 
     // MARK: - Header
 
-    /// "updated 42s ago" / "updated 5m ago" / "updated 3h ago". Nunca ciclado
-    /// (fetchedAt na época zero) → "not updated yet" (honesto, nada fake).
+    /// "Updated just now" (< 60s — port de `UsageFormatter.updatedString`),
+    /// "updated 42m ago" / "updated 3h ago"; ≥ 24h cai para o dia absoluto
+    /// ("updated Sep 8"). Nunca ciclado (fetchedAt na época zero) → "not
+    /// updated yet" (honesto, nada fake). Delta negativo (clock do snapshot
+    /// no futuro) satura em "just now" — nunca número negativo.
     public static func updatedText(now: Date, fetchedAt: Date) -> String {
         guard fetchedAt.timeIntervalSince1970 > 0 else { return "not updated yet" }
         let delta = max(0, now.timeIntervalSince(fetchedAt))
-        if delta < 60 { return "updated \(max(1, Int(delta)))s ago" }
+        if delta < 60 { return "Updated just now" }
         if delta < 3_600 { return "updated \(Int(delta / 60))m ago" }
-        return "updated \(Int(delta / 3_600))h ago"
+        if delta < 86_400 { return "updated \(Int(delta / 3_600))h ago" }
+        let day = fetchedAt.formatted(.dateTime.month(.abbreviated).day())
+        return "updated \(day)"
     }
 
-    /// Badge do header: "local" (ingest local — fonte do dado é o arquivo
-    /// local), "auth" (API com credencial ok), "no auth"/"auth invalid" para
-    /// os estados ruins da API.
+    /// Badge do header (posição do plan/level da referência — não temos dado
+    /// de plano no motor, o badge de fonte ocupa o lugar, sem invenção):
+    /// "local" (ingest local), "auth" (API ok), "no auth"/"auth invalid".
     public static func authBadgeText(source: DataSource, authState: AuthState) -> String {
         if source == .localOnly { return "local" }
         switch authState {
@@ -173,6 +226,162 @@ public enum ProviderPanelModel {
         case .invalid: return "auth invalid"
         }
     }
+
+    // MARK: - Dashboard (KPIs + chart + linhas de detalhe)
+
+    /// Célula do grid de KPIs (port de `KPIBlock`): título pequeno, valor
+    /// grande; `emphasis` → headline (o "Today" da referência).
+    public struct KPICell: Identifiable, Equatable, Sendable {
+        public let title: String
+        public let value: String
+        public let emphasis: Bool
+
+        public init(title: String, value: String, emphasis: Bool = false) {
+            self.title = title
+            self.value = value
+            self.emphasis = emphasis
+        }
+
+        public var id: String { title }
+    }
+
+    /// Grid 2×2 da referência: "Today $0.00 · 30d $1,116.52 · Recent tokens
+    /// 216M · 30d tokens 8.9B". Custo ausente (NULL ≠ 0) → "—" (a referência
+    /// usa "—" na célula; nunca inventa número). `nil` = nada a mostrar
+    /// (provider sem histórico carregado → seção some).
+    public static func kpiCells(
+        todayCostUsd: Double?,
+        monthCostUsd: Double?,
+        todayTokens: Int64,
+        monthTokens: Int64
+    ) -> [KPICell]? {
+        let hasAnyData = todayCostUsd != nil || monthCostUsd != nil
+            || todayTokens > 0 || monthTokens > 0
+        guard hasAnyData else { return nil }
+        return [
+            KPICell(title: "Today", value: kpiCostString(todayCostUsd), emphasis: true),
+            KPICell(title: "30d", value: kpiCostString(monthCostUsd)),
+            KPICell(title: "Recent tokens", value: tokenCountString(todayTokens)),
+            KPICell(title: "30d tokens", value: tokenCountString(monthTokens)),
+        ]
+    }
+
+    /// O dashboard inteiro aparece só com ALGUM dado de histórico (custo,
+    /// tokens ou série) — sem DB, seção omitida (comportamento F3/F4).
+    public static func showsDashboard(
+        weekHistoryAvailable: Bool, monthHistoryAvailable: Bool,
+        todayCostUsd: Double?, monthCostUsd: Double?,
+        todayTokens: Int64, monthTokens: Int64, series: [PanelDayPoint]
+    ) -> Bool {
+        weekHistoryAvailable || monthHistoryAvailable || series.isEmpty == false
+            || todayCostUsd != nil || monthCostUsd != nil || todayTokens > 0 || monthTokens > 0
+    }
+
+    /// O valor monetário da célula: "$1,116.52" (agrupado, 2 decimais);
+    /// sub-centavo real mantém 4 decimais ($0.0050 — não vira $0.00);
+    /// `nil` → "—" (NULL ≠ 0).
+    static func kpiCostString(_ cost: Double?) -> String {
+        guard let cost else { return "—" }
+        if cost > 0, cost < 0.01 { return String(format: "$%.4f", cost) }
+        return cost.formatted(
+            .currency(code: "USD").precision(.fractionLength(2)).locale(Locale(identifier: "en_US")))
+    }
+
+    /// Contagem compacta no formato da referência: "216M", "8.9B", "3.1K" —
+    /// um decimal e ".0" cortado; ≥10 unidades sem decimal. Port de
+    /// `UsageFormatter.tokenCountString`.
+    public static func tokenCountString(_ value: Int64) -> String {
+        let absValue = value.magnitude
+        let sign = value < 0 ? "-" : ""
+        let units: [(threshold: UInt64, divisor: Double, suffix: String)] = [
+            (999_500_000, 1_000_000_000, "B"),
+            (999_500, 1_000_000, "M"),
+            (1_000, 1_000, "K"),
+        ]
+        for unit in units where absValue >= unit.threshold {
+            let scaled = Double(absValue) / unit.divisor
+            let formatted: String
+            if scaled >= 10 {
+                formatted = String(format: "%.0f", scaled)
+            } else {
+                var s = String(format: "%.1f", scaled)
+                if s.hasSuffix(".0") { s.removeLast(2) }
+                formatted = s
+            }
+            return "\(sign)\(formatted)\(unit.suffix)"
+        }
+        return String(value)
+    }
+
+    /// Modelo do chart diário (port de `MiniUsageBars`): valores diários e o
+    /// rótulo de escala ("$282" — o pico, quando os pontos têm custo; senão
+    /// tokens abreviados). `nil` = série vazia (chart omitido).
+    public struct ChartModel: Equatable, Sendable {
+        public let values: [Double]
+        /// Rótulo do topo (pico da série) — `nil` quando todos os pontos são
+        /// zero (nada a anotar).
+        public let peakLabel: String?
+    }
+
+    public static func chartModel(series: [PanelDayPoint]) -> ChartModel? {
+        guard !series.isEmpty else { return nil }
+        let usesCost = series.contains { ($0.costUSD ?? 0) > 0 }
+        let values = series.map { point in
+            usesCost ? max(0, point.costUSD ?? 0) : max(0, Double(point.tokens))
+        }
+        guard let peak = values.max(), peak > 0 else {
+            return ChartModel(values: values, peakLabel: nil)
+        }
+        let label = usesCost
+            ? compactCurrency(peak)
+            : tokenCountString(Int64(peak))
+        return ChartModel(values: values, peakLabel: label)
+    }
+
+    /// "$282" / "$1,116" (0 decimais); abaixo de $1 mantém centavos — port
+    /// de `UsageFormatter.compactCurrencyString` (USD).
+    static func compactCurrency(_ value: Double) -> String {
+        if value != 0, abs(value) < 1 {
+            return String(format: "$%.2f", value)
+        }
+        return value.formatted(
+            .currency(code: "USD").precision(.fractionLength(0)).locale(Locale(identifier: "en_US")))
+    }
+
+    /// Linhas de detalhe sob o chart (port das `detailLines`): "Last 7 days:
+    /// $585.43 · 3.1B tokens", "Top model: gpt-5.6", e o disclaimer de
+    /// estimativa quando há custo/projeção na tela. Segmento sem dado some
+    /// (NULL ≠ 0); linha sem segmentos não nasce.
+    public static func detailLines(
+        weekCostUsd: Double?,
+        weekTokens: Int64,
+        topModel: String?,
+        showsEstimate: Bool
+    ) -> [String] {
+        var lines: [String] = []
+        var weekParts: [String] = []
+        if let weekCost = weekCostUsd { weekParts.append(kpiCostString(weekCost)) }
+        if weekTokens > 0 { weekParts.append(tokenCountString(weekTokens) + " tokens") }
+        if !weekParts.isEmpty { lines.append("Last 7 days: " + weekParts.joined(separator: " · ")) }
+        if let topModel, !topModel.isEmpty {
+            lines.append("Top model: " + shortModelName(topModel))
+        }
+        if showsEstimate {
+            lines.append("Estimated from token usage · not a subscription bill")
+        }
+        return lines
+    }
+
+    /// Nomes longos truncam em 26 caracteres ("…" final) — port de
+    /// `shortModelName` da referência.
+    public static func shortModelName(_ name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > 26 else { return trimmed }
+        return String(trimmed.prefix(25)) + "…"
+    }
+
+    /// Disclaimer da referência para custos estimados (hint do Codex).
+    public static let estimateDisclaimer = "Estimated from token usage · not a subscription bill"
 
     // MARK: - Multi-conta (união registry ⊕ ciclo)
 

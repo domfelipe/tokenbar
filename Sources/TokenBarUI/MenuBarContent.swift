@@ -115,6 +115,12 @@ public struct ProviderDisplay: Equatable, Sendable {
     /// comportamento F2/F3 fica bit-a-bit igual (nenhum campo do menu bar ou
     /// do heartbeat v3 depende disto; é só painel).
     public var accounts: [AccountDisplay]
+    /// Modelo com mais tokens nos últimos 7 dias (daily_agg/daily_model_agg,
+    /// janela 7d, provider-wide — F5, linha "Top model:" do painel; port da
+    /// referência). `nil` = sem histórico com modelo na janela (linha
+    /// omitida — nada inventado). Painel-only: a string do menu bar NÃO muda
+    /// (render gate da F1 intocado).
+    public var topModel7d: String?
 
     public init(
         percent: Double? = nil,
@@ -133,7 +139,8 @@ public struct ProviderDisplay: Equatable, Sendable {
         monthHistoryAvailable: Bool = false,
         pacing: PacingForecast? = nil,
         monthSeries: [PanelDayPoint] = [],
-        accounts: [AccountDisplay] = []
+        accounts: [AccountDisplay] = [],
+        topModel7d: String? = nil
     ) {
         self.percent = percent
         self.todayTokens = todayTokens
@@ -152,6 +159,7 @@ public struct ProviderDisplay: Equatable, Sendable {
         self.pacing = pacing
         self.monthSeries = monthSeries
         self.accounts = accounts
+        self.topModel7d = topModel7d
     }
 
     /// Estado inicial (nada ciclo ainda): sem dado — some da string do menu.

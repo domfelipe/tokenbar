@@ -2,9 +2,9 @@
 
 Native macOS menu bar app that keeps your AI coding usage visible — light enough to never think about it.
 
-**Status: F4** — everything from F3 (Codex, Gemini CLI, Z.ai, Claude local core; SQLite history with estimated cost, Analytics window and CSV/JSON export) plus the rich panel: provider tabs with logos, usage-window bars with reset countdown, honest pacing estimate, today/30-day costs with an in-panel 30-day chart, and multi-account support ("+ Add account", toggle/remove, worst-case aggregation). Full roadmap: `docs/specs/2026-09-02-design.md` (pt-BR).
+**Status: F5 (Task 1)** — everything from F4 (Codex, Gemini CLI, Z.ai, Claude local core; SQLite history with estimated cost, Analytics window and CSV/JSON export, multi-account) plus the panel redesign ported 1:1 from the MIT reference CodexBar (`NOTICE` in the repo root): provider chip-bar with logos and per-chip quota indicator, segmented usage bar with pace stripe, large-stat dashboard ("Today / 30d / Recent tokens / 30d tokens"), daily bar chart with peak label, "Top model" line, action rows and the Refresh ⌘R / Settings… ⌘, (disabled until F5 T3) / About / Quit ⌘Q footer. Full roadmap: `docs/specs/2026-09-02-design.md` (pt-BR).
 
-> **Trademark notice:** Provider logos are simplified original marks; trademarks belong to their owners — used for identification only, not affiliated.
+> **Trademark notice:** Provider logos are ported from CodexBar (MIT — see `NOTICE`); trademarks belong to their owners — used for identification only, not affiliated.
 
 ## What you see (F2)
 
@@ -17,23 +17,23 @@ Order is fixed C · X · G · Z; providers without data stay hidden.
 | `G:193` | Gemini CLI | local sessions (`~/.gemini/tmp/**/chats`), real tokens |
 | `Z:81%` | Z.ai coding plan | usage API (`quota/limit`) |
 
-Open the panel for a line per provider (percent + reset time, or today's tokens with estimated cost), the **7-day history line** (`7d: X tok ~$Y`), **Analytics…**, **Export history…**, **Refresh now** and **Quit TokenBar** (⌘Q).
+Open the panel for the provider chip-bar, usage-window bars with the pace stripe and pacing line, the large-stat dashboard with the daily chart, action rows (Usage dashboard, Export, Add account…) and the Refresh/Settings/About/Quit footer.
 
 Behavior highlights: adaptive scheduler (idle 5 min, menu 60 s, pressure ≥ 80% → 30 s, error backoff ×2 capped at 30 min, zero network during sleep) · graceful degradation (API down → last good state, local providers keep counting; restart mid-day keeps today's totals; database unavailable → app runs in F2 mode, never crashes) · per-provider cursors + day snapshot, self-healing against truncation and corrupted state.
 
-## Rich panel & multi-account (F4)
+## Rich panel & multi-account (F4/F5)
 
-- **Tabs, not lines.** The panel is a tab per provider (original simplified logo + short name). The selected tab shows: usage-window bars (`Weekly 74% used`, `Renews in 6d 16h` — past reset shows `Renewed`, never a negative countdown), today/30-day estimated cost (`Today ~$0.08 · 30d ~$2.10 · 8.9G tok`), a 30-day tokens-per-day chart (daily aggregates only) and "updated Xs ago".
-- **Pacing is honest or absent.** When a provider has a quota window AND at least two days of local history, the panel estimates whether the current pace exhausts the window (`Estimated — exhausts in 2h 44m`, always labeled "estimate — not a guarantee"). No history, unknown reset or unknown fraction → no line at all; session windows project flat (daily aggregates cannot resolve them).
+- **Chip-bar, not lines.** The panel opens on a chip per provider (logo + short name + a 2pt quota indicator). The selected provider shows: usage-window bars (`Weekly 74% used`, `Renews in 6d 16h` — past reset shows `Renewed`, never a negative countdown) with a green/red pace stripe and pacing line (`69% in deficit · Exhausts in 2h 44m`), the large-stat dashboard (`Today $0.08`, `30d $2.10`, `Recent tokens`, `30d tokens`), a 30-day bar chart with a peak label ("$282") and detail lines ("Last 7 days: …", "Top model: …", estimate disclaimer). Panel design ported 1:1 from the MIT reference (CodexBar) — see `NOTICE`.
+- **Pacing is honest or absent.** When a provider has a quota window AND at least two days of local history, the panel estimates whether the current pace exhausts the window (`69% in deficit · Exhausts in 2h 44m`; no deficit → `N% in reserve` / `On pace · Lasts until reset`). The stripe marks the projected end of the window (red = overshoot, green = fits). No history, unknown reset or unknown fraction → no line, no stripe at all; session windows project flat (daily aggregates cannot resolve them).
 - **Multi-account.** Providers that support it (Claude, Codex, Z.ai) get "Add account…" — a label, a credential file (read-only, never logged) and an optional data directory (own corpus; empty = API-only). Registered accounts cycle alongside the default account with isolated cursors/high-water marks per account. The panel lists accounts (toggle active/inactive, context-menu remove) and the provider total is the SUM of accounts while windows show the worst-case (most-pressed) account. Directories overlapping an existing scan root are blocked at registration — they would double-count history permanently. Invalid paths degrade the account alone with an "invalid path" badge.
-- **Logos** are simplified original artwork used for identification; see the trademark notice above. Providers without artwork fall back to their letter tile.
+- **Logos** are ported from the MIT reference (CodexBar `ProviderIcon-*.svg` — attribution in `NOTICE`); trademarks belong to their owners, identification only. Providers without a ported icon fall back to their letter tile.
 
 ## History, cost & export (F3)
 
 - **SQLite (WAL via GRDB)** at `~/Library/Application Support/TokenBar/tokenbar.sqlite`. Every ingested event is persisted (same transaction updates the daily aggregate); legacy F2 `cursors.json` files migrate automatically on first launch (renamed `.migrated`) — no re-scan, no backfill.
 - **Estimated cost (`~$`)** is computed at ingest time from the versioned pricing table (`Sources/TokenBarCore/Resources/pricing.json` — public per-MTok prices from vendor pages, PR-welcome). Models without a public price get no cost (NULL, never $0). Costs are never recomputed retroactively.
 - **`tokenbar history [--days N] [--provider P] [--format csv|json]`** prints the daily series from the same database the UI reads. Empty window → header-only CSV / `[]`, exit 0.
-- **Export history…** writes `history-<timestamp>.csv|.json` (RFC 4180 CSV, n-null JSON) to `<App Support>/TokenBar/exports/` and reveals them in Finder.
+- **Export** (panel action row) writes `history-<timestamp>.csv|.json` (RFC 4180 CSV, n-null JSON) to `<App Support>/TokenBar/exports/` and reveals them in Finder.
 - The database is additive: corruption, full disk or permission errors degrade to F2 behavior (no history display, app keeps working). E2E covers migration, re-run idempotency and resource budget with the database open.
 
 ## Build (no Xcode required)

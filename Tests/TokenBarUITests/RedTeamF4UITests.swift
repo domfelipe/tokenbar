@@ -54,14 +54,18 @@ struct RedTeamF4UITests {
         #expect(rows[2].countdownText == nil)
     }
 
-    @Test("pacing/updated adversarial: exhaustedIn negativo/zero → 'should last'; fetchedAt no futuro → delta nunca negativo")
+    @Test("pacing/updated adversarial: déficit sem etá válido mostra só o déficit; fetchedAt no futuro → delta nunca negativo")
     func pacingAndUpdatedAdversarial() {
+        // Eta inválido (negativo) com déficit → só o déficit (nada a prometer
+        // do horizonte); sem déficit nem eta → "On pace".
+        let negativeDeficit = PacingForecast(exhaustedIn: -120, projectedFraction: 1.4, deficitPct: 40)
+        #expect(ProviderPanelModel.pacingText(negativeDeficit, now: now) == "40% in deficit")
         let negative = PacingForecast(exhaustedIn: -120, projectedFraction: 0.5, deficitPct: nil)
-        #expect(ProviderPanelModel.pacingText(negative, now: now) == "Estimated — should last until renew")
+        #expect(ProviderPanelModel.pacingText(negative, now: now) == "50% in reserve · Lasts until reset")
         #expect(ProviderPanelModel.pacingText(nil, now: now) == nil)
 
         let future = ProviderPanelModel.updatedText(now: now, fetchedAt: now.addingTimeInterval(600))
-        #expect(future == "updated 1s ago", "delta clamped ≥ 0")
+        #expect(future == "Updated just now", "delta clamped ≥ 0")
         let epoch = ProviderPanelModel.updatedText(now: now, fetchedAt: Date(timeIntervalSince1970: 0))
         #expect(epoch == "not updated yet")
     }

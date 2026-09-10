@@ -436,6 +436,10 @@ public final class ProviderCoordinator {
                 let month = try? database.weekTotal(provider: id, days: 30)
                 let series = (try? database.dailySeries(provider: id, days: 30)) ?? []
                 let todayCost = try? database.todayCostUSD(provider: id)
+                // Top model 7d (F5): primeiro do breakdown (tokens desc) do
+                // PRÓPRIO provider; sem histórico → nil (linha omitida).
+                let topModel = ((try? database.modelBreakdown(days: 7, provider: id)) ?? [])
+                    .first?.model
                 var pacingByAccount: [String: [(day: Date, total: Int64)]] = [:]
                 for key in pacingKeys {
                     pacingByAccount[key] = (try? database.pacingInput(
@@ -443,7 +447,7 @@ public final class ProviderCoordinator {
                 }
                 return HistoryStats(
                     week: week, month: month, series: series,
-                    todayCost: todayCost, pacingByAccount: pacingByAccount)
+                    todayCost: todayCost, topModel: topModel, pacingByAccount: pacingByAccount)
             }.value
             : nil
 
@@ -524,6 +528,8 @@ public final class ProviderCoordinator {
                 aggregate.monthSeries = stats.series.map {
                     PanelDayPoint(day: $0.day, tokens: $0.tokens, costUSD: $0.costUSD)
                 }
+                // "Top model" do painel (F5) — painel-only, menu bar intocado.
+                aggregate.topModel7d = stats.topModel
             } else {
                 aggregate.weekHistoryAvailable = false
                 aggregate.monthHistoryAvailable = false
@@ -763,6 +769,9 @@ private struct HistoryStats: Sendable {
     /// `nil` = query falhou (com DB aberto) → custo do dia some do painel
     /// (mesmo padrão F2/F3: nunca 0 fake).
     var todayCost: Double?
+    /// Modelo com mais tokens na janela 7d do provider (F5, linha "Top
+    /// model" do painel). `nil` = sem breakdown do provider na janela.
+    var topModel: String?
     /// Input do PacingEngine por chave de conta (daily_agg por conta; contas
     /// sem ingest ficam de fora — engine recebe vazio e devolve nil).
     var pacingByAccount: [String: [(day: Date, total: Int64)]]
