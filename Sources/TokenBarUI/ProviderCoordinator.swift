@@ -26,6 +26,12 @@ public struct ProviderCoordinatorConfig: Sendable {
     /// `false` quando o chamador injetou fábrica própria (testes/selfcheck) —
     /// nesse caso a store de cursores em SQLite NÃO substitui a injetada.
     let usesDefaultOffsetStore: Bool
+    /// Gateway de notificações (F5 T2). `nil` (default) = gateway REAL
+    /// (`UserNotificationGateway`), criado LAZY no primeiro uso — o init do
+    /// coordinator NUNCA toca no UNUserNotificationCenter (tests runner não
+    /// tem bundle id; ruling F5-NOTIF: nada de notificação no launch).
+    /// Testes injetam um fake capturável.
+    public let notificationGateway: (any NotificationSending)?
 
     public init(
         environment: [String: String],
@@ -33,12 +39,14 @@ public struct ProviderCoordinatorConfig: Sendable {
         supportDirectory: URL,
         e2eDirectory: URL? = nil,
         makeOffsetStore: (@Sendable (ProviderID, String?) -> any FileOffsetStoring)? = nil,
-        makeLedgerSnapshotStore: (@Sendable (ProviderID, String?) -> (any LedgerSnapshotStoring)?)? = nil
+        makeLedgerSnapshotStore: (@Sendable (ProviderID, String?) -> (any LedgerSnapshotStoring)?)? = nil,
+        notificationGateway: (any NotificationSending)? = nil
     ) {
         self.environment = environment
         self.home = home
         self.supportDirectory = supportDirectory
         self.e2eDirectory = e2eDirectory
+        self.notificationGateway = notificationGateway
         self.usesDefaultOffsetStore = (makeOffsetStore == nil)
         if let makeOffsetStore {
             self.makeOffsetStore = makeOffsetStore
@@ -117,6 +125,19 @@ public final class ProviderCoordinator {
     /// banco não abriu (degradação F2) — a UI esconde "+ Add account" (sem DB
     /// não há onde registrar; honesto, não desabilitado por engano).
     public let accountRegistry: AccountRegistry?
+    /// Motor de alertas (F5 T2): thresholds/dedupe sobre as janelas do ciclo.
+    /// Exposto p/ a janela de Settings (T3) aplicar config — que pede a
+    /// permissão de notificação EXPLICITAMENTE (ruling F5-NOTIF).
+    public let alertEngine: AlertEngine
+    /// Gateway de notificações: injetado (testes) ou real, criado LAZY.
+    private var cachedGateway: (any NotificationSending)?
+    var notifications: any NotificationSending {
+        if let injected = config.notificationGateway { return injected }
+        if let cachedGateway { return cachedGateway }
+        let real = UserNotificationGateway()
+        cachedGateway = real
+        return real
+    }
     /// Support directory (o export grava em `<support>/exports`).
     public var supportDirectory: URL { config.supportDirectory }
 
@@ -180,6 +201,9 @@ public final class ProviderCoordinator {
             calendar: calendar)
         self.database = database
         self.accountRegistry = database.map(AccountRegistry.init)
+        // Motor de alertas (F5 T2): config + dedupe lidos do banco (settings);
+        // sem DB → só memória (degrada honesta, default DESLIGADO — F5-NOTIF).
+        alertEngine = AlertEngine(database: database)
         if let database {
             // Migração dos cursores legados F1/F2 (JSON → settings), uma vez
             // por arquivo (idempotente); o live store vira DBOffsetStore.
@@ -453,7 +477,9 @@ public final class ProviderCoordinator {
 
         // Fase 3 — FetchUsage POR CONTA: local-only nunca gera rede; API sem
         // credencial degrada (`.missing`) sem request; erro de rede → último
-        // snapshot bom da conta fica.
+        // snapshot bom da conta fica. Janelas bem-sucedidas alimentam o
+        // AlertEngine (F5 T2) no fim do ciclo.
+        var cycleSnapshots: [(provider: ProviderID, account: AccountID, windows: [UsageWindow])] = []
         for target in targets {
             let key = target.ref.id.key
             var display = perAccountDisplays[id]?[key] ?? ProviderDisplay.empty
@@ -462,6 +488,8 @@ public final class ProviderCoordinator {
 
             do {
                 let snapshot = try await target.instance.fetchUsage(target.ref)
+                cycleSnapshots.append(
+                    (provider: id, account: target.ref.id, windows: snapshot.windows))
                 let critical = criticalWindow(in: snapshot.windows)
                 display.percent = critical?.usedFraction.map { $0 * 100 }
                 display.resetsAt = critical?.resetsAt
@@ -543,6 +571,11 @@ public final class ProviderCoordinator {
             cycleErrors.removeValue(forKey: id)
         }
         publish()
+
+        // Alertas (F5 T2): thresholds sobre os snapshots DESTE ciclo, entrega
+        // pelo gateway e estado honesto no painel. Default DESLIGADO — quando
+        // off, nada toca no gateway/permissão (ruling F5-NOTIF).
+        await dispatchAlerts(snapshots: cycleSnapshots, now: Date())
 
         let pressure = displays[id]?.percent.map { $0 / 100 }  // 0...1 p/ scheduler
         await scheduler.noteResult(provider: id, ok: primaryOK, pressure: pressure)
@@ -699,6 +732,34 @@ public final class ProviderCoordinator {
         result.fetchedAt = accounts.map(\.display.fetchedAt).max() ?? previous.fetchedAt
         result.accounts = accounts
         return result
+    }
+
+    // MARK: - Alertas (F5 T2, spec §8)
+
+    /// Avalia o `AlertEngine` sobre os snapshots do ciclo e entrega cada
+    /// evento novo pelo gateway (dedupe é responsabilidade do engine — o
+    /// coordinator só despacha). Atualiza o estado honesto do painel:
+    /// off → `.disabled` (sem tocar em gateway/permissão); ligado → reflete
+    /// a autorização REAL do gateway (`enabled`/`notConfigured`/`blocked`).
+    /// Internal para os testes de wiring injetarem snapshots direto.
+    func dispatchAlerts(
+        snapshots: [(provider: ProviderID, account: AccountID, windows: [UsageWindow])],
+        now: Date
+    ) async {
+        let config = await alertEngine.config
+        guard config.enabled else {
+            store.setAlertsStatus(.disabled)
+            return
+        }
+        let events = await alertEngine.evaluate(snapshots: snapshots, now: now)
+        for event in events {
+            await notifications.deliver(event)
+        }
+        switch await notifications.authorizationState() {
+        case .granted: store.setAlertsStatus(.enabled)
+        case .notDetermined: store.setAlertsStatus(.notConfigured)
+        case .denied: store.setAlertsStatus(.blocked)
+        }
     }
 
     // MARK: - Menu (spec §7: fire imediato com throttle; reafirmar enquanto aberto)

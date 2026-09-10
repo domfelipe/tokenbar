@@ -421,4 +421,22 @@ public enum ProviderPanelModel {
     ) -> Bool {
         rows.count > 1 || registeredCount > 0
     }
+
+    // MARK: - Estado honesto de alertas (F5 T2)
+
+    /// Texto da linha de estado de notificações no rodapé do painel. `nil`
+    /// quando nada a dizer (alerts ligados E autorizados — silêncio honesto).
+    /// Off/sem permissão aparecem SEMPRE (spec §8: estado honesto na UI).
+    public static func alertsStatusText(_ status: AlertsPanelStatus) -> String? {
+        switch status {
+        case .enabled:
+            return nil
+        case .disabled:
+            return "Notifications off — enable in Settings"
+        case .notConfigured:
+            return "Notifications pending permission — allow in Settings"
+        case .blocked:
+            return "Notifications blocked — allow in System Settings"
+        }
+    }
 }

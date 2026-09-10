@@ -131,6 +131,23 @@ public struct ProviderPanelView: View {
     @ViewBuilder
     private var footer: some View {
         VStack(alignment: .leading, spacing: 1) {
+            // Estado honesto de alertas (F5 T2): some quando tudo certo
+            // (ligado + autorizado); caso contrário diz a verdade — nunca
+            // prompt escondido (ruling F5-NOTIF: só Settings pede permissão).
+            if let alertsText = ProviderPanelModel.alertsStatusText(store.alertsStatus) {
+                HStack(spacing: 6) {
+                    Image(systemName: "bell.slash")
+                        .font(.caption2)
+                    Text(alertsText)
+                        .font(.caption)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+                .padding(.bottom, 4)
+                .accessibilityIdentifier("alertsStatusLine")
+            }
             if let refreshAction {
                 MenuRowView(icon: "arrow.clockwise", title: "Refresh", shortcut: "⌘R")
                     { refreshAction() }
