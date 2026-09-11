@@ -1,10 +1,34 @@
 # TokenBar
 
+[![CI](https://github.com/OWNER/tokenbar/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/tokenbar/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey)](#install)
+[![Release](https://img.shields.io/badge/release-v1.0.0-green)](#install)
+
 Native macOS menu bar app that keeps your AI coding usage visible — light enough to never think about it.
 
-**Status: F5 (paridade CodexBar, concluída)** — everything from F4 (Claude/Codex/Gemini/Z.ai core; SQLite history with estimated cost, Analytics window and CSV/JSON export, multi-account) plus the F5 parity work: the panel redesigned 1:1 from the MIT reference CodexBar (`NOTICE` in the repo root) — provider chip-bar with logos and per-chip quota indicator, segmented usage bar with pace stripe, large-stat dashboard ("Today / 30d / Recent tokens / 30d tokens"), daily bar chart with peak label, "Top model" and "Credits" lines — plus **limit alerts with dedupe** (`AlertEngine` + `UNUserNotificationCenter`, permission asked only when you enable alerts in Settings), the **Settings window (⌘,)** (launch at login, refresh intervals, alert thresholds, menu bar visibility) and **six new providers** ported from the reference: Cursor, OpenRouter, Qwen/Alibaba, Antigravity, DeepSeek, Grok (10 total). Full roadmap: `docs/specs/2026-09-02-design.md` (pt-BR).
+**Current release: v1.0.0** — 10 providers, the panel ported 1:1 from the MIT reference CodexBar (`NOTICE` in the repo root), SQLite history with estimated cost + Analytics window + CSV/JSON export, multi-account, limit alerts with dedupe, and a Settings window (⌘,). Everything below ships in this release.
+
+![Panel side-by-side with the CodexBar reference](docs/qa/evidence/f5-design-side-by-side.png)
+
+| Panel (Claude) | Panel (Codex) | Panel (Z.ai) | Accounts |
+|---|---|---|---|
+| ![Claude panel](docs/qa/evidence/f4-panel-claude.png) | ![Codex panel](docs/qa/evidence/f4-panel-codex.png) | ![Z.ai panel](docs/qa/evidence/f4-panel-zai.png) | ![Account rows](docs/qa/evidence/f4-account-rows.png) |
 
 > **Trademark notice:** Provider logos are ported from CodexBar (MIT — see `NOTICE`); trademarks belong to their owners — used for identification only, not affiliated.
+
+## Install
+
+**Download (recommended):** grab `TokenBar-<version>.zip` from the [Releases page](../../releases) (the `v*` tag build attaches the zip + sha256 automatically), unzip, move `TokenBar.app` to /Applications, then **right-click → Open** — the build is ad-hoc signed, so Gatekeeper asks once. Verify integrity with the attached `.sha256`.
+
+**Build from source** (no Xcode required — Command Line Tools suffice):
+
+```bash
+./run-tests.sh                 # build + tests (see the warning below before running bare `swift test`)
+./scripts/make-app.sh          # → build/TokenBar.app
+```
+
+Requirements: macOS 14+, Swift 6 toolchain (full Xcode or CLT). For a local release artifact (zip + checksum + notes): `./scripts/release.sh`.
 
 ## What you see
 
@@ -58,8 +82,15 @@ Cursor, OpenRouter, Qwen/Alibaba, Antigravity, DeepSeek and Grok were ported fro
 ```bash
 ./run-tests.sh                 # build + tests (Swift Testing; never run bare `swift test` — false green on CLT toolchains)
 ./scripts/make-app.sh          # → build/TokenBar.app
+./scripts/release.sh           # local release: .app + zip + sha256 + notes in build/ (publishes nothing)
 ./scripts/e2e.sh               # full end-to-end: mock API server (Codex/Z.ai/OpenRouter), alerts via capture gateway, degradation, persistence, migration, multi-account, resource budget
 ```
+
+CI (`.github/workflows/ci.yml`) runs `swift build -c release` + `swift test` on every PR/push to main (GitHub macOS runners ship full Xcode, so plain `swift test` is safe there), and on a `v*` tag builds the .app, zips it and attaches zip + sha256 to the GitHub Release.
+
+## Add your provider
+
+Every data source is a `UsageProvider` (`Sources/TokenBarCore/Providers/UsageProvider.swift`) — declare capabilities, discover accounts (read-only on credentials), fetch usage over the API and/or ingest local transcripts with an incremental cursor. Pick a no-collision menu-bar letter (the D5 table), wire it in the `ProviderCoordinator`, cover it with fixture-replay tests using `fake-*` data, and degrade honestly (missing credential → hidden; 401/403 → "auth invalid"; network error → scheduler backoff with last good state kept). Codex (`Sources/TokenBarProviders/Codex/`) is the API example, Gemini (`Gemini/`) the local-only one. The full step-by-step with the checklist lives in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Environment overrides
 
@@ -98,3 +129,8 @@ Read-only on your CLI session files AND on credentials (`~/.codex/auth.json`, `~
 - `docs/specs/f5-providers.md` — F5 providers: ported endpoints, sources, non-ported with reasons, Codex credits verdict
 - `docs/decisoes-f1.md` … `docs/decisoes-f5.md` — technical decisions (context → decision → consequence)
 - `docs/qa/f1-*.md` … `docs/qa/f5-*.md` — QA gates and Red Team reports
+- `CONTRIBUTING.md` — dev setup, bug reports and the "Add your provider" guide
+
+## License
+
+MIT — see `LICENSE`. Ported CodexBar material (logos, panel design system) keeps its MIT attribution in `NOTICE`.
