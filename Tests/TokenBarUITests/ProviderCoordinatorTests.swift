@@ -6,9 +6,20 @@ import TokenBarCore
 
 /// Smoke do wiring T7 (degradação): dirs fake via env, bases de API apontando
 /// pra nada, credencial sintética p/ forçar tentativa de rede do Codex —
-/// sem crash, heartbeat v2 escrito com os 4 providers, credencial nunca vaza.
+/// sem crash, heartbeat v2 escrito com os 10 providers (4 canônicos + 6 F5),
+/// credencial nunca vaza (doc comment atualizado na T7 — carregava "4
+/// providers" da era F2).
 ///
 /// Não toca no App Support real: stores de cursor em memória via fábrica.
+/// Providers registrados pelo wiring default (F5 Tasks 4–5: +6 sobre os 4
+/// canônicos). O heartbeat v2 lista todos os registrados.
+enum F5RegisteredProviders {
+    static let all: Set<String> = [
+        "claude", "codex", "gemini", "zai",
+        "cursor", "openrouter", "alibaba", "antigravity", "deepseek", "grok",
+    ]
+}
+
 @MainActor
 struct ProviderCoordinatorTests {
     private struct Fixture {
@@ -74,7 +85,7 @@ struct ProviderCoordinatorTests {
         }
     }
 
-    @Test("wiring degradado: 4 providers no heartbeat v2, sem crash, credencial não vaza")
+    @Test("wiring degradado: 10 providers no heartbeat v2, sem crash, credencial não vaza")
     func degradedWiringWritesHeartbeatV2() async throws {
         let fakeToken = "t7-synthetic-token-never-real"
         let fixture = try Fixture.make(fakeToken: fakeToken)
@@ -100,7 +111,7 @@ struct ProviderCoordinatorTests {
         #expect(json["menuBarText"] as? String == "TB")  // sem dado → nada na string
 
         let providers = try #require(json["providers"] as? [String: Any])
-        #expect(Set(providers.keys) == ["claude", "codex", "gemini", "zai"])
+        #expect(Set(providers.keys) == F5RegisteredProviders.all)
 
         let keys = ["menuBar", "percent", "todayTokens", "authState", "fetchedAt"]
         for id in providers.keys {
@@ -155,14 +166,14 @@ struct ProviderCoordinatorTests {
 
         // M1 é skip-if-busy sob MainActor: dois ciclos enfileirados do mesmo
         // provider nunca se sobrepõem (o segundo roda depois — comportamento
-        // observável: ambos completam e o heartbeat fica com os 4 providers).
+        // observável: ambos completam e o heartbeat fica com os 10 providers).
         async let first: Void = coordinator.refreshAllNow()
         async let second: Void = coordinator.refreshAllNow()
         _ = await (first, second)
 
         let data = try Data(contentsOf: fixture.e2eDirectory.appendingPathComponent("state.json"))
         let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-        #expect((json["providers"] as? [String: Any])?.count == 4)
+        #expect((json["providers"] as? [String: Any])?.count == F5RegisteredProviders.all.count)
         #expect(json["menuBarText"] as? String == "TB")
     }
 
@@ -197,8 +208,8 @@ struct ProviderCoordinatorTests {
         let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         let providers = try #require(json["providers"] as? [String: Any])
 
-        // TODOS os 4 registrados continuam no payload — inclusive o zai em erro.
-        #expect(Set(providers.keys) == ["claude", "codex", "gemini", "zai"])
+        // TODOS os registrados continuam no payload — inclusive o zai em erro.
+        #expect(Set(providers.keys) == F5RegisteredProviders.all)
 
         // O zai degradado entra vazio (sem dado inventado) com o erro tokenizado
         // no diagnóstico — nunca mensagem crua com URL (spec §9).
@@ -263,7 +274,7 @@ struct ProviderCoordinatorTests {
 
     /// Red Team Task 1: DB que não abre (support dir é um ARQUIVO) → degrada
     /// para o comportamento F2 (JSON stores, sem persistência) — ciclos
-    /// completam, heartbeat v2 sai com os 4 providers, sem crash.
+    /// completam, heartbeat v2 sai com os 10 providers, sem crash.
     @Test("degradação sem DB: coordinator segue vivo com comportamento F2")
     func coordinatorDegradesWhenDatabaseUnavailable() async throws {
         let fixture = try Fixture.make(fakeToken: "t7-synthetic-token-never-real")
@@ -293,7 +304,7 @@ struct ProviderCoordinatorTests {
         let data = try Data(contentsOf: fixture.e2eDirectory.appendingPathComponent("state.json"))
         let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
         let providers = try #require(json["providers"] as? [String: Any])
-        #expect(Set(providers.keys) == ["claude", "codex", "gemini", "zai"])
+        #expect(Set(providers.keys) == F5RegisteredProviders.all)
 
         // Sem DB, ingest local continua funcionando: display do dia correto
         // (ledger), apenas sem persistência.

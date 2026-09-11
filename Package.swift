@@ -23,7 +23,8 @@ let package = Package(
             resources: [.copy("Resources/pricing.json")]
         ),
         .target(name: "TokenBarProviders", dependencies: ["TokenBarCore"]),
-        // `Resources/` (F4 Task 2): SVGs autorais dos logos — cópia PURA
+        // `Resources/` (F5): SVGs `ProviderIcon-*.svg` PORTADOS da referência
+        // MIT (CodexBar — ruling F5-DESIGN; ver NOTICE na raiz) — cópia PURA
         // (`.copy`, nunca `.process`: sem asset catalog/actool, CLT-safe),
         // carregados via NSImage (macOS 14 lê SVG). `Bundle.module` só passa
         // a existir neste target quando ele declara resources.
@@ -37,6 +38,13 @@ let package = Package(
             dependencies: ["TokenBarCore", "TokenBarProviders", "TokenBarUI"]
         ),
         .executableTarget(name: "genfixtures"),
+        // Harness de render do QA (F5): `ImageRenderer` das views REAIS do
+        // painel com dados de lab → PNG para o loop render-compare contra a
+        // referência (evidência em docs/qa/evidence/). Nunca roda no app.
+        .executableTarget(
+            name: "panelrender",
+            dependencies: ["TokenBarUI", "TokenBarCore"]
+        ),
         .testTarget(
             name: "TokenBarCoreTests",
             dependencies: [

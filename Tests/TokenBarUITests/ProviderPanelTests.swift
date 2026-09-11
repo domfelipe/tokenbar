@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import TokenBarCore
 @testable import TokenBarUI
@@ -119,22 +120,28 @@ struct PanelWindowRowTests {
     }
 }
 
-// MARK: - Pacing condicional
+// MARK: - Pacing condicional (formato da referência MIT — F5)
 
 @Suite
 struct PanelPacingTests {
     private let now = Date(timeIntervalSince1970: 1_000_000)
 
-    @Test("forecast com esgotamento → 'Estimated — exhausts in 2h 44m'")
+    @Test("forecast com déficit e esgotamento → '20% in deficit · Exhausts in 2h 44m'")
     func exhaustText() {
         let forecast = PacingForecast(exhaustedIn: 2 * 3_600 + 44 * 60, projectedFraction: 1.2, deficitPct: 20)
-        #expect(ProviderPanelModel.pacingText(forecast, now: now) == "Estimated — exhausts in 2h 44m")
+        #expect(ProviderPanelModel.pacingText(forecast, now: now) == "20% in deficit · Exhausts in 2h 44m")
     }
 
-    @Test("forecast sem esgotamento (taxa flat/queda) → 'should last until renew'")
-    func lastUntilRenew() {
+    @Test("forecast sem déficit mas com folga → 'N% in reserve · Lasts until reset'")
+    func reserveText() {
         let forecast = PacingForecast(exhaustedIn: nil, projectedFraction: 0.4, deficitPct: nil)
-        #expect(ProviderPanelModel.pacingText(forecast, now: now) == "Estimated — should last until renew")
+        #expect(ProviderPanelModel.pacingText(forecast, now: now) == "60% in reserve · Lasts until reset")
+    }
+
+    @Test("forecast encostando em 100% sem déficit → 'On pace · Lasts until reset'")
+    func onPaceText() {
+        let forecast = PacingForecast(exhaustedIn: nil, projectedFraction: 1.0, deficitPct: nil)
+        #expect(ProviderPanelModel.pacingText(forecast, now: now) == "On pace · Lasts until reset")
     }
 
     @Test("sem forecast → linha some (menos de 2 pontos, janela sem reset/fração)")
@@ -142,32 +149,171 @@ struct PanelPacingTests {
         #expect(ProviderPanelModel.pacingText(nil, now: now) == nil)
     }
 
-    @Test("disclaimer curto acompanha a linha de pacing")
+    @Test("disclaimer de estimativa (port do hint da referência) acompanha o dashboard")
     func disclaimer() {
-        #expect(ProviderPanelModel.pacingDisclaimer == "estimate — not a guarantee")
+        #expect(ProviderPanelModel.estimateDisclaimer == "Estimated from token usage · not a subscription bill")
     }
 }
 
-// MARK: - Custos hoje/30d
+// MARK: - Faixa de pacing na barra (janela crítica)
 
 @Suite
-struct PanelCostsTests {
-    @Test("custos e tokens 30d no formato 'Today ~$X · 30d ~$Y · 8.9G tok'")
-    func fullLine() {
+struct PanelPaceStripeTests {
+    private let now = Date(timeIntervalSince1970: 1_000_000)
+
+    @Test("faixa de pacing vai na janela CRÍTICA (âncora do engine); déficit → vermelha")
+    func stripeOnCriticalWindow() {
+        let windows = [
+            UsageWindow(kind: .session, usedFraction: 0.42, resetsAt: now.addingTimeInterval(4_860), label: "5h"),
+            UsageWindow(kind: .weekly, usedFraction: 0.74, resetsAt: now.addingTimeInterval(6 * 86_400), label: "Semanal"),
+        ]
+        let pacing = PacingForecast(exhaustedIn: 9_840, projectedFraction: 1.2, deficitPct: 20)
+        let rows = ProviderPanelModel.windowRows(windows: windows, now: now, pacing: pacing)
+        #expect(rows[0].paceStripePercent == nil, "janela não-âncora não ganha faixa")
+        #expect(rows[1].paceStripePercent == 100, "projeção > 1 satura no fim da barra")
+        #expect(rows[1].paceIsDeficit)
+    }
+
+    @Test("projeção dentro da janela → faixa verde na posição projetada")
+    func greenStripeInsideWindow() {
+        let window = UsageWindow(kind: .weekly, usedFraction: 0.3, resetsAt: now.addingTimeInterval(86_400), label: "w")
+        let pacing = PacingForecast(exhaustedIn: nil, projectedFraction: 0.55, deficitPct: nil)
+        let rows = ProviderPanelModel.windowRows(windows: [window], now: now, pacing: pacing)
+        #expect(rows[0].paceStripePercent == 55)
+        #expect(!rows[0].paceIsDeficit)
+    }
+
+    @Test("sem pacing → nenhuma faixa (nada inventado)")
+    func noStripeWithoutPacing() {
+        let window = UsageWindow(kind: .weekly, usedFraction: 0.3, resetsAt: now.addingTimeInterval(86_400), label: "w")
+        let rows = ProviderPanelModel.windowRows(windows: [window], now: now)
+        #expect(rows[0].paceStripePercent == nil)
+    }
+}
+
+// MARK: - Dashboard: KPIs (formato da referência MIT — F5)
+
+@Suite
+struct PanelKPITests {
+    @Test("grid completo: 'Today $0.08' (ênfase) · '30d $2.10' · 'Recent tokens 12.4K' · '30d tokens 8.9B'")
+    func fullGrid() {
+        let cells = ProviderPanelModel.kpiCells(
+            todayCostUsd: 0.08, monthCostUsd: 2.1, todayTokens: 12_400, monthTokens: 8_900_000_000)
+        #expect(cells?.map(\.value) == ["$0.08", "$2.10", "12K", "8.9B"])
+        #expect(cells?.first?.emphasis == true)
+        #expect(cells?.first?.title == "Today")
+        #expect(cells?.count == 4)
+    }
+
+    @Test("custo ausente (NULL ≠ 0) → célula '—' (formato da referência); nada computável → grid some")
+    func nilCostShowsDashAndEmptyGridHides() {
+        let partial = ProviderPanelModel.kpiCells(
+            todayCostUsd: nil, monthCostUsd: 1.5, todayTokens: 0, monthTokens: 0)
+        #expect(partial?.map(\.value) == ["—", "$1.50", "0", "0"])
+
+        let empty = ProviderPanelModel.kpiCells(
+            todayCostUsd: nil, monthCostUsd: nil, todayTokens: 0, monthTokens: 0)
+        #expect(empty == nil)
+    }
+
+    @Test("sub-centavo mantém 4 decimais ($0.0050 não vira $0.00); agrupamento de milhar")
+    func subCentAndGrouping() {
+        let sub = ProviderPanelModel.kpiCells(
+            todayCostUsd: 0.005, monthCostUsd: 1_116.52, todayTokens: 0, monthTokens: 0)
+        #expect(sub?[0].value == "$0.0050")
+        #expect(sub?[1].value == "$1,116.52")
+    }
+}
+
+// MARK: - Dashboard: contagem compacta, chart e linhas de detalhe
+
+@Suite
+struct PanelDashboardTests {
+    @Test("tokenCountString: '216M', '8.9B', '3.1K' — um decimal e '.0' cortado")
+    func tokenCounts() {
+        #expect(ProviderPanelModel.tokenCountString(216_000_000) == "216M")
+        #expect(ProviderPanelModel.tokenCountString(8_900_000_000) == "8.9B")
+        #expect(ProviderPanelModel.tokenCountString(3_100) == "3.1K")
+        #expect(ProviderPanelModel.tokenCountString(42) == "42")
+        #expect(ProviderPanelModel.tokenCountString(10_400_000) == "10M", "≥10 unidades → sem decimal (comportamento da referência)")
+        #expect(ProviderPanelModel.tokenCountString(999_500_000) == "1B")
+    }
+
+    @Test("chartModel: série com custo → barras em USD e pico '$282'; só tokens → pico abreviado")
+    func chartModelVariants() {
+        let costSeries = [
+            PanelDayPoint(day: "2026-09-08", tokens: 1_000, costUSD: 12.5),
+            PanelDayPoint(day: "2026-09-09", tokens: 2_000, costUSD: 282.0),
+        ]
+        let costChart = ProviderPanelModel.chartModel(series: costSeries)
+        #expect(costChart?.values == [12.5, 282.0])
+        #expect(costChart?.peakLabel == "$282")
+
+        let tokenSeries = [
+            PanelDayPoint(day: "2026-09-08", tokens: 1_000_000, costUSD: nil),
+            PanelDayPoint(day: "2026-09-09", tokens: 216_000_000, costUSD: nil),
+        ]
+        let tokenChart = ProviderPanelModel.chartModel(series: tokenSeries)
+        #expect(tokenChart?.values == [1_000_000, 216_000_000])
+        #expect(tokenChart?.peakLabel == "216M")
+
+        #expect(ProviderPanelModel.chartModel(series: []) == nil)
+        let zeros = ProviderPanelModel.chartModel(
+            series: [PanelDayPoint(day: "2026-09-08", tokens: 0, costUSD: nil)])
+        #expect(zeros?.peakLabel == nil)
+    }
+
+    @Test("detailLines: 7d com custo+tokens, top model truncado em 26, disclaimer condicional")
+    func detailLinesAssembly() {
+        let full = ProviderPanelModel.detailLines(
+            weekCostUsd: 585.43, weekTokens: 3_100_000_000,
+            topModel: "gpt-5.6-sonnet", showsEstimate: true)
+        #expect(full == [
+            "Last 7 days: $585.43 · 3.1B tokens",
+            "Top model: gpt-5.6-sonnet",
+            "Estimated from token usage · not a subscription bill",
+        ])
+
+        // Sem custo na semana → só tokens; sem tokens → só custo.
         #expect(
-            ProviderPanelModel.costsText(todayCostUsd: 0.08, monthCostUsd: 2.1, monthTokens: 8_900_000_000)
-                == "Today ~$0.08 · 30d ~$2.10 · 8.9G tok")
+            ProviderPanelModel.detailLines(
+                weekCostUsd: nil, weekTokens: 45_600, topModel: nil, showsEstimate: false)
+                == ["Last 7 days: 46K tokens"])
+        #expect(
+            ProviderPanelModel.detailLines(
+                weekCostUsd: 1.5, weekTokens: 0, topModel: nil, showsEstimate: false)
+                == ["Last 7 days: $1.50"])
+
+        // Nada → nenhuma linha.
+        #expect(
+            ProviderPanelModel.detailLines(
+                weekCostUsd: nil, weekTokens: 0, topModel: nil, showsEstimate: false).isEmpty)
     }
 
-    @Test("segmentos sem dado são omitidos (custo nil = NULL ≠ 0; nada vira zero fake)")
-    func partialSegments() {
-        #expect(ProviderPanelModel.costsText(todayCostUsd: nil, monthCostUsd: 1.5, monthTokens: 0) == "30d ~$1.50")
-        #expect(ProviderPanelModel.costsText(todayCostUsd: 0.005, monthCostUsd: nil, monthTokens: 0) == "Today ~$0.0050")
+    @Test("shortModelName: nomes longos truncam em 25 + '…'; curtos passam intactos")
+    func modelTruncation() {
+        #expect(ProviderPanelModel.shortModelName("gpt-5.6-sonnet") == "gpt-5.6-sonnet")
+        let long = String(repeating: "m", count: 40)
+        let cut = ProviderPanelModel.shortModelName(long)
+        #expect(cut.count == 26)
+        #expect(cut.hasSuffix("…"))
     }
 
-    @Test("nada computável → linha some")
-    func emptyLine() {
-        #expect(ProviderPanelModel.costsText(todayCostUsd: nil, monthCostUsd: nil, monthTokens: 0) == nil)
+    @Test("showsDashboard: qualquer dado de histórico/custo/tokens/série liga; sem nada, some")
+    func dashboardVisibility() {
+        #expect(ProviderPanelModel.showsDashboard(
+            weekHistoryAvailable: false, monthHistoryAvailable: false,
+            todayCostUsd: nil, monthCostUsd: nil, todayTokens: 0, monthTokens: 0, series: []) == false)
+        #expect(ProviderPanelModel.showsDashboard(
+            weekHistoryAvailable: true, monthHistoryAvailable: false,
+            todayCostUsd: nil, monthCostUsd: nil, todayTokens: 0, monthTokens: 0, series: []))
+        #expect(ProviderPanelModel.showsDashboard(
+            weekHistoryAvailable: false, monthHistoryAvailable: false,
+            todayCostUsd: nil, monthCostUsd: nil, todayTokens: 0, monthTokens: 0,
+            series: [PanelDayPoint(day: "2026-09-08", tokens: 10, costUSD: nil)]))
+        #expect(ProviderPanelModel.showsDashboard(
+            weekHistoryAvailable: false, monthHistoryAvailable: false,
+            todayCostUsd: 0.5, monthCostUsd: nil, todayTokens: 0, monthTokens: 0, series: []))
     }
 }
 
@@ -177,12 +323,27 @@ struct PanelCostsTests {
 struct PanelHeaderTests {
     private let now = Date(timeIntervalSince1970: 1_000_000)
 
-    @Test("'updated Xs ago' em segundos/minutos/horas; nunca ciclado → 'not updated yet'")
+    @Test("'Updated just now' (<60s) / 'Updated Xm ago' / 'Updated Xh ago' — capitalização CONFERIDA contra UsageFormatter MIT (T6); nunca ciclado → 'not updated yet'")
     func updatedText() {
-        #expect(ProviderPanelModel.updatedText(now: now, fetchedAt: now.addingTimeInterval(-42)) == "updated 42s ago")
-        #expect(ProviderPanelModel.updatedText(now: now, fetchedAt: now.addingTimeInterval(-90)) == "updated 1m ago")
-        #expect(ProviderPanelModel.updatedText(now: now, fetchedAt: now.addingTimeInterval(-2 * 3_600)) == "updated 2h ago")
+        #expect(ProviderPanelModel.updatedText(now: now, fetchedAt: now.addingTimeInterval(-42)) == "Updated just now")
+        #expect(ProviderPanelModel.updatedText(now: now, fetchedAt: now.addingTimeInterval(-90)) == "Updated 1m ago")
+        #expect(ProviderPanelModel.updatedText(now: now, fetchedAt: now.addingTimeInterval(-2 * 3_600)) == "Updated 2h ago")
         #expect(ProviderPanelModel.updatedText(now: now, fetchedAt: Date(timeIntervalSince1970: 0)) == "not updated yet")
+    }
+
+    @Test("creditsText (F5 T6): saldo real → 'Credits: $X'; unlimited → texto; nil/null → linha omitida (verdicto wham/usage)")
+    func creditsText() {
+        // Sem credits no snapshot → linha NÃO existe (nada inventado).
+        #expect(ProviderPanelModel.creditsText(nil) == nil)
+        // Shape observado do wham/usage em contas Plus/Pro: balance null.
+        #expect(ProviderPanelModel.creditsText(CreditsInfo(remaining: nil, unlimited: false)) == nil)
+        // Saldo real → formato monetário do painel (2 decimais; sub-centavo 4).
+        #expect(ProviderPanelModel.creditsText(CreditsInfo(remaining: 4.2, unlimited: false)) == "Credits: $4.20")
+        #expect(ProviderPanelModel.creditsText(CreditsInfo(remaining: 1_116.52, unlimited: false)) == "Credits: $1,116.52")
+        #expect(ProviderPanelModel.creditsText(CreditsInfo(remaining: 0.005, unlimited: false)) == "Credits: $0.0050")
+        // unlimited → texto honesto, sem número.
+        #expect(ProviderPanelModel.creditsText(CreditsInfo(remaining: nil, unlimited: true)) == "Credits: unlimited")
+        #expect(ProviderPanelModel.creditsText(CreditsInfo(remaining: 0, unlimited: true)) == "Credits: unlimited")
     }
 
     @Test("badge: local / auth / no auth / auth invalid")
@@ -194,17 +355,17 @@ struct PanelHeaderTests {
     }
 }
 
-// MARK: - Logos autorais (F4-LOGOS): SVGs existem e NSImage carrega
+// MARK: - Logos portados da referência MIT (F5-DESIGN): SVGs existem e NSImage carrega
 
 @Suite
 struct PanelLogoTests {
-    @Test("os 4 SVGs existem no bundle e carregam como NSImage template")
+    @Test("os 4 SVGs portados (ProviderIcon-*) existem no bundle e carregam como NSImage template")
     @MainActor
     func svgsLoadViaNSImage() throws {
         for id in [ProviderID.claude, .codex, .gemini, .zai] {
             let url = try #require(
                 Bundle.module.url(
-                    forResource: "logo-\(id.rawValue)",
+                    forResource: "ProviderIcon-\(id.rawValue)",
                     withExtension: "svg",
                     subdirectory: "Resources"),
                 "SVG ausente para \(id.rawValue)")
@@ -220,6 +381,15 @@ struct PanelLogoTests {
     @MainActor
     func missingLogoFallsBack() {
         #expect(ProviderLogo.image(for: .cursor) == nil)
+    }
+
+    @Test("cores de marca = tokens exatos da referência MIT (ProviderBranding)")
+    @MainActor
+    func brandColorsMatchReference() {
+        #expect(ProviderLogo.brandColor(for: .claude) == Color(red: 204 / 255, green: 124 / 255, blue: 94 / 255))
+        #expect(ProviderLogo.brandColor(for: .codex) == Color(red: 73 / 255, green: 163 / 255, blue: 176 / 255))
+        #expect(ProviderLogo.brandColor(for: .gemini) == Color(red: 171 / 255, green: 135 / 255, blue: 234 / 255))
+        #expect(ProviderLogo.brandColor(for: .zai) == Color(red: 232 / 255, green: 90 / 255, blue: 106 / 255))
     }
 }
 

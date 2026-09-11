@@ -1,0 +1,171 @@
+[e2e] TMP=/tmp/tokenbar-e2e.ArJkOI
+[e2e] mock em 127.0.0.1:53679 (pid 35040)
+[e2e] PASS: mock no ar: wham/usage 200 com rate_limit.primary_window
+[e2e] PASS: mock no ar: quota/limit 200 com success=true
+[e2e] PASS: mock no ar: /credits 200 com saldo 62.80
+[e2e] PASS: mock no ar: /key 200 com limit 50
+[e2e] gerando corpus Claude + sessão Gemini + credenciais fake
+[0/1] Planning build
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'genfixtures' complete! (0.19s)
+[e2e] seed launch (build + 1º launch sem alertas, só p/ criar o banco)
+build/TokenBar.app: replacing existing signature
+[e2e] PASS: bundle de recursos no .app: GRDB_GRDB.bundle em Contents/Resources
+[e2e] PASS: bundle de recursos no .app: TokenBar_TokenBarCore.bundle em Contents/Resources
+[e2e] PASS: bundle de recursos no .app: TokenBar_TokenBarUI.bundle em Contents/Resources
+[e2e] PASS: seed launch: app de pé e ciclo completo publicado em 30s (X/Z/O do mock no texto)
+[e2e] PASS: seed: DB com tabela settings criada pelo app
+[e2e] PASS: seed: alerts:enabled=true plantado no banco (substitute do toggle da Settings)
+[0/1] Planning build
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'tokenbar' complete! (0.18s)
+[e2e] selfcheck (mock no ar): {"menuBarText":"C:7.4M X:42% G:193 Z:81% O:49%","providers":{"alibaba":{"authState":"missing","fetchedAt":"2026-09-11T01:05:13Z","menuBar":null,"percent":null,"todayTokens":0},"antigravity":{"authState":"missing","fetchedAt":"2026-09-11T01:05:13Z","menuBar":null,"percent":null,"todayTokens":0},"claude":{"authState":"ok","fetchedAt":"2026-09-11T01:05:13Z","history7d":{"costUsd":553.3063279500002,"tokens":285927523},"menuBar":"C:7.4M","monthCostUsd":553.3063279500002,"monthTokens":285927523,"percent":null,"todayCostUsd":154.96142474999999,"todayTokens":7387799},"codex":{"authState":"ok","fetchedAt":"2026-09-11T01:05:13Z","history7d":{"costUsd":2153.3111492499979,"tokens":4373554963},"menuBar":"X:42%","monthCostUsd":12606.735532749994,"monthTokens":19550117044,"pacing":{"deficitPct":null,"exhaustedIn":null,"projectedFraction":0.41999999999999998},"percent":42,"todayTokens":0},"cursor":{"authState":"missing","fetchedAt":"2026-09-11T01:05:13Z","menuBar":null,"percent":null,"todayTokens":0},"deepseek":{"authState":"missing","fetchedAt":"2026-09-11T01:05:13Z","menuBar":null,"percent":null,"todayTokens":0},"gemini":{"authState":"ok","fetchedAt":"2026-09-11T01:05:13Z","history7d":{"costUsd":0.0057750000000000006,"tokens":4246},"menuBar":"G:193","monthCostUsd":0.0057750000000000006,"monthTokens":4246,"percent":null,"todayCostUsd":0.0018374999999999999,"todayTokens":193},"grok":{"authState":"missing","fetchedAt":"2026-09-11T01:05:13Z","menuBar":null,"percent":null,"todayTokens":0},"openrouter":{"authState":"ok","credits":{"remaining":62.799999999999997,"unlimited":false},"fetchedAt":"2026-09-11T01:05:13Z","menuBar":"O:49%","percent":49,"todayTokens":0},"zai":{"authState":"ok","fetchedAt":"2026-09-11T01:05:13Z","menuBar":"Z:81%","percent":81,"todayTokens":0}},"updatedAt":"2026-09-11T01:05:13Z"}
+[e2e] PASS: selfcheck v2 mostra os API-driven com % do mock (X:42% e Z:81% em 'C:7.4M X:42% G:193 Z:81% O:49%')
+[e2e] PASS: selfcheck v2 mostra os locais (C e G) em 'C:7.4M X:42% G:193 Z:81% O:49%'
+[e2e] PASS: selfcheck v3: history7d presente, tokens ≥ todayTokens > 0 e custo > 0
+[e2e] PASS: hermeticidade F5: texto é EXATAMENTE C X G Z O — sem fragmento de provider da máquina
+[0/1] Planning build
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'tokenbar' complete! (0.19s)
+[e2e] selfcheck sonda pacing: {"menuBarText":"X:42% G:193 Z:81% O:49%","providers":{"alibaba":{"authState":"missing","fetchedAt":"2026-09-11T01:05:15Z","menuBar":null,"percent":null,"todayTokens":0},"antigravity":{"authState":"missing","fetchedAt":"2026-09-11T01:05:15Z","menuBar":null,"percent":null,"todayTokens":0},"claude":{"authState":"ok","fetchedAt":"2026-09-11T01:05:15Z","history7d":{"costUsd":553.3063279500002,"tokens":285927523},"menuBar":null,"monthCostUsd":553.3063279500002,"monthTokens":285927523,"percent":null,"todayCostUsd":154.96142474999999,"todayTokens":0},"codex":{"authState":"ok","fetchedAt":"2026-09-11T01:05:15Z","history7d":{"costUsd":2153.3111492499979,"tokens":4373556463},"menuBar":"X:42%","monthCostUsd":12606.735532749994,"monthTokens":19550118544,"pacing":{"deficitPct":null,"exhaustedIn":null,"projectedFraction":0.41999999999999998},"percent":42,"todayTokens":500},"cursor":{"authState":"missing","fetchedAt":"2026-09-11T01:05:15Z","menuBar":null,"percent":null,"todayTokens":0},"deepseek":{"authState":"missing","fetchedAt":"2026-09-11T01:05:15Z","menuBar":null,"percent":null,"todayTokens":0},"gemini":{"authState":"ok","fetchedAt":"2026-09-11T01:05:15Z","history7d":{"costUsd":0.0057750000000000006,"tokens":4246},"menuBar":"G:193","monthCostUsd":0.0057750000000000006,"monthTokens":4246,"percent":null,"todayCostUsd":0.0018374999999999999,"todayTokens":193},"grok":{"authState":"missing","fetchedAt":"2026-09-11T01:05:15Z","menuBar":null,"percent":null,"todayTokens":0},"openrouter":{"authState":"ok","credits":{"remaining":62.799999999999997,"unlimited":false},"fetchedAt":"2026-09-11T01:05:15Z","menuBar":"O:49%","percent":49,"todayTokens":0},"zai":{"authState":"ok","fetchedAt":"2026-09-11T01:05:15Z","menuBar":"Z:81%","percent":81,"todayTokens":0}},"updatedAt":"2026-09-11T01:05:15Z"}
+[e2e] PASS: sonda pacing: codex COM 2 dias de histórico → pacing presente e FLAT (projectedFraction=0.42, sem esgotamento inventado)
+[e2e] PASS: sonda pacing: zai COM fração+reset mas ZERO histórico diário → pacing AUSENTE (sem chute)
+[e2e] PASS: sonda pacing: claude sem janela com fração → pacing AUSENTE
+[0/1] Planning build
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'tokenbar' complete! (0.18s)
+[e2e] selfcheck (mock 500): {"menuBarText":"C:7.4M G:193","providers":{"alibaba":{"authState":"missing","fetchedAt":"2026-09-11T01:05:15Z","menuBar":null,"percent":null,"todayTokens":0},"antigravity":{"authState":"missing","fetchedAt":"2026-09-11T01:05:15Z","menuBar":null,"percent":null,"todayTokens":0},"claude":{"authState":"ok","fetchedAt":"2026-09-11T01:05:15Z","history7d":{"costUsd":553.3063279500002,"tokens":285927523},"menuBar":"C:7.4M","monthCostUsd":553.3063279500002,"monthTokens":285927523,"percent":null,"todayCostUsd":154.96142474999999,"todayTokens":7387799},"codex":{"authState":"missing","error":"http","fetchedAt":"2026-09-11T01:05:15Z","history7d":{"costUsd":2153.3111492499979,"tokens":4373556463},"menuBar":null,"monthCostUsd":12606.735532749994,"monthTokens":19550118544,"percent":null,"todayTokens":0},"cursor":{"authState":"missing","fetchedAt":"2026-09-11T01:05:15Z","menuBar":null,"percent":null,"todayTokens":0},"deepseek":{"authState":"missing","fetchedAt":"2026-09-11T01:05:15Z","menuBar":null,"percent":null,"todayTokens":0},"gemini":{"authState":"ok","fetchedAt":"2026-09-11T01:05:15Z","history7d":{"costUsd":0.0057750000000000006,"tokens":4246},"menuBar":"G:193","monthCostUsd":0.0057750000000000006,"monthTokens":4246,"percent":null,"todayCostUsd":0.0018374999999999999,"todayTokens":193},"grok":{"authState":"missing","fetchedAt":"2026-09-11T01:05:15Z","menuBar":null,"percent":null,"todayTokens":0},"openrouter":{"authState":"missing","error":"http","fetchedAt":"1970-01-01T00:00:00Z","menuBar":null,"percent":null,"todayTokens":0},"zai":{"authState":"missing","error":"http","fetchedAt":"1970-01-01T00:00:00Z","menuBar":null,"percent":null,"todayTokens":0}},"updatedAt":"2026-09-11T01:05:15Z"}
+[e2e] PASS: selfcheck sob 500: erro tokenizado 'http' em codex e zai
+[e2e] PASS: heartbeat criado em 30s
+[e2e] PASS: menu bar text igual ao selfcheck ('C:7.4M X:42% G:193 Z:81% O:49%' == 'C:7.4M X:42% G:193 Z:81% O:49%')
+[e2e] PASS: heartbeat: percent API-driven do mock (codex=42, zai=81, openrouter=49)
+[e2e] PASS: heartbeat v2: authState ok e fetchedAt fresco nos API-driven
+[e2e] PASS: heartbeat v5: credits REAL do openrouter (remaining 62.8 = 100 − 37.2 do mock)
+[e2e] PASS: heartbeat v5: codex/zai SEM credits no payload (mock devolve balance null — chave ausente, honesto)
+[e2e] PASS: F5 alerts: EXATOS 2 disparos no 1º ciclo (zai cruza t50+t75 — nada abaixo dispara)
+[e2e] PASS: F5 alerts: render EN do gateway real (títulos 'Z.ai · 50/75% of session window used')
+[e2e] PASS: F5 alerts: identifiers de dedupe por (provider,conta,janela,causa) — zai.local.session.t50/t75
+[e2e] PASS: F5 alerts: body com countdown real do reset ('Resets in …', nada inventado)
+[e2e] PASS: F5 alerts: alertsStatus 'enabled' no heartbeat (gateway granted — estado honesto)
+[e2e] PASS: heartbeat v4: claude monthTokens/monthCostUsd consistentes com history7d (30d == 7d com corpus < 48h)
+[e2e] PASS: heartbeat v4: codex sem histórico diário → pacing AUSENTE no app (fração 42% não vira forecast)
+[e2e] PASS: live update após append (Δ=+333 observado)
+[e2e] PASS: degradação: mock morto → app vivo e heartbeat continua (Δ=+222, updatedAt avança)
+[e2e] PASS: sem retry storm: 0 request(s) do app além do burst inicial (≤ 3)
+[e2e] PASS: requests do APP na vida do mock atribuídos pelo token: 8 (≤ 10; esperado 8 = 2 bursts)
+[e2e] PASS: requests/10s do APP limitados pelo backoff: pico 8 na janela deslizante de 10s (≤ 8)
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'tokenbar' complete! (0.09s)
+[e2e] selfcheck (mock morto): {"menuBarText":"C:7.4M G:193","providers":{"alibaba":{"authState":"missing","fetchedAt":"2026-09-11T01:05:26Z","menuBar":null,"percent":null,"todayTokens":0},"antigravity":{"authState":"missing","fetchedAt":"2026-09-11T01:05:26Z","menuBar":null,"percent":null,"todayTokens":0},"claude":{"authState":"ok","fetchedAt":"2026-09-11T01:05:26Z","history7d":{"costUsd":561.13050780000015,"tokens":290027260},"menuBar":"C:7.4M","monthCostUsd":561.13050780000015,"monthTokens":290027260,"percent":null,"todayCostUsd":162.10607354999999,"todayTokens":7388354},"codex":{"authState":"missing","error":"network","fetchedAt":"2026-09-11T01:05:26Z","history7d":{"costUsd":2153.3111492499979,"tokens":4373556463},"menuBar":null,"monthCostUsd":12606.735532749994,"monthTokens":19550118544,"percent":null,"todayTokens":0},"cursor":{"authState":"missing","fetchedAt":"2026-09-11T01:05:26Z","menuBar":null,"percent":null,"todayTokens":0},"deepseek":{"authState":"missing","fetchedAt":"2026-09-11T01:05:26Z","menuBar":null,"percent":null,"todayTokens":0},"gemini":{"authState":"ok","fetchedAt":"2026-09-11T01:05:26Z","history7d":{"costUsd":0.0057750000000000006,"tokens":4246},"menuBar":"G:193","monthCostUsd":0.0057750000000000006,"monthTokens":4246,"percent":null,"todayCostUsd":0.0018374999999999999,"todayTokens":193},"grok":{"authState":"missing","fetchedAt":"2026-09-11T01:05:26Z","menuBar":null,"percent":null,"todayTokens":0},"openrouter":{"authState":"missing","error":"network","fetchedAt":"1970-01-01T00:00:00Z","menuBar":null,"percent":null,"todayTokens":0},"zai":{"authState":"missing","error":"network","fetchedAt":"1970-01-01T00:00:00Z","menuBar":null,"percent":null,"todayTokens":0}},"updatedAt":"2026-09-11T01:05:26Z"}
+[e2e] PASS: selfcheck pós-morte: erro tokenizado 'network' em codex e zai
+[e2e] F5 alerts: relaunch (mock morto) p/ provar dedupe persistido e silêncio sob erro
+[e2e] PASS: F5 dedupe: app re-aberto publicou ciclo (claude preservado, updatedAt avançou)
+[e2e] PASS: F5 dedupe: captura ainda com EXATAS 2 linhas — estado persistido não re-dispara, erro não inventa alerta
+[e2e] PASS: F5 dedupe: alertsStatus segue 'enabled' (config do banco + gateway granted)
+[0/1] Planning build
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'tokenbar' complete! (0.21s)
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'tokenbar' complete! (0.09s)
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'tokenbar' complete! (0.09s)
+[e2e] history 3d json: [
+  {
+    "costUsd" : 1.4695698,
+    "day" : "2026-09-09",
+    "provider" : "claude",
+    "tokens" : 798494
+  },
+  {
+    "costUsd" : 14.388003450000003,
+    "day" : "2026-09-10",
+    "provider" : "claude",
+    "tokens" : 7388354
+  },
+  {
+    "costUsd" : 0.0002625,
+    "day" : "2026-09-10",
+    "provider" : "gemini",
+    "tokens" : 193
+  }
+]
+[e2e] totais: 3d[claude=8186848 gemini=193 claude_cost=15.857573] 7d[claude=8186848 gemini=193 claude_cost=15.857573] | heartbeat C=7388354 G=193 h7=8186848
+[e2e] PASS: history 3d == history 7d (corpus inteiro dentro de 48h): claude=8186848
+[e2e] PASS: history 3d do claude == history7d do heartbeat (8186848 == 8186848)
+[e2e] PASS: history 3d cobre o dia de hoje: claude 3d ≥ todayTokens (8186848 ≥ 7388354)
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'tokenbar' complete! (0.09s)
+[e2e] PASS: history 1d (só hoje) == todayTokens do heartbeat (claude 7388354 == 7388354, gemini 193 == 193)
+[e2e] PASS: history: custo do claude computado (> 0, modelo precificado)
+[e2e] PASS: history CSV: mesmo total do JSON (parse RFC 4180, formatos consistentes)
+[e2e] aguardando 60s para medir recursos...
+[e2e] PASS: processo vivo (sem crash, mock morto há >60s)
+[e2e] PASS: memória própria (phys_footprint) 19.8M ≤ 40MB (rss informativo: 75664KB)
+[e2e] PASS: cpu 0.0% ≤ 0.5%
+[e2e] migração: capturando estado da fase 1 e matando o app
+[e2e] PASS: cursors.json legados plantados no formato F2 (offset presente)
+[e2e] PASS: banco removido (cenário F2: sem DB)
+[e2e] PASS: migração: cursors.json → .migrated e heartbeat de pé em 30s
+[e2e] PASS: migração: NÃO re-escaneia — claude preservado exato (7388354 == 7388354, não 0, não dobrado)
+[e2e] PASS: migração: gemini preservado exato (193 == 193)
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'tokenbar' complete! (0.11s)
+[e2e] PASS: migração: NÃO retroage no banco novo (history 7d vazio — backfill fora de escopo)
+[e2e] PASS: migração: evento novo soma sobre o ledger restaurado (Δ=+300 → 7388654)
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'tokenbar' complete! (0.10s)
+[e2e] PASS: migração: evento novo persistiu 1× no banco (1 linha, 300 tokens)
+[e2e] re-run da migration: relançando o app (cursors já .migrated — no-op esperado)
+[e2e] PASS: re-run: idempotente — claude 7388654 == 7388654 no 3º launch
+[e2e] PASS: re-run: banco não dobrou (usage_events ainda == 1)
+[e2e] PASS: re-run: daily_agg não dobrou (300 tokens)
+[e2e] aguardando 10s para medir recursos do app re-aberto (DB aberto)...
+[e2e] PASS: pós-migração: processo vivo
+[e2e] PASS: pós-migração: memória própria (phys_footprint) 20.0M ≤ 40MB com DB aberto
+[e2e] PASS: pós-migração: cpu 0.0% ≤ 0.5%
+[e2e] F4: corpus da 2ª conta + credencial sintética
+[0/1] Planning build
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'genfixtures' complete! (0.21s)
+[0/1] Planning build
+Building for production...
+[0/2] Write swift-version--1AB21518FC5DEDBE.txt
+Build of product 'tokenbar' complete! (0.18s)
+[e2e] SC2 (corpus 2ª conta, todayTokens): 1517031
+[e2e] PASS: corpus da 2ª conta tem eventos HOJE (SC2 > 0 — conta deve somar hoje)
+[e2e] PASS: F4: conta registrada programaticamente no registry (1 linha)
+[e2e] PASS: F4 multi-conta: ciclo cobre as DUAS contas — agregado exato (8906018 == 7388654 + 333 + 1517031, sem duplicação)
+[e2e] PASS: F4 multi-conta: eventos stampados POR CONTA no DB (2 contas no claude)
+[e2e] PASS: F4 multi-conta: daily_agg da conta registrada presente (namespace próprio)
+[e2e] PASS: F4 multi-conta: cursor POR CONTA (chave cursors:claude:acct-e2e-b no settings)
+[e2e] PASS: F4 heartbeat: monthTokens ≥ history7d com 2 contas (agregado DB; custo presente — 30d ⊇ 7d; sem backfill F3, todayTokens é ledger e não participa)
+[e2e] F4: toggle ativa OFF → conta sai do ciclo; registro permanece
+[e2e] PASS: F4 toggle: conta inativa sai do agregado (7389098 == 7389098 — canônico + append, sem a parte da conta)
+[e2e] PASS: F4 toggle: registro PERMANECE (linha intacta com active=0)
+[e2e] F4: frota de 30 contas CLAUDE (137 tokens cada) — ciclo único, orçamento
+[e2e] PASS: F4 frota: 31 contas registradas (canônica não está na tabela)
+[e2e] F4 frota: ciclo cobriu 31 contas em 4s (limite do loop: 30s)
+[e2e] PASS: F4 frota: UM ciclo cobre as 31 contas — soma exata (7393358 == 7389098 + 150 + 4110) em 4s
+[e2e] PASS: F4 frota: 30 contas com eventos no DB (local + B + 30 da frota = 32 namespaces)
+[e2e] PASS: F4 heartbeat: higiene — payload de 1518B ≤ 64KB SEM paths/ids de conta (grep TMP/acct- vazio)
+[e2e] F4: orçamento de recursos com 31 contas (10s de acomodação pós-ingest)
+[e2e] PASS: F4 orçamento: processo vivo com 31 contas
+[e2e] PASS: F4 orçamento: memória própria (phys_footprint) 20.0M ≤ 40MB com 31 contas
+[e2e] PASS: F4 orçamento: cpu 0.0% ≤ 0.5% com 31 contas
+[e2e] F4: remoção de todas as contas → display volta ao layout F2 (prune)
+[e2e] PASS: F4 remoção: contas removidas saem do ciclo (7389368 == 7389368 — só a canônica)
+[e2e] PASS: F4 remoção: registry vazio e DB não duplicou (eventos da frota permanecem, só-histórico)
+[e2e] concluído: 0 falha(s)
+./scripts/e2e.sh: line 916: 35931 Terminated: 15          env "${COMMON_ENV[@]}" TOKENBAR_E2E_DIR="$STATE" "build/TokenBar.app/Contents/MacOS/tokenbar"

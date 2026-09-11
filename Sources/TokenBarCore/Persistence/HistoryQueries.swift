@@ -175,18 +175,24 @@ extension AppDatabase {
 
     /// Breakdown por modelo na janela, tokens desc (a UI corta o top 5 —
     /// `AnalyticsModel.topModelsLimit`); custo com a semântica NULL ≠ 0.
-    public func modelBreakdown(days: Int, now: Date = Date()) throws -> [ModelBreakdownRow] {
+    /// `provider` opcional (F5): filtra UM provider — fonte da linha "Top
+    /// model" do painel; `nil` mantém o comportamento global (Analytics).
+    public func modelBreakdown(
+        days: Int, provider: ProviderID? = nil, now: Date = Date()
+    ) throws -> [ModelBreakdownRow] {
         let sql = """
             SELECT model,
                    SUM(input_tokens + output_tokens + cache_read_tokens + cache_write_tokens) AS tokens,
                    SUM(cost_usd) AS cost
             FROM daily_agg
-            WHERE day >= ?
+            WHERE day >= ?\(provider != nil ? " AND provider = ?" : "")
             GROUP BY model
             ORDER BY tokens DESC, model ASC
             """
+        var arguments: [String] = [windowStartDay(days: days, now: now)]
+        if let provider { arguments.append(provider.rawValue) }
         return try writer.read { db in
-            try Row.fetchAll(db, sql: sql, arguments: [windowStartDay(days: days, now: now)]).map { row in
+            try Row.fetchAll(db, sql: sql, arguments: StatementArguments(arguments)).map { row in
                 let cost: Double? = row["cost"]
                 let tokens: Int64 = row["tokens"] ?? 0
                 return ModelBreakdownRow(model: row["model"], tokens: tokens, costUSD: cost)

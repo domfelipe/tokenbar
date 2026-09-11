@@ -26,6 +26,12 @@ public struct ProviderCoordinatorConfig: Sendable {
     /// `false` quando o chamador injetou fábrica própria (testes/selfcheck) —
     /// nesse caso a store de cursores em SQLite NÃO substitui a injetada.
     let usesDefaultOffsetStore: Bool
+    /// Gateway de notificações (F5 T2). `nil` (default) = gateway REAL
+    /// (`UserNotificationGateway`), criado LAZY no primeiro uso — o init do
+    /// coordinator NUNCA toca no UNUserNotificationCenter (tests runner não
+    /// tem bundle id; ruling F5-NOTIF: nada de notificação no launch).
+    /// Testes injetam um fake capturável.
+    public let notificationGateway: (any NotificationSending)?
 
     public init(
         environment: [String: String],
@@ -33,12 +39,14 @@ public struct ProviderCoordinatorConfig: Sendable {
         supportDirectory: URL,
         e2eDirectory: URL? = nil,
         makeOffsetStore: (@Sendable (ProviderID, String?) -> any FileOffsetStoring)? = nil,
-        makeLedgerSnapshotStore: (@Sendable (ProviderID, String?) -> (any LedgerSnapshotStoring)?)? = nil
+        makeLedgerSnapshotStore: (@Sendable (ProviderID, String?) -> (any LedgerSnapshotStoring)?)? = nil,
+        notificationGateway: (any NotificationSending)? = nil
     ) {
         self.environment = environment
         self.home = home
         self.supportDirectory = supportDirectory
         self.e2eDirectory = e2eDirectory
+        self.notificationGateway = notificationGateway
         self.usesDefaultOffsetStore = (makeOffsetStore == nil)
         if let makeOffsetStore {
             self.makeOffsetStore = makeOffsetStore
@@ -117,8 +125,29 @@ public final class ProviderCoordinator {
     /// banco não abriu (degradação F2) — a UI esconde "+ Add account" (sem DB
     /// não há onde registrar; honesto, não desabilitado por engano).
     public let accountRegistry: AccountRegistry?
+    /// Motor de alertas (F5 T2): thresholds/dedupe sobre as janelas do ciclo.
+    /// Exposto p/ a janela de Settings (T3) aplicar config — que pede a
+    /// permissão de notificação EXPLICITAMENTE (ruling F5-NOTIF).
+    public let alertEngine: AlertEngine
+    /// Gateway de notificações: injetado (testes) ou real, criado LAZY.
+    /// PÚBLICO para a janela de Settings (T3) pedir a autorização no toggle
+    /// de alertas — acessá-lo NÃO pede permissão (ruling F5-NOTIF: só o
+    /// toggle chama `requestAuthorization()`).
+    public var notifications: any NotificationSending {
+        if let injected = config.notificationGateway { return injected }
+        if let cachedGateway { return cachedGateway }
+        let real = UserNotificationGateway()
+        cachedGateway = real
+        return real
+    }
+    private var cachedGateway: (any NotificationSending)?
     /// Support directory (o export grava em `<support>/exports`).
     public var supportDirectory: URL { config.supportDirectory }
+    /// Providers visíveis no TEXTO do menu bar (F5 Task 3) — carregado da
+    /// tabela `settings` no init e mantido vivo pela janela de Settings via
+    /// `applyMenuBarVisibility` (a persistência fica com o SettingsModel).
+    public private(set) var menuBarVisibleProviders: Set<ProviderID> =
+        AppSettingsStore.defaultVisibleProviders
 
     /// Dirs observados por FSEvents (file-driven): Claude projects, Gemini tmp.
     private let watcherDirectories: [ProviderID: URL]
@@ -157,7 +186,6 @@ public final class ProviderCoordinator {
     public init(config: ProviderCoordinatorConfig, scheduler: AdaptiveScheduler? = nil) {
         self.config = config
         self.store = SnapshotStore()
-        self.scheduler = scheduler ?? AdaptiveScheduler(clock: ContinuousClock())
 
         let env = config.environment
         let home = config.home
@@ -172,7 +200,10 @@ public final class ProviderCoordinator {
         // SupportDirectory.resolve e as fábricas default também criam, mas o
         // selfcheck passa um dir próprio com fábricas injetadas — sem o
         // createDirectory aqui o DB dele NUNCA abria e o history7d ficava
-        // sempre omitido (review T4, Important).
+        // sempre omitido (review T4, Important). Aberto ANTES do scheduler
+        // (F5 Task 3): os intervalos persistidos na tabela `settings` são o
+        // estado inicial do scheduler — sem restart quando a Settings troca
+        // (setters vivos do actor aplicam na hora).
         try? FileManager.default.createDirectory(
             at: config.supportDirectory, withIntermediateDirectories: true)
         let database = try? AppDatabase.open(
@@ -180,6 +211,20 @@ public final class ProviderCoordinator {
             calendar: calendar)
         self.database = database
         self.accountRegistry = database.map(AccountRegistry.init)
+        // Motor de alertas (F5 T2): config + dedupe lidos do banco (settings);
+        // sem DB → só memória (degrada honesta, default DESLIGADO — F5-NOTIF).
+        alertEngine = AlertEngine(database: database)
+
+        // F5 Task 3: preferências do usuário no launch — scheduler com os
+        // intervalos persistidos (foreground/menu e background/ocioso) e o
+        // texto do menu bar com a visibilidade persistida.
+        let settings = AppSettingsStore(database: database)
+        self.scheduler = scheduler ?? AdaptiveScheduler(
+            clock: ContinuousClock(),
+            idleInterval: Duration.seconds(settings.loadIdleIntervalSeconds()),
+            menuInterval: Duration.seconds(settings.loadMenuIntervalSeconds()))
+        menuBarVisibleProviders = settings.loadVisibleProviders()
+
         if let database {
             // Migração dos cursores legados F1/F2 (JSON → settings), uma vez
             // por arquivo (idempotente); o live store vira DBOffsetStore.
@@ -252,9 +297,38 @@ public final class ProviderCoordinator {
         let zai = ZaiProvider(
             credentialReader: zaiReader,
             client: UsageHTTPClient(baseURL: ZaiProvider.resolveBaseURL(environment: env, regionHint: zaiReader.read()?.regionBaseURL)),
-            accounts: accountRegistry
-        )
-        registry = ProviderRegistry(providers: [claude, codex, gemini, zai])
+            accounts: accountRegistry)
+        // Providers F5 (Tasks 4–5): todos API-only com degradação local-first
+        // (sem credencial → discoverAccounts [] + snapshot .missing — some da
+        // barra, nunca erro). Isolamento: quebra de um NÃO afeta os demais.
+        let cursor = CursorProvider(
+            credentialReader: .resolve(environment: env, home: home),
+            client: UsageHTTPClient(baseURL: CursorProvider.resolveBaseURL(environment: env)),
+            accounts: accountRegistry)
+        let openrouter = OpenRouterProvider(
+            credentialReader: OpenRouterCredentialReader(environment: env),
+            client: UsageHTTPClient(baseURL: OpenRouterProvider.resolveBaseURL(environment: env)),
+            accounts: accountRegistry)
+        let alibaba = AlibabaProvider(
+            credentialReader: AlibabaCredentialReader(environment: env),
+            client: UsageHTTPClient(baseURL: AlibabaProvider.resolveBaseURL(environment: env)),
+            accounts: accountRegistry)
+        let antigravity = AntigravityProvider(
+            credentialReader: AntigravityCredentialReader.resolve(environment: env, home: home),
+            client: UsageHTTPClient(baseURL: AntigravityProvider.defaultBaseURL),
+            accounts: accountRegistry)
+        let deepseek = DeepSeekProvider(
+            credentialReader: DeepSeekCredentialReader(environment: env),
+            client: UsageHTTPClient(baseURL: DeepSeekProvider.defaultBaseURL),
+            accounts: accountRegistry)
+        let grok = GrokProvider(
+            credentialReader: GrokCredentialReader.resolve(environment: env, home: home),
+            client: UsageHTTPClient(baseURL: GrokProvider.defaultBaseURL),
+            accounts: accountRegistry)
+        registry = ProviderRegistry(providers: [
+            claude, codex, gemini, zai,
+            cursor, openrouter, alibaba, antigravity, deepseek, grok,
+        ])
         watcherDirectories = [.claude: claudeDirectory, .gemini: geminiDirectory.appendingPathComponent("tmp", isDirectory: true)]
         for id in watcherDirectories.keys {
             debouncers[id] = Debouncer(quiesce: Self.debounceQuiesce, clock: ContinuousClock())
@@ -372,7 +446,18 @@ public final class ProviderCoordinator {
         let defaultRef = discovered.first { $0.id.key == "local" }
             ?? AccountRef(id: AccountID(provider: id, key: "local"), label: "local")
         targets.append((provider, defaultRef, nil))
+        // Guard de overlap RESIDUAL (Red Team F5): a UI bloquea registro de dir
+        // sobre a raiz canônica (review T3), mas um INSERT programático por
+        // baixo do app contorna o guard — a conta sobreposta NÃO ingere (o
+        // canônico já cobre aqueles arquivos; sem este filtro o agregado do
+        // provider dobraria a cada ciclo). Badge segue o path (visível).
+        let canonicalRoot = canonicalScanRoot(for: id)
         for entry in registered where entry.accountKey != "local" {
+            if Self.overlapsCanonical(
+                accountDirectory: entry.directoryPath, canonicalRoot: canonicalRoot)
+            {
+                continue
+            }
             if let instance = accountInstance(provider: id, entry: entry) {
                 targets.append((instance, AccountRef(id: AccountID(provider: id, key: entry.accountKey), label: entry.label), entry))
             }
@@ -436,6 +521,10 @@ public final class ProviderCoordinator {
                 let month = try? database.weekTotal(provider: id, days: 30)
                 let series = (try? database.dailySeries(provider: id, days: 30)) ?? []
                 let todayCost = try? database.todayCostUSD(provider: id)
+                // Top model 7d (F5): primeiro do breakdown (tokens desc) do
+                // PRÓPRIO provider; sem histórico → nil (linha omitida).
+                let topModel = ((try? database.modelBreakdown(days: 7, provider: id)) ?? [])
+                    .first?.model
                 var pacingByAccount: [String: [(day: Date, total: Int64)]] = [:]
                 for key in pacingKeys {
                     pacingByAccount[key] = (try? database.pacingInput(
@@ -443,13 +532,15 @@ public final class ProviderCoordinator {
                 }
                 return HistoryStats(
                     week: week, month: month, series: series,
-                    todayCost: todayCost, pacingByAccount: pacingByAccount)
+                    todayCost: todayCost, topModel: topModel, pacingByAccount: pacingByAccount)
             }.value
             : nil
 
         // Fase 3 — FetchUsage POR CONTA: local-only nunca gera rede; API sem
         // credencial degrada (`.missing`) sem request; erro de rede → último
-        // snapshot bom da conta fica.
+        // snapshot bom da conta fica. Janelas bem-sucedidas alimentam o
+        // AlertEngine (F5 T2) no fim do ciclo.
+        var cycleSnapshots: [(provider: ProviderID, account: AccountID, windows: [UsageWindow])] = []
         for target in targets {
             let key = target.ref.id.key
             var display = perAccountDisplays[id]?[key] ?? ProviderDisplay.empty
@@ -458,6 +549,8 @@ public final class ProviderCoordinator {
 
             do {
                 let snapshot = try await target.instance.fetchUsage(target.ref)
+                cycleSnapshots.append(
+                    (provider: id, account: target.ref.id, windows: snapshot.windows))
                 let critical = criticalWindow(in: snapshot.windows)
                 display.percent = critical?.usedFraction.map { $0 * 100 }
                 display.resetsAt = critical?.resetsAt
@@ -476,6 +569,9 @@ public final class ProviderCoordinator {
                 display.authState = snapshot.authState
                 display.source = snapshot.source
                 display.fetchedAt = snapshot.fetchedAt
+                // Credits do snapshot (F5 T6): saldo real → linha do painel +
+                // heartbeat; nil/ausente → omitido (nada inventado).
+                display.credits = snapshot.credits
             } catch {
                 ok = false
                 errorToken = errorToken ?? Self.errorToken(error)
@@ -524,6 +620,8 @@ public final class ProviderCoordinator {
                 aggregate.monthSeries = stats.series.map {
                     PanelDayPoint(day: $0.day, tokens: $0.tokens, costUSD: $0.costUSD)
                 }
+                // "Top model" do painel (F5) — painel-only, menu bar intocado.
+                aggregate.topModel7d = stats.topModel
             } else {
                 aggregate.weekHistoryAvailable = false
                 aggregate.monthHistoryAvailable = false
@@ -537,6 +635,11 @@ public final class ProviderCoordinator {
             cycleErrors.removeValue(forKey: id)
         }
         publish()
+
+        // Alertas (F5 T2): thresholds sobre os snapshots DESTE ciclo, entrega
+        // pelo gateway e estado honesto no painel. Default DESLIGADO — quando
+        // off, nada toca no gateway/permissão (ruling F5-NOTIF).
+        await dispatchAlerts(snapshots: cycleSnapshots, now: Date())
 
         let pressure = displays[id]?.percent.map { $0 / 100 }  // 0...1 p/ scheduler
         await scheduler.noteResult(provider: id, ok: primaryOK, pressure: pressure)
@@ -570,6 +673,27 @@ public final class ProviderCoordinator {
             return true
         }
         return false
+    }
+
+    /// Dir de conta sobre a raiz canônica de scan (igual, descendente OU
+    /// ancestral — Red Team F5 caso "bypass programático residual"): inserir
+    /// direto no banco contorna o guard da UI, então o CICLO defende. Comparação
+    /// por path padronizado com fronteira de componente (`/a/b` não cobre
+    /// `/a/bc`); dir vazia nunca sobrepõe. `canonicalRoot == nil` (provider
+    /// API-only) → false.
+    static func overlapsCanonical(accountDirectory: String, canonicalRoot: URL?) -> Bool {
+        guard !accountDirectory.isEmpty, let canonicalRoot else { return false }
+        func standardized(_ path: String, isDirectory: Bool) -> String {
+            var url = URL(fileURLWithPath: path, isDirectory: isDirectory)
+                .standardizedFileURL
+            if url.path.hasSuffix("/") { url.deleteLastPathComponent() }
+            return url.path
+        }
+        let account = standardized(accountDirectory, isDirectory: true)
+        let canonical = standardized(canonicalRoot.path, isDirectory: true)
+        guard !account.isEmpty, !canonical.isEmpty else { return false }
+        if account == canonical { return true }
+        return account.hasPrefix(canonical + "/") || canonical.hasPrefix(account + "/")
     }
 
     /// Instância de provider da conta registrada — criada uma vez e retida
@@ -618,6 +742,51 @@ public final class ProviderCoordinator {
                 client: UsageHTTPClient(baseURL: ZaiProvider.resolveBaseURL(
                     environment: config.environment,
                     regionHint: reader.read()?.regionBaseURL)),
+                accountKey: key,
+                label: entry.label)
+        case .cursor:
+            return CursorProvider(
+                credentialReader: CursorCredentialReader(
+                    databaseFileURL: nil,
+                    tokenFileURL: URL(filePath: entry.credentialPath)),
+                client: UsageHTTPClient(baseURL: CursorProvider.resolveBaseURL(environment: config.environment)),
+                accountKey: key,
+                label: entry.label)
+        case .openrouter:
+            return OpenRouterProvider(
+                credentialReader: OpenRouterCredentialReader(
+                    keyFileURL: URL(filePath: entry.credentialPath)),
+                client: UsageHTTPClient(baseURL: OpenRouterProvider.resolveBaseURL(environment: config.environment)),
+                accountKey: key,
+                label: entry.label)
+        case .alibaba:
+            return AlibabaProvider(
+                credentialReader: AlibabaCredentialReader(
+                    environment: [:],
+                    keyFileURL: URL(filePath: entry.credentialPath)),
+                client: UsageHTTPClient(baseURL: AlibabaProvider.resolveBaseURL(environment: config.environment)),
+                accountKey: key,
+                label: entry.label)
+        case .antigravity:
+            return AntigravityProvider(
+                credentialReader: AntigravityCredentialReader(
+                    credentialsFileURL: URL(filePath: entry.credentialPath)),
+                client: UsageHTTPClient(baseURL: AntigravityProvider.defaultBaseURL),
+                accountKey: key,
+                label: entry.label)
+        case .deepseek:
+            return DeepSeekProvider(
+                credentialReader: DeepSeekCredentialReader(
+                    environment: [:],
+                    keyFileURL: URL(filePath: entry.credentialPath)),
+                client: UsageHTTPClient(baseURL: DeepSeekProvider.defaultBaseURL),
+                accountKey: key,
+                label: entry.label)
+        case .grok:
+            return GrokProvider(
+                credentialReader: GrokCredentialReader(
+                    authFileURL: URL(filePath: entry.credentialPath)),
+                client: UsageHTTPClient(baseURL: GrokProvider.defaultBaseURL),
                 accountKey: key,
                 label: entry.label)
         default:
@@ -691,8 +860,52 @@ public final class ProviderCoordinator {
         result.authState = source.display.authState
         result.source = source.display.source
         result.fetchedAt = accounts.map(\.display.fetchedAt).max() ?? previous.fetchedAt
+        // Credits segue a conta-fonte (crítica/primeira) — mesmo critério do
+        // pior caso visível (F5 T6); agregação de saldos somaria contas
+        // distintas como se fosse uma carteira só (mentira).
+        result.credits = source.display.credits
         result.accounts = accounts
         return result
+    }
+
+    // MARK: - Alertas (F5 T2, spec §8)
+
+    /// Avalia o `AlertEngine` sobre os snapshots do ciclo e entrega cada
+    /// evento novo pelo gateway (dedupe é responsabilidade do engine — o
+    /// coordinator só despacha). Atualiza o estado honesto do painel:
+    /// off → `.disabled` (sem tocar em gateway/permissão); ligado → reflete
+    /// a autorização REAL do gateway (`enabled`/`notConfigured`/`blocked`).
+    /// Internal para os testes de wiring injetarem snapshots direto.
+    func dispatchAlerts(
+        snapshots: [(provider: ProviderID, account: AccountID, windows: [UsageWindow])],
+        now: Date
+    ) async {
+        let config = await alertEngine.config
+        guard config.enabled else {
+            store.setAlertsStatus(.disabled)
+            return
+        }
+        let events = await alertEngine.evaluate(snapshots: snapshots, now: now)
+        for event in events {
+            await notifications.deliver(event)
+        }
+        switch await notifications.authorizationState() {
+        case .granted: store.setAlertsStatus(.enabled)
+        case .notDetermined: store.setAlertsStatus(.notConfigured)
+        case .denied: store.setAlertsStatus(.blocked)
+        }
+    }
+
+    // MARK: - Settings vivas (F5 Task 3)
+
+    /// Janela de Settings trocou os providers visíveis no texto do menu bar:
+    /// estado vivo + republish imediato (o render gate da F1 cuida de só
+    /// re-renderizar quando a string exibida muda de fato). Persistência fica
+    /// com o SettingsModel (tabela `settings`); aqui é só o estado em runtime.
+    public func applyMenuBarVisibility(_ visible: Set<ProviderID>) {
+        guard menuBarVisibleProviders != visible else { return }
+        menuBarVisibleProviders = visible
+        publish()
     }
 
     // MARK: - Menu (spec §7: fire imediato com throttle; reafirmar enquanto aberto)
@@ -726,9 +939,14 @@ public final class ProviderCoordinator {
     // MARK: - Saídas
 
     private func publish() {
-        store.apply(MenuBarContent(providers: displays))
+        // F5 Task 3: o texto do menu bar respeita a visibilidade escolhida
+        // na Settings (default = todos).
+        store.apply(MenuBarContent(
+            providers: displays, visibleProviders: menuBarVisibleProviders))
         if let e2eDirectory = config.e2eDirectory {
-            E2EHeartbeat.write(menuBarText: store.menuBarText, providers: displays, directory: e2eDirectory)
+            E2EHeartbeat.write(
+                menuBarText: store.menuBarText, providers: displays,
+                directory: e2eDirectory, alertsStatus: store.alertsStatus)
         }
     }
 
@@ -763,6 +981,9 @@ private struct HistoryStats: Sendable {
     /// `nil` = query falhou (com DB aberto) → custo do dia some do painel
     /// (mesmo padrão F2/F3: nunca 0 fake).
     var todayCost: Double?
+    /// Modelo com mais tokens na janela 7d do provider (F5, linha "Top
+    /// model" do painel). `nil` = sem breakdown do provider na janela.
+    var topModel: String?
     /// Input do PacingEngine por chave de conta (daily_agg por conta; contas
     /// sem ingest ficam de fora — engine recebe vazio e devolve nil).
     var pacingByAccount: [String: [(day: Date, total: Int64)]]

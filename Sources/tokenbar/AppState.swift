@@ -20,6 +20,12 @@ final class AppState: NSObject, NSWindowDelegate {
     /// Gerenciamento de contas (F4): registry do coordinator + providers com
     /// suporte. Mutação → refresh imediato (painel reflete na hora).
     let accountsModel: AccountsModel
+    /// Modelo da janela de Settings (F5 Task 3): banco/engine/scheduler/
+    /// gateway do coordinator + SMAppService real. Toggle de alertas chama
+    /// requestAuthorization() EXPLICITAMENTE (ruling F5-NOTIF); trocas de
+    /// intervalo/visibilidade aplicam vivos no scheduler/republish — sem
+    /// restart.
+    let settingsModel: SettingsModel
 
     var store: SnapshotStore { coordinator.store }
 
@@ -38,11 +44,18 @@ final class AppState: NSObject, NSWindowDelegate {
         }
         // Locais primeiro: closures abaixo capturam a constante, não self
         // (self só é utilizável após super.init — NSObject).
+        // Gateway de captura do e2e (F5 T7): `TOKENBAR_E2E_ALERTS_CAPTURE` no
+        // ambiente troca o UNUserNotificationCenter real pelo gateway que grava
+        // os alertas em arquivo (prova de disparo sem centro de notificação —
+        // o caminho de render/identificador é o mesmo do gateway real).
+        let e2eAlertsCapture = env["TOKENBAR_E2E_ALERTS_CAPTURE"]
+            .map { E2EAlertCaptureGateway(fileURL: URL(filePath: $0)) }
         let coord = ProviderCoordinator(config: ProviderCoordinatorConfig(
             environment: env,
             home: URL(filePath: NSHomeDirectory()),
             supportDirectory: supportDir,
-            e2eDirectory: e2eDir
+            e2eDirectory: e2eDir,
+            notificationGateway: e2eAlertsCapture
         ))
         coordinator = coord
         let multiAccount = Set(ProviderID.allCases.filter { coord.supportsMultiAccount($0) })
@@ -58,6 +71,16 @@ final class AppState: NSObject, NSWindowDelegate {
             registry: coord.accountRegistry,
             multiAccountProviders: multiAccount,
             canonicalRoots: canonicalRoots)
+        // F5 Task 3: republish da visibilidade do menu bar direto no
+        // coordinator (ambos MainActor; o coordinator não retém o modelo —
+        // sem ciclo).
+        settingsModel = SettingsModel(
+            database: coord.historyDatabase,
+            alerts: coord.alertEngine,
+            scheduler: coord.scheduler,
+            notifications: coord.notifications,
+            login: SMAppLoginService(),
+            republishVisibility: { coord.applyMenuBarVisibility($0) })
         super.init()  // NSObject: antes de qualquer uso de self (delegates)
         accountsModel.onMutation = { [weak self] in
             guard let self else { return }

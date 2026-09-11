@@ -1,26 +1,33 @@
 #!/bin/bash
-# E2E v4 (F4): corpus sintético + mock server (Codex/Z.ai) → app real com os 4
-# providers (C/X/G/Z) → menu bar correto, live update, degradação graciosa,
-# orçamento de recursos (COM o banco SQLite aberto) + persistência + painel
-# rico/multi-conta: heartbeat v3 com os campos ADITIVOS da F4 (monthTokens/
-# monthCostUsd/pacing) consistentes, e o ciclo multi-conta cobrindo contas
-# registradas (registro programático — mesmo caminho do Red Team caso 5),
-# toggle/remove e uma frota de 30 contas dentro do orçamento. Prova do Goal
-# E2E: todos os checks PASS + exit 0.
+# E2E v5 (F5): corpus sintético + mock server (Codex/Z.ai/OpenRouter) → app
+# real com os providers do wiring (C/X/G/Z + os 6 F5; OpenRouter EXERCITADO de
+# verdade via override TOKENBAR_OPENROUTER_API) → menu bar correto, live
+# update, degradação graciosa, orçamento de recursos (COM o banco SQLite
+# aberto) + persistência + migração + painel rico/multi-conta (heartbeat v5:
+# credits real + alertsStatus honesto, ADITIVOS) + ALERTA DISPARADO de verdadE:
+# `alerts:enabled` plantado no banco antes do 1º launch e o app rodando com o
+# GATEWAY DE CAPTURA (TOKENBAR_E2E_ALERTS_CAPTURE — mesma fronteira
+# NotificationSending, render/identifier do gateway real; NUNCA o
+# UNUserNotificationCenter real no e2e, ruling F5-NOTIF). Dedupe provado no
+# relaunch: estado persistido no banco não re-dispara e erro de rede não
+# inventa alerta. Todas as esperas são POR CONTEÚDO (arquivo/valor esperado,
+# nunca sleep cego — os sleeps fixos existentes são janelas de MEDIÇÃO da
+# spec §7).
 #
 # Verdade de referência (padrão F1): selfcheck — a MESMA pipeline do app sobre
 # o MESMO corpus no MESMO dia — para os providers locais (C/G). Para os
-# API-driven (X/Z) a verdade é o próprio mock: percentuais sintéticos fixos
-# (Codex 42%, Z.ai 81%) que o check exige verbatim.
+# API-driven (X/Z/O) a verdade é o próprio mock: valores sintéticos fixos
+# (Codex 42%, Z.ai 81%, OpenRouter saldo 62.80/janela 49%) que o check exige
+# verbatim.
 #
 # Degradação (spec §5): 500 persistente → selfcheck tokeniza "http"; mock morto
 # → app segue vivo (heartbeat continua via providers locais) e selfcheck
 # diagnostica "network". NÃO há retry storm: o mock loga cada request com o
 # header Authorization e as credenciais do APP são tokens fake distintos das do
 # SELFcheck — o contador atribui cada request e prova que o app não fez nada
-# além do burst inicial (≤ 4 na vida do mock) e que o pico por janela
-# deslizante de 10 s é ≤ 2 (backoff ×2 a partir de 5 min torna storm
-# estruturalmente impossível).
+# além do burst inicial (esperado 4: 1 codex + 1 zai + 2 openrouter
+# credits+key) e que o pico por janela deslizante de 10 s é ≤ 4 (backoff ×2 a
+# partir de 5 min torna storm estruturalmente impossível).
 #
 # Persistência (F3): o app persiste eventos em $SUPPORT/tokenbar.sqlite e o
 # heartbeat v3 expõe history7d. Cenários novos:
@@ -77,12 +84,14 @@ say "TMP=$TMP"
 
 # ---------------------------------------------------------------------------
 # 1. Mock server (python3 http.server + handler JSON embutido): serve as
-#    rotas canônicas da spec F2 com shapes sintéticos — Codex `wham/usage`
-#    (§1.3, primary 42% / secondary 7%, reset_at em SEGUNDOS) e Z.ai
-#    `quota/limit` (§2.3, success/code válidos, TOKENS_LIMIT 5h 81% e
-#    semanal 34%, nextResetTime em MILISSEGUNDOS). Loga cada request (com o
-#    header Authorization — fixtures são fake, nada real p/ vazar) e obedece
-#    o modo do arquivo $MOCK_MODE (200 sintético | 500 p/ teste de storm).
+#    rotas canônicas da spec F2 + OpenRouter (F5) com shapes sintéticos —
+#    Codex `wham/usage` (§1.3, primary 42% / secondary 7%, reset_at em
+#    SEGUNDOS), Z.ai `quota/limit` (§2.3, success/code válidos, TOKENS_LIMIT
+#    5h 81% e semanal 34%, nextResetTime em MILISSEGUNDOS) e OpenRouter
+#    `/credits` (100.00 − 37.20 → saldo 62.80) + `/key` (limit 50,
+#    limit_remaining 25.5 → janela 49%). Loga cada request (com o header
+#    Authorization — fixtures são fake, nada real p/ vazar) e obedece o modo
+#    do arquivo $MOCK_MODE (200 sintético | 500 p/ teste de storm).
 # ---------------------------------------------------------------------------
 python3 - "$TMP" <<'PYEOF' &
 import http.server, json, sys, time, os
@@ -115,6 +124,11 @@ ZAI = {
         ],
     },
 }
+# OpenRouter (F5): /credits (saldo 62.80) + /key (janela 49% da key).
+OR_CREDITS = {"data": {"total_credits": 100.00, "total_usage": 37.20}}
+OR_KEY = {"data": {"limit": 50, "limit_remaining": 25.5, "usage": 37.2,
+                   "usage_daily": 1.5, "usage_weekly": 8.25, "usage_monthly": 30.0,
+                   "limit_reset": "monthly"}}
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def _log(self, path):
@@ -135,6 +149,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = json.dumps(CODEX).encode()
         elif "quota/limit" in self.path:
             body = json.dumps(ZAI).encode()
+        elif self.path.endswith("/credits"):
+            body = json.dumps(OR_CREDITS).encode()
+        elif self.path.endswith("/key"):
+            body = json.dumps(OR_KEY).encode()
         else:
             self.send_response(404)
             self.end_headers()
@@ -163,6 +181,10 @@ check "mock no ar: wham/usage 200 com rate_limit.primary_window" \
   "curl -s --max-time 5 \"http://127.0.0.1:$PORT/backend-api/wham/usage\" | python3 -c 'import json,sys;d=json.load(sys.stdin);exit(0 if d[\"rate_limit\"][\"primary_window\"][\"used_percent\"]==42 else 1)'"
 check "mock no ar: quota/limit 200 com success=true" \
   "curl -s --max-time 5 \"http://127.0.0.1:$PORT/api/monitor/usage/quota/limit\" | python3 -c 'import json,sys;d=json.load(sys.stdin);exit(0 if d[\"success\"] and d[\"code\"]==200 else 1)'"
+check "mock no ar: /credits 200 com saldo 62.80" \
+  "curl -s --max-time 5 \"http://127.0.0.1:$PORT/credits\" | python3 -c 'import json,sys;d=json.load(sys.stdin)[\"data\"];exit(0 if d[\"total_credits\"]-d[\"total_usage\"]==62.8 else 1)'"
+check "mock no ar: /key 200 com limit 50" \
+  "curl -s --max-time 5 \"http://127.0.0.1:$PORT/key\" | python3 -c 'import json,sys;d=json.load(sys.stdin)[\"data\"];exit(0 if d[\"limit\"]==50 and d[\"limit_remaining\"]==25.5 else 1)'"
 
 # ---------------------------------------------------------------------------
 # 2. Corpora sintéticos + credenciais fake (NUNCA reais — spec §9).
@@ -204,10 +226,20 @@ EOF
 # máquina; o scan do Codex real ~10 GB tornaria o teste inviável). O SUPPORT
 #_DIR isola cursores/ledger do App Support real: sem ele, corpora descartáveis
 # acumulam entradas no store real e o snapshot do dia as ressuscita entre runs
-# (achado P1 do e2e final da T8).
+# (achado P1 do e2e final da T8). F5: OpenRouter exercitado via mock (override
+# TOKENBAR_OPENROUTER_API + key no env — 1 key = 1 conta) e o GATEWAY DE
+# CAPTURA de alertas (a captura grava cada AlertEvent como linha JSON — o app
+# NUNCA toca no UNUserNotificationCenter no e2e). HERMETICIDADE DOS 6 NOVOS
+# PROVIDERS (achado do run 3: a máquina de execução tinha Cursor/Grok reais →
+# U:19%/K:11% no texto e REQUEST REAL com credencial real!): as descobertas de
+# credencial apontam para arquivo INEXISTENTE no lab e as env-only são
+# NEUTRALIZADAS com vazio — todos os 6 degradam `.missing` e saem da barra
+# (nunca rede real, nunca máquina-dependente).
 COMMON_ENV=(
   TOKENBAR_CODEX_API="http://127.0.0.1:$PORT"
   TOKENBAR_ZAI_API="http://127.0.0.1:$PORT"
+  TOKENBAR_OPENROUTER_API="http://127.0.0.1:$PORT"
+  OPENROUTER_API_KEY="fake-openrouter-e2e"
   TOKENBAR_SUPPORT_DIR="$SUPPORT"
   TOKENBAR_CODEX_DIR="$CODEX_DIR"
   TOKENBAR_CODEX_AUTH="$CRED/codex-auth.json"
@@ -215,6 +247,14 @@ COMMON_ENV=(
   TOKENBAR_ZAI_AUTH="$CRED/credentials-ausentes.json"
   TOKENBAR_GEMINI_DIR="$GEMINI_DIR"
   TOKENBAR_CLAUDE_DIR="$CORPUS"
+  TOKENBAR_E2E_ALERTS_CAPTURE="$STATE/alerts.jsonl"
+  TOKENBAR_CURSOR_DB="$CRED/credentials-ausentes.json"
+  TOKENBAR_GROK_AUTH="$CRED/credentials-ausentes.json"
+  TOKENBAR_ANTIGRAVITY_CREDS="$CRED/credentials-ausentes.json"
+  DEEPSEEK_API_KEY=""
+  ALIBABA_CODING_PLAN_API_KEY=""
+  ALIBABA_QWEN_API_KEY=""
+  DASHSCOPE_API_KEY=""
 )
 mkdir -p "$TMP/support"
 # Selfcheck usa as credenciais "-selfcheck" (mesmo shape, token distinto) —
@@ -223,7 +263,47 @@ SELF_ENV=(
   "${COMMON_ENV[@]}"
   TOKENBAR_CODEX_AUTH="$CRED/codex-auth-selfcheck.json"
   TOKENBAR_ZAI_CONFIG="$CRED/zai-config-selfcheck.json"
+  OPENROUTER_API_KEY="fake-openrouter-e2e-selfcheck"
 )
+
+# ---------------------------------------------------------------------------
+# 2.5 (F5 T7) SEED LAUNCH: o app é construído e lançado UMA VEZ SEM alertas —
+#      é ele quem cria o banco (migrations na abertura; o CLI `history` só lê
+#      banco existente). Kill, PLANTA `alerts:enabled=true` na tabela settings
+#      (substitute honesto do toggle da Settings — ruling F5-NOTIF: o e2e
+#      NUNCA pede permissão real), e o launch PRINCIPAL (§4) sobe com o
+#      AlertEngine já ligado e o gateway de captura provando os disparos.
+# ---------------------------------------------------------------------------
+say "seed launch (build + 1º launch sem alertas, só p/ criar o banco)"
+./scripts/make-app.sh release >/dev/null
+# Regressão do fix do hang via `open` (F3/F4): os bundles SPM (.copy) precisam
+# estar dentro do .app — sem eles Bundle.module pendura a main thread em
+# NSBundle URLForResource quando lançado via LaunchServices.
+for b in GRDB_GRDB TokenBar_TokenBarCore TokenBar_TokenBarUI; do
+  check "bundle de recursos no .app: $b.bundle em Contents/Resources" \
+    "[ -d 'build/TokenBar.app/Contents/Resources/$b.bundle' ]"
+done
+env "${COMMON_ENV[@]}" TOKENBAR_E2E_DIR="$STATE" \
+  "build/TokenBar.app/Contents/MacOS/tokenbar" &
+SEED_PID=$!
+SEED_OK=0
+# Espera POR CONTEÚDO até o ÚLTIMO provider com dado publicar (openrouter 49%
+# depois do Z no texto) — matar no meio da fila deixaria um request em voo
+# contando na janela de 10 s do burst do launch principal (flake do run 2).
+for _ in $(seq 1 30); do
+  APP_TEXT_SEED="$(json_field "$STATE/state.json" "['menuBarText']" 2>/dev/null)"
+  case "$APP_TEXT_SEED" in *Z:81*O:49*) SEED_OK=1 && break;; esac
+  sleep 1
+done
+check "seed launch: app de pé e ciclo completo publicado em 30s (X/Z/O do mock no texto)" "[ '$SEED_OK' = '1' ]"
+kill -9 "$SEED_PID" 2>/dev/null; wait "$SEED_PID" 2>/dev/null
+SUPPORT_DB="$SUPPORT/tokenbar.sqlite"
+SEED_TABLES="$(sqlite3 "$SUPPORT_DB" "SELECT COUNT(*) FROM settings" 2>/dev/null || echo ERR)"
+check "seed: DB com tabela settings criada pelo app" "[ '$SEED_TABLES' != 'ERR' ]"
+sqlite3 "$SUPPORT_DB" "INSERT OR REPLACE INTO settings (key, value) VALUES ('alerts:enabled','true');"
+SEED_PLANTED="$(sqlite3 "$SUPPORT_DB" "SELECT value FROM settings WHERE key='alerts:enabled'" 2>/dev/null)"
+check "seed: alerts:enabled=true plantado no banco (substitute do toggle da Settings)" \
+  "[ '$SEED_PLANTED' = 'true' ]"
 
 # ---------------------------------------------------------------------------
 # 3. Verdade de referência: selfcheck v2 com o mock NO AR (mesma pipeline do
@@ -249,6 +329,13 @@ import json,sys
 p=json.load(sys.stdin)[\"providers\"][\"claude\"]
 h=p.get(\"history7d\")
 exit(0 if h and h[\"tokens\"]>=p[\"todayTokens\"]>0 and (h.get(\"costUsd\") or 0)>0 else 1)'"
+
+# Hermeticidade dos providers F5 (achado do run 3): com as credenciais da
+# MÁQUINA neutralizadas, cursor/grok/alibaba/antigravity/deepseek degradam
+# `.missing` e NÃO entram no texto — o texto esperado é EXATAMENTE
+# C/X/G/Z/O. Qualquer fragmento U:/K:/Q:/V:/D: = vazamento de máquina.
+check "hermeticidade F5: texto é EXATAMENTE C X G Z O — sem fragmento de provider da máquina" \
+  "echo \"\$SC_TEXT\" | grep -qE '^C:[0-9.]+[kM]? X:42% G:193 Z:81% O:49%$'"
 
 # ---------------------------------------------------------------------------
 # 3.1 (F4-d) Sonda de pacing: sessões Codex sintéticas em 2 DIAS (formato
@@ -309,35 +396,66 @@ echo ok > "$MOCK_MODE"
 
 # ---------------------------------------------------------------------------
 # 4. App real com os mesmos overrides — MESMO caminho de corpus do selfcheck.
+#    (binário já construído no seed launch §2.5; alerts:enabled já plantado —
+#    este launch sobe com o AlertEngine LIGADO e o gateway de captura ativo.)
 # ---------------------------------------------------------------------------
-./scripts/make-app.sh release >/dev/null
-# Regressão do fix do hang via `open` (F3/F4): os bundles SPM (.copy) precisam
-# estar dentro do .app — sem eles Bundle.module pendura a main thread em
-# NSBundle URLForResource quando lançado via LaunchServices.
-for b in GRDB_GRDB TokenBar_TokenBarCore TokenBar_TokenBarUI; do
-  check "bundle de recursos no .app: $b.bundle em Contents/Resources" \
-    "[ -d 'build/TokenBar.app/Contents/Resources/$b.bundle' ]"
-done
 env "${COMMON_ENV[@]}" TOKENBAR_E2E_DIR="$STATE" \
   "build/TokenBar.app/Contents/MacOS/tokenbar" &
 APP_PID=$!
 
 # 5. Menu bar correto em ≤ 30 s (heartbeat é escrito no primeiro ingest).
 #    O publish acontece a CADA provider (o state.json surge com só o claude
-#    já no meio do 1º ciclo), então a espera é pelo CONTEÚDO completo — os 4
-#    providers no payload — não pela existência do arquivo.
+#    já no meio do 1º ciclo), então a espera é pelo CONTEÚDO completo —
+#    todos os providers com dado no payload (locais + API-driven + OpenRouter
+#    F5, que entra na ordem alfabética DEPOIS do Z) — não pela existência do
+#    arquivo.
 for _ in $(seq 1 30); do
   APP_TEXT_NOW="$(json_field "$STATE/state.json" "['menuBarText']" 2>/dev/null)"
-  case "$APP_TEXT_NOW" in *Z:81*G:193*) break;; esac
+  case "$APP_TEXT_NOW" in *G:193*Z:81*O:49*) break;; esac
   sleep 1
 done
 check "heartbeat criado em 30s" "[ -f '$STATE/state.json' ]"
 APP_TEXT="$(json_field "$STATE/state.json" "['menuBarText']")"
 check "menu bar text igual ao selfcheck ('$APP_TEXT' == '$SC_TEXT')" "[ '$APP_TEXT' = '$SC_TEXT' ]"
-check "heartbeat: percent API-driven do mock (codex=42, zai=81)" \
-  "[ \"\$(json_field '$STATE/state.json' \"['providers']['codex']['percent']\")\" = '42' ] && [ \"\$(json_field '$STATE/state.json' \"['providers']['zai']['percent']\")\" = '81' ]"
+check "heartbeat: percent API-driven do mock (codex=42, zai=81, openrouter=49)" \
+  "[ \"\$(json_field '$STATE/state.json' \"['providers']['codex']['percent']\")\" = '42' ] && [ \"\$(json_field '$STATE/state.json' \"['providers']['zai']['percent']\")\" = '81' ] && [ \"\$(json_field '$STATE/state.json' \"['providers']['openrouter']['percent']\")\" = '49' ]"
 check "heartbeat v2: authState ok e fetchedAt fresco nos API-driven" \
   "[ \"\$(json_field '$STATE/state.json' \"['providers']['codex']['authState']\")\" = 'ok' ] && [ \"\$(json_field '$STATE/state.json' \"['providers']['zai']['authState']\")\" = 'ok' ] && [ \"\$(json_field '$STATE/state.json' \"['providers']['zai']['fetchedAt']\")\" != '1970-01-01T00:00:00Z' ]"
+
+# F5 (heartbeat v5, ADITIVO): provider NOVO exercitado de verdade no app real
+# — OpenRouter com janela da key (49%) e CREDITS do snapshot (saldo 62.80 do
+# mock); providers sem credits não têm a chave (nada fake).
+check "heartbeat v5: credits REAL do openrouter (remaining 62.8 = 100 − 37.2 do mock)" \
+  "python3 -c '
+import json,sys
+p=json.load(open(sys.argv[1]))[\"providers\"][\"openrouter\"]
+c=p.get(\"credits\") or {}
+exit(0 if c.get(\"remaining\")==62.8 and c.get(\"unlimited\") is False else 1)' '$STATE/state.json'"
+check "heartbeat v5: codex/zai SEM credits no payload (mock devolve balance null — chave ausente, honesto)" \
+  "python3 -c '
+import json,sys
+p=json.load(open(sys.argv[1]))[\"providers\"]
+exit(0 if \"credits\" not in p[\"codex\"] and \"credits\" not in p[\"zai\"] else 1)' '$STATE/state.json'"
+
+# F5 (T7): ALERTA DISPARADO no 1º ciclo com `alerts:enabled` plantado — o
+# gateway de captura grava cada AlertEvent como linha JSON. Esperado: EXATOS 2
+# disparos (zai session 81% cruza 50 e 75; codex 42% e openrouter 49% ficam
+# abaixo; weekly 34% idem) com o MESMO render EN do gateway real. Estado
+# honesto no heartbeat: alertsStatus 'enabled' (gateway captor é granted).
+ALERT_OK=0
+for _ in $(seq 1 15); do
+  [ -f "$STATE/alerts.jsonl" ] && [ "$(wc -l < "$STATE/alerts.jsonl" | tr -d ' ')" = "2" ] && ALERT_OK=1 && break
+  sleep 1
+done
+check "F5 alerts: EXATOS 2 disparos no 1º ciclo (zai cruza t50+t75 — nada abaixo dispara)" "[ '$ALERT_OK' = '1' ]"
+check "F5 alerts: render EN do gateway real (títulos 'Z.ai · 50/75% of session window used')" \
+  "grep -q '\"title\":\"Z.ai · 50% of session window used\"' '$STATE/alerts.jsonl' && grep -q '\"title\":\"Z.ai · 75% of session window used\"' '$STATE/alerts.jsonl'"
+check "F5 alerts: identifiers de dedupe por (provider,conta,janela,causa) — zai.local.session.t50/t75" \
+  "grep -q 'tokenbar.alert.zai.local.session.t50' '$STATE/alerts.jsonl' && grep -q 'tokenbar.alert.zai.local.session.t75' '$STATE/alerts.jsonl'"
+check "F5 alerts: body com countdown real do reset ('Resets in …', nada inventado)" \
+  "grep -q '\"body\":\"Resets in ' '$STATE/alerts.jsonl'"
+check "F5 alerts: alertsStatus 'enabled' no heartbeat (gateway granted — estado honesto)" \
+  "[ \"\$(json_field '$STATE/state.json' \"['alertsStatus']\")\" = 'enabled' ]"
 
 # 5.1 (F4-e) Campos ADITIVOS do heartbeat v3 no app real: monthTokens/
 #     monthCostUsd do claude presentes e consistentes com o history7d do
@@ -411,14 +529,17 @@ check "sem retry storm: $APP_REQ request(s) do app além do burst inicial (≤ 3
 
 # Contador do mock, atribuído por credencial: linhas com o Authorization do APP
 # (os selfchecks usam tokens "-selfcheck" e o curl não manda header — saem da
-# conta). Duas provas de backoff: o app fez ≤ 4 requests na vida INTEIRA do
-# mock (esperado 2 = burst inicial, 1 por provider) e o pico em qualquer janela
-# deslizante de 10 s é ≤ 2 (um storm real apareceria como dezenas por segundo —
-# o backoff ×2 parte de 5 min, então cadência alta é estruturalmente impossível).
+# conta). Duas provas de backoff: o app fez ≤ 10 requests na vida INTEIRA do
+# mock (esperado 8 = DOIS bursts de 4: seed launch + launch principal, cada um
+# com 1 codex + 1 zai + 2 openrouter credits+key) e o pico em qualquer janela
+# deslizante de 10 s é ≤ 8 — o e2e moderno é rápido o bastante para os DOIS
+# bursts legítimos caírem na mesma janela (pico observado 8); um STORM real
+# apareceria como dezenas POR SEGUNDO (centenas na janela) — o backoff ×2
+# parte de 5 min, então cadência alta é estruturalmente impossível.
 read -r APP_TOTAL BURST_10S <<EOF2
 $(python3 - "$MOCK_LOG" <<'PYEOF'
 import sys
-app_auth = ("Bearer fake-token-e2e", "Bearer fake-api-key-e2e")
+app_auth = ("Bearer fake-token-e2e", "Bearer fake-api-key-e2e", "Bearer fake-openrouter-e2e")
 ts = []
 for line in open(sys.argv[1]):
     parts = line.split(None, 2)
@@ -434,10 +555,10 @@ print(len(ts), best)
 PYEOF
 )
 EOF2
-check "requests do APP na vida do mock atribuídos pelo token: ${APP_TOTAL:-99} (≤ 4; esperado 2 = burst)" \
-  "[ '${APP_TOTAL:-99}' -le 4 ]"
-check "requests/10s do APP limitado pelo backoff: pico ${BURST_10S:-99} na janela deslizante de 10s (≤ 2)" \
-  "[ '${BURST_10S:-99}' -le 2 ]"
+check "requests do APP na vida do mock atribuídos pelo token: ${APP_TOTAL:-99} (≤ 10; esperado 8 = 2 bursts)" \
+  "[ '${APP_TOTAL:-99}' -le 10 ]"
+check "requests/10s do APP limitados pelo backoff: pico ${BURST_10S:-99} na janela deslizante de 10s (≤ 8)" \
+  "[ '${BURST_10S:-99}' -le 8 ]"
 
 # Diagnóstico da degradação (selfcheck v2 com o mock MORTO): erro tokenizado
 # "network" por provider — nunca mensagem crua com URL (spec §9).
@@ -445,6 +566,35 @@ SELFCHECK_DOWN="$(env "${SELF_ENV[@]}" swift run -c release tokenbar selfcheck "
 say "selfcheck (mock morto): $SELFCHECK_DOWN"
 check "selfcheck pós-morte: erro tokenizado 'network' em codex e zai" \
   "echo \"\$SELFCHECK_DOWN\" | python3 -c 'import json,sys;p=json.load(sys.stdin)[\"providers\"];exit(0 if p[\"codex\"].get(\"error\")==\"network\" and p[\"zai\"].get(\"error\")==\"network\" else 1)'"
+
+# ---------------------------------------------------------------------------
+# 7.7 (F5 T7) DEDUPE PERSISTIDO: relaunch com o mock MORTO. O estado de dedupe
+#     (zai t50/t75, resetsAt carimbado) sobreviveu no banco `alerts:state`;
+#     além disso, snapshot que falha NÃO entra na avaliação — erro de rede não
+#     inventa alerta. Espera POR CONTEÚDO: updatedAt avançar (novo ciclo
+#     publicado) — então o arquivo de captura ainda tem EXATAS 2 linhas e o
+#     estado segue 'enabled' (config persistida + gateway granted).
+# ---------------------------------------------------------------------------
+say "F5 alerts: relaunch (mock morto) p/ provar dedupe persistido e silêncio sob erro"
+kill -9 "$APP_PID" 2>/dev/null; wait "$APP_PID" 2>/dev/null
+env "${COMMON_ENV[@]}" TOKENBAR_E2E_DIR="$STATE" \
+  "build/TokenBar.app/Contents/MacOS/tokenbar" &
+APP_PID=$!
+DEDUPE_OK=0
+for _ in $(seq 1 45); do
+  NEW_UPDATED="$(json_field "$STATE/state.json" "['updatedAt']" 2>/dev/null)"
+  NEW_CLAUDE="$(json_field "$STATE/state.json" "['providers']['claude']['todayTokens']" 2>/dev/null)"
+  if [ "$NEW_UPDATED" != "MISSING" ] && [ "$NEW_CLAUDE" != "MISSING" ] \
+     && [ "$NEW_UPDATED" != "$LAST_UPDATED" ] && [ "$NEW_CLAUDE" -ge "$((AFTER_TOTAL + 222))" ] 2>/dev/null; then
+    DEDUPE_OK=1 && break
+  fi
+  sleep 1
+done
+check "F5 dedupe: app re-aberto publicou ciclo (claude preservado, updatedAt avançou)" "[ '$DEDUPE_OK' = '1' ]"
+check "F5 dedupe: captura ainda com EXATAS 2 linhas — estado persistido não re-dispara, erro não inventa alerta" \
+  "[ \"\$(wc -l < '$STATE/alerts.jsonl' | tr -d ' ')\" = '2' ]"
+check "F5 dedupe: alertsStatus segue 'enabled' (config do banco + gateway granted)" \
+  "[ \"\$(json_field '$STATE/state.json' \"['alertsStatus']\")\" = 'enabled' ]"
 
 # ---------------------------------------------------------------------------
 # 7.5 (F3-a) Histórico consistente: `tokenbar history` (mesmo banco, mesma

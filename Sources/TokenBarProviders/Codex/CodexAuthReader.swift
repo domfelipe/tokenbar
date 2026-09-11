@@ -178,4 +178,14 @@ enum FlexibleJSON {
         }
         return nil
     }
+
+    /// Bloco aninhado opcional por lista de alias (snake/camel): ausente,
+    /// `null` ou shape inesperado → `nil` — o resto da resposta sobrevive
+    /// (mesmo contrato lossy dos campos escalares).
+    static func optional<T: Decodable>(_ type: T.Type, _ c: KeyedDecodingContainer<AnyKey>, _ keys: String...) -> T? {
+        for key in keys {
+            if let v = try? c.decode(T.self, forKey: AnyKey(key)) { return v }
+        }
+        return nil
+    }
 }

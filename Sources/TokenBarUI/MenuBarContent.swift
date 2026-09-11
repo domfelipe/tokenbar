@@ -115,6 +115,16 @@ public struct ProviderDisplay: Equatable, Sendable {
     /// comportamento F2/F3 fica bit-a-bit igual (nenhum campo do menu bar ou
     /// do heartbeat v3 depende disto; é só painel).
     public var accounts: [AccountDisplay]
+    /// Modelo com mais tokens nos últimos 7 dias (daily_agg/daily_model_agg,
+    /// janela 7d, provider-wide — F5, linha "Top model:" do painel; port da
+    /// referência). `nil` = sem histórico com modelo na janela (linha
+    /// omitida — nada inventado). Painel-only: a string do menu bar NÃO muda
+    /// (render gate da F1 intocado).
+    public var topModel7d: String?
+    /// Créditos do último snapshot (F5 T6: saldo de API do Codex/OpenRouter/
+    /// DeepSeek; linha "Credits" do painel). `nil` = provider sem crédito no
+    /// ciclo (linha omitida). Painel/heartbeat-only: menu bar intocado.
+    public var credits: CreditsInfo?
 
     public init(
         percent: Double? = nil,
@@ -133,7 +143,9 @@ public struct ProviderDisplay: Equatable, Sendable {
         monthHistoryAvailable: Bool = false,
         pacing: PacingForecast? = nil,
         monthSeries: [PanelDayPoint] = [],
-        accounts: [AccountDisplay] = []
+        accounts: [AccountDisplay] = [],
+        topModel7d: String? = nil,
+        credits: CreditsInfo? = nil
     ) {
         self.percent = percent
         self.todayTokens = todayTokens
@@ -152,6 +164,8 @@ public struct ProviderDisplay: Equatable, Sendable {
         self.pacing = pacing
         self.monthSeries = monthSeries
         self.accounts = accounts
+        self.topModel7d = topModel7d
+        self.credits = credits
     }
 
     /// Estado inicial (nada ciclo ainda): sem dado — some da string do menu.
@@ -174,10 +188,21 @@ public struct ProviderDisplay: Equatable, Sendable {
 /// Conteúdo consolidado do menu bar — estado POR provider (F2). A string de
 /// exibição segue a tabela de siglas D5, ordem fixa C, X, G, Z; provider sem
 /// dado (sem % e sem tokens) some da string.
+///
+/// F5 Task 3: `visibleProviders` filtra QUAIS providers aparecem no texto
+/// (janela de Settings → checkboxes; persistência na tabela `settings`, lida
+/// pelo coordinator). Default = todos — comportamento idêntico ao de quem
+/// nunca abriu settings. O gate da F1 segue valendo: visibilidade que não
+/// muda a string exibida (provider escondido sem dados) não re-renderiza.
 public struct MenuBarContent: Equatable, Sendable {
-    /// Tabela de siglas D5 — codex é "X" (não colide com claude).
+    /// Tabela de siglas D5 — codex é "X" (não colide com claude). F5 (ruling
+    /// F5-SIGLAS): cursor=U, openrouter=O, qwen/alibaba=Q, antigravity=V,
+    /// deepseek=D, grok=K (G conflita com gemini; A conflita com a ordem
+    /// alfabética dos demais — tabela estendida em docs/decisoes-f5).
     public static let siglas: [ProviderID: String] = [
         .claude: "C", .codex: "X", .gemini: "G", .zai: "Z",
+        .cursor: "U", .openrouter: "O", .alibaba: "Q",
+        .antigravity: "V", .deepseek: "D", .grok: "K",
     ]
 
     /// Ordem fixa de exibição; ids fora da tabela (cursor/openrouter/copilot)
@@ -187,14 +212,23 @@ public struct MenuBarContent: Equatable, Sendable {
     /// Nome completo p/ as linhas do painel (menu, não menu bar).
     public static let displayNames: [ProviderID: String] = [
         .claude: "Claude", .codex: "Codex", .gemini: "Gemini", .zai: "Z.ai",
+        .cursor: "Cursor", .openrouter: "OpenRouter", .alibaba: "Qwen",
+        .antigravity: "Antigravity", .deepseek: "DeepSeek", .grok: "Grok",
     ]
 
     public let providers: [ProviderID: ProviderDisplay]
+    /// Providers presentes no texto do menu bar/linhas (Task 3). Vazio é
+    /// escolha válida → displayString fica "TB".
+    public let visibleProviders: Set<ProviderID>
 
     public static let empty = MenuBarContent(providers: [:])
 
-    public init(providers: [ProviderID: ProviderDisplay]) {
+    public init(
+        providers: [ProviderID: ProviderDisplay],
+        visibleProviders: Set<ProviderID> = Set(ProviderID.allCases)
+    ) {
         self.providers = providers
+        self.visibleProviders = visibleProviders
     }
 
     /// Conveniência de migração (F1/totais crus): só tokens, sem janela.
@@ -211,14 +245,17 @@ public struct MenuBarContent: Equatable, Sendable {
     }
 
     /// Pares (id, display) com dado, na ordem fixa de exibição (C, X, G, Z;
-    /// demais ids atrás, alfabético).
+    /// demais ids atrás, alfabético). Respeita `visibleProviders` (Task 3):
+    /// provider fora do conjunto NÃO entra no texto do menu bar nem nas
+    /// linhas — some por escolha do usuário, não por falta de dado.
     public func orderedProviders() -> [(id: ProviderID, display: ProviderDisplay)] {
         var order: [ProviderID: Int] = [:]
         let allIDs: [ProviderID] = Self.displayOrder + ProviderID.allCases.sorted { $0.rawValue < $1.rawValue }
         for (index, id) in allIDs.enumerated() {
             if order[id] == nil { order[id] = index }  // primeira ocorrência vence
         }
-        let active = providers.compactMap { (id: $0.key, display: $0.value) }.filter { $0.display.hasData }
+        let active = providers.compactMap { (id: $0.key, display: $0.value) }
+            .filter { $0.display.hasData && visibleProviders.contains($0.id) }
         let sorted = active.sorted { lhs, rhs in
             let lhsIndex = order[lhs.id] ?? Int.max
             let rhsIndex = order[rhs.id] ?? Int.max

@@ -35,64 +35,51 @@ struct TokenBarApp: App {
     var body: some Scene {
         // Estilo .window: dá onAppear/onDisappear do painel — é assim que o
         // wiring cumpre a spec §7 (fire imediato ao abrir, reafirmar enquanto
-        // aberto). F4: painel rico (abas por provider com logo, barras de
-        // janela com countdown, pacing, custos e chart 30d) no lugar da lista
-        // de texto; ações preservadas; multi-conta (F4 Task 3) com seção de
-        // contas por aba e item "Add account…".
+        // aberto). F5 (ruling F5-DESIGN): o painel INTEIRO é o design portado
+        // da referência (chip-bar, barra segmentada, dashboard, ações e
+        // rodapé Refresh/Settings/About/Quit dentro da view) — o app só
+        // fornece as ações.
         MenuBarExtra {
-            VStack(alignment: .leading, spacing: 8) {
-                // F4 Task 3: painel recebe o modelo de contas + ação de abrir
-                // o formulário de add-account (janela própria).
-                ProviderPanelView(
-                    store: appState.store,
-                    accounts: appState.accountsModel,
-                    addAccountAction: { appState.showAddAccount(for: $0) })
-                Divider()
-                Button("Refresh now") {
-                    Task { await appState.forceIngest() }
-                }
-                Divider()
-                // F3 Task 3: analytics em janela PRÓPRIA (não o painel) e export
-                // CSV/JSON do histórico (30d) com reveal no Finder. Sem atalhos
-                // próprios (padrão F2: só o Quit tem — evita colidir com bindings
-                // padrão do macOS).
-                Button("Analytics…") {
-                    appState.showAnalytics()
-                }
-                Button("Export history…") {
-                    Task { await appState.exportHistory() }
-                }
-                // F4 Task 3: multi-conta — abre o form para o provider da aba
-                // selecionada COM suporte (aba Gemini/sem suporte não registra
-                // linha morta; review T3 Minor 2) ou o primeiro com suporte.
-                // Sem DB (degradação F2) → item oculto (honesto: nada a
-                // registrar).
-                if appState.accountsModel.registry != nil {
-                    Button("Add account…") {
-                        let selected = appState.store.selectedProvider
-                        let target = selected
-                            .flatMap { appState.accountsModel.supportsMultiAccount($0) ? $0 : nil }
-                            ?? appState.accountsModel.multiAccountProviders
-                                .sorted { $0.rawValue < $1.rawValue }.first
-                        if let target {
-                            appState.showAddAccount(for: target)
-                        }
+            // F4 Task 3: painel recebe o modelo de contas + ação de abrir o
+            // formulário de add-account (janela própria). O alvo é o provider
+            // da aba COM suporte a multi-conta; sem suporte na aba → o
+            // primeiro com suporte (fallback do item F4; aba sem suporte não
+            // registra linha morta — review T3 Minor 2). Sem DB (degradação
+            // F2) → showAddAccount loga e ignora. Settings fica desabilitado
+            // até a Task 3 (linha presente, clique não).
+            ProviderPanelView(
+                store: appState.store,
+                accounts: appState.accountsModel,
+                addAccountAction: { selected in
+                    let target = appState.accountsModel.supportsMultiAccount(selected)
+                        ? selected
+                        : appState.accountsModel.multiAccountProviders
+                            .sorted { $0.rawValue < $1.rawValue }.first
+                    if let target {
+                        appState.showAddAccount(for: target)
                     }
-                }
-                Divider()
-                Button("Quit TokenBar") {
+                },
+                refreshAction: { Task { await appState.forceIngest() } },
+                analyticsAction: { appState.showAnalytics() },
+                exportAction: { Task { await appState.exportHistory() } },
+                aboutAction: { NSApp.orderFrontStandardAboutPanel(nil) },
+                quitAction: {
                     appState.stop()
                     NSApp.terminate(nil)
-                }
-                .keyboardShortcut("q")
-            }
-            .padding(10)
-            .frame(minWidth: 280, alignment: .leading)
-            .onAppear { appState.menuDidOpen() }
-            .onDisappear { appState.menuDidClose() }
+                })
+                .onAppear { appState.menuDidOpen() }
+                .onDisappear { appState.menuDidClose() }
         } label: {
             Text(appState.store.menuBarText)
         }
         .menuBarExtraStyle(.window)
+
+        // F5 Task 3: janela de ajustes (⌘,) — launch at login, intervalos de
+        // refresh, alertas e providers do menu bar. O SettingsModel é criado
+        // no AppState com as partes do coordinator (engine de alertas,
+        // scheduler, gateway, banco).
+        Settings {
+            SettingsView(model: appState.settingsModel)
+        }
     }
 }
