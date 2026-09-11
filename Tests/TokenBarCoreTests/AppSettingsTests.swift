@@ -102,11 +102,44 @@ final class AppSettingsTests {
         store.saveVisibleProviders([])
         #expect(store.loadVisibleProviders() == [])
 
-        // JSON de versão futura com id desconhecido → carrega o que der.
+        // JSON de versão futura com id desconhecido → carrega o que der (a
+        // flag touched existe porque o save acima a gravou).
         try db.setSetting(
             String(decoding: JSONEncoder().encode(["claude", "warp"]), as: UTF8.self),
             forKey: AppSettingsStore.menuBarVisibleKey)
         #expect(store.loadVisibleProviders() == [.claude])
+    }
+
+    // MARK: - Migração visibleProvidersTouched (F5 T7, carry-forward T4/T5)
+
+    @Test("migração: banco F4 legado (lista SEM flag touched) → novos providers ficam VISÍVEIS")
+    func legacyListWithoutTouchedFlagShowsNewProviders() throws {
+        let db = try makeDatabase()
+        // Exatamente o que um F4 gravava: o conjunto COMPLETO da época
+        // (claude/codex/gemini/zai), sem flag — os 6 F5 não existiam lá.
+        try db.setSetting(
+            String(decoding: JSONEncoder().encode(
+                ["claude", "codex", "gemini", "zai"]), as: UTF8.self),
+            forKey: AppSettingsStore.menuBarVisibleKey)
+        let store = AppSettingsStore(database: db)
+        #expect(store.loadVisibleProviders() == Set(ProviderID.allCases))
+        #expect(store.loadVisibleProviders().isSuperset(of: [.cursor, .openrouter, .alibaba, .antigravity, .deepseek, .grok]))
+    }
+
+    @Test("migração: após o 1º save a flag existe — lista persistida manda (novos nascem escondidos)")
+    func touchedFlagMakesPersistedListAuthoritative() throws {
+        let db = try makeDatabase()
+        let store = AppSettingsStore(database: db)
+        store.saveVisibleProviders([.claude, .codex])
+        // "Novo provider" surgindo depois do usuário editar uma vez:
+        try db.setSetting("false", forKey: AppSettingsStore.visibleTouchedKey)  // flag presente
+        try db.setSetting(
+            String(decoding: JSONEncoder().encode(["claude"]), as: UTF8.self),
+            forKey: AppSettingsStore.menuBarVisibleKey)
+        #expect(store.loadVisibleProviders() == [.claude])
+        // Flag removida (rollback/repair manual) → default de novo.
+        try db.setSetting(nil, forKey: AppSettingsStore.visibleTouchedKey)
+        #expect(store.loadVisibleProviders() == Set(ProviderID.allCases))
     }
 
     // MARK: - Sem DB (degradação)

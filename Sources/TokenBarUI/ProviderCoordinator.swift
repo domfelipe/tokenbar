@@ -446,7 +446,18 @@ public final class ProviderCoordinator {
         let defaultRef = discovered.first { $0.id.key == "local" }
             ?? AccountRef(id: AccountID(provider: id, key: "local"), label: "local")
         targets.append((provider, defaultRef, nil))
+        // Guard de overlap RESIDUAL (Red Team F5): a UI bloquea registro de dir
+        // sobre a raiz canônica (review T3), mas um INSERT programático por
+        // baixo do app contorna o guard — a conta sobreposta NÃO ingere (o
+        // canônico já cobre aqueles arquivos; sem este filtro o agregado do
+        // provider dobraria a cada ciclo). Badge segue o path (visível).
+        let canonicalRoot = canonicalScanRoot(for: id)
         for entry in registered where entry.accountKey != "local" {
+            if Self.overlapsCanonical(
+                accountDirectory: entry.directoryPath, canonicalRoot: canonicalRoot)
+            {
+                continue
+            }
             if let instance = accountInstance(provider: id, entry: entry) {
                 targets.append((instance, AccountRef(id: AccountID(provider: id, key: entry.accountKey), label: entry.label), entry))
             }
@@ -558,6 +569,9 @@ public final class ProviderCoordinator {
                 display.authState = snapshot.authState
                 display.source = snapshot.source
                 display.fetchedAt = snapshot.fetchedAt
+                // Credits do snapshot (F5 T6): saldo real → linha do painel +
+                // heartbeat; nil/ausente → omitido (nada inventado).
+                display.credits = snapshot.credits
             } catch {
                 ok = false
                 errorToken = errorToken ?? Self.errorToken(error)
@@ -659,6 +673,27 @@ public final class ProviderCoordinator {
             return true
         }
         return false
+    }
+
+    /// Dir de conta sobre a raiz canônica de scan (igual, descendente OU
+    /// ancestral — Red Team F5 caso "bypass programático residual"): inserir
+    /// direto no banco contorna o guard da UI, então o CICLO defende. Comparação
+    /// por path padronizado com fronteira de componente (`/a/b` não cobre
+    /// `/a/bc`); dir vazia nunca sobrepõe. `canonicalRoot == nil` (provider
+    /// API-only) → false.
+    static func overlapsCanonical(accountDirectory: String, canonicalRoot: URL?) -> Bool {
+        guard !accountDirectory.isEmpty, let canonicalRoot else { return false }
+        func standardized(_ path: String, isDirectory: Bool) -> String {
+            var url = URL(fileURLWithPath: path, isDirectory: isDirectory)
+                .standardizedFileURL
+            if url.path.hasSuffix("/") { url.deleteLastPathComponent() }
+            return url.path
+        }
+        let account = standardized(accountDirectory, isDirectory: true)
+        let canonical = standardized(canonicalRoot.path, isDirectory: true)
+        guard !account.isEmpty, !canonical.isEmpty else { return false }
+        if account == canonical { return true }
+        return account.hasPrefix(canonical + "/") || canonical.hasPrefix(account + "/")
     }
 
     /// Instância de provider da conta registrada — criada uma vez e retida
@@ -825,6 +860,10 @@ public final class ProviderCoordinator {
         result.authState = source.display.authState
         result.source = source.display.source
         result.fetchedAt = accounts.map(\.display.fetchedAt).max() ?? previous.fetchedAt
+        // Credits segue a conta-fonte (crítica/primeira) — mesmo critério do
+        // pior caso visível (F5 T6); agregação de saldos somaria contas
+        // distintas como se fosse uma carteira só (mentira).
+        result.credits = source.display.credits
         result.accounts = accounts
         return result
     }
@@ -905,7 +944,9 @@ public final class ProviderCoordinator {
         store.apply(MenuBarContent(
             providers: displays, visibleProviders: menuBarVisibleProviders))
         if let e2eDirectory = config.e2eDirectory {
-            E2EHeartbeat.write(menuBarText: store.menuBarText, providers: displays, directory: e2eDirectory)
+            E2EHeartbeat.write(
+                menuBarText: store.menuBarText, providers: displays,
+                directory: e2eDirectory, alertsStatus: store.alertsStatus)
         }
     }
 

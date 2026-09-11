@@ -144,8 +144,9 @@ final class AlibabaUsageAPITests {
     }
 
     /// Contrato da referência: POST no gateway injetado com action/product/api/
-    /// currentRegionId, Bearer + x-api-key + X-DashScope-API-Key, corpo com
-    /// commodityCode da região. Janelas 5h/semana/mês mapeadas.
+    /// currentRegionId, Bearer + x-api-key + X-DashScope-API-Key + Origin/
+    /// Referer da região (carry-forward T7), corpo com commodityCode da região.
+    /// Janelas 5h/semana/mês mapeadas.
     @Test func fetchUsageMapsQuotaWindowsAndSendsContract() async throws {
         F5StubURLProtocol.configure({ _ in
             F5StubURLProtocol.Exchange(status: 200, body: Data(AlibabaFixtures.quotaBody.utf8), error: nil)
@@ -166,6 +167,10 @@ final class AlibabaUsageAPITests {
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer fake-key")
         #expect(request.value(forHTTPHeaderField: "x-api-key") == "fake-key")
         #expect(request.value(forHTTPHeaderField: "X-DashScope-API-Key") == "fake-key")
+        // Carry-forward T7: Origin = gateway da região; Referer = dashboard da
+        // região (`dashboardURL` da referência, bit-a-bit).
+        #expect(request.value(forHTTPHeaderField: "Origin") == "https://\(AlibabaFixtures.host)")
+        #expect(request.value(forHTTPHeaderField: "Referer") == "https://modelstudio.console.alibabacloud.com/ap-southeast-1/?tab=coding-plan#/efm/coding_plan")
         #expect(request.httpBody != nil)
 
         #expect(snapshot.source == .api)

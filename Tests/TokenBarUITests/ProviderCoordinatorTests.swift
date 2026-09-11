@@ -6,7 +6,9 @@ import TokenBarCore
 
 /// Smoke do wiring T7 (degradação): dirs fake via env, bases de API apontando
 /// pra nada, credencial sintética p/ forçar tentativa de rede do Codex —
-/// sem crash, heartbeat v2 escrito com os 4 providers, credencial nunca vaza.
+/// sem crash, heartbeat v2 escrito com os 10 providers (4 canônicos + 6 F5),
+/// credencial nunca vaza (doc comment atualizado na T7 — carregava "4
+/// providers" da era F2).
 ///
 /// Não toca no App Support real: stores de cursor em memória via fábrica.
 /// Providers registrados pelo wiring default (F5 Tasks 4–5: +6 sobre os 4
@@ -83,7 +85,7 @@ struct ProviderCoordinatorTests {
         }
     }
 
-    @Test("wiring degradado: 4 providers no heartbeat v2, sem crash, credencial não vaza")
+    @Test("wiring degradado: 10 providers no heartbeat v2, sem crash, credencial não vaza")
     func degradedWiringWritesHeartbeatV2() async throws {
         let fakeToken = "t7-synthetic-token-never-real"
         let fixture = try Fixture.make(fakeToken: fakeToken)
@@ -164,7 +166,7 @@ struct ProviderCoordinatorTests {
 
         // M1 é skip-if-busy sob MainActor: dois ciclos enfileirados do mesmo
         // provider nunca se sobrepõem (o segundo roda depois — comportamento
-        // observável: ambos completam e o heartbeat fica com os 4 providers).
+        // observável: ambos completam e o heartbeat fica com os 10 providers).
         async let first: Void = coordinator.refreshAllNow()
         async let second: Void = coordinator.refreshAllNow()
         _ = await (first, second)
@@ -272,7 +274,7 @@ struct ProviderCoordinatorTests {
 
     /// Red Team Task 1: DB que não abre (support dir é um ARQUIVO) → degrada
     /// para o comportamento F2 (JSON stores, sem persistência) — ciclos
-    /// completam, heartbeat v2 sai com os 4 providers, sem crash.
+    /// completam, heartbeat v2 sai com os 10 providers, sem crash.
     @Test("degradação sem DB: coordinator segue vivo com comportamento F2")
     func coordinatorDegradesWhenDatabaseUnavailable() async throws {
         let fixture = try Fixture.make(fakeToken: "t7-synthetic-token-never-real")

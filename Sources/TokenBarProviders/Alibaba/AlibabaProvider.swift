@@ -78,7 +78,9 @@ public struct AlibabaAPIError: Error, Sendable, Equatable {
 /// - `fetchUsage`: API key → `POST {gateway}/data/api.json?action=
 ///   zeldaEasy.broadscope-bailian.codingPlan.queryCodingPlanInstanceInfoV2&...`
 ///   com Bearer + `x-api-key` + `X-DashScope-API-Key` (mesma key — ordem da
-///   referência). O gateway PRIMÁRIO é o baseURL injetado no client (canônico
+///   referência) + `Origin`/`Referer` da região (carry-forward T7: portados
+///   do `AlibabaCodingPlanUsageFetcher`). O gateway PRIMÁRIO é o baseURL
+///   injetado no client (canônico
 ///   intl no wiring; injetável p/ e2e); fallback = gateway CANÔNICO da outra
 ///   região (1 tentativa extra/ciclo, como `shouldRetryOnAlternateRegion`).
 ///   401/403 nas duas → `.invalid`; erro de rede → rethrow (backoff).
@@ -96,22 +98,44 @@ public final class AlibabaProvider: Sendable, UsageProvider {
         public let gateway: URL
         public let regionID: String
         public let commodityCode: String
+        /// Dashboard da região (Referer da referência — `dashboardURL`).
+        public let dashboardURL: URL
 
-        init(id: String, gateway: URL, regionID: String, commodityCode: String) {
+        init(
+            id: String, gateway: URL, regionID: String, commodityCode: String,
+            dashboardURL: URL
+        ) {
             self.id = id
             self.gateway = gateway
             self.regionID = regionID
             self.commodityCode = commodityCode
+            self.dashboardURL = dashboardURL
         }
     }
 
     /// Regiões canônicas da referência: intl (Model Studio) e cn (Bailian).
+    /// `dashboardURL` é o `dashboardURL` da referência (campo `Referer` do
+    /// request — carry-forward review T4/T5: os headers Origin/Referer que a
+    /// referência manda no modo API key foram omitidos no port inicial).
     public static let regions: [Region] = [
-        Region(id: "intl", gateway: URL(string: "https://modelstudio.console.alibabacloud.com")!,
-               regionID: "ap-southeast-1", commodityCode: "sfm_codingplan_public_intl"),
-        Region(id: "cn", gateway: URL(string: "https://bailian.console.aliyun.com")!,
-               regionID: "cn-beijing", commodityCode: "sfm_codingplan_public_cn"),
+        Region(
+            id: "intl", gateway: URL(string: "https://modelstudio.console.alibabacloud.com")!,
+            regionID: "ap-southeast-1", commodityCode: "sfm_codingplan_public_intl",
+            dashboardURL: URL(string: "https://modelstudio.console.alibabacloud.com/ap-southeast-1/?tab=coding-plan#/efm/coding_plan")!),
+        Region(
+            id: "cn", gateway: URL(string: "https://bailian.console.aliyun.com")!,
+            regionID: "cn-beijing", commodityCode: "sfm_codingplan_public_cn",
+            dashboardURL: URL(string: "https://bailian.console.aliyun.com/cn-beijing/?tab=model#/efm/coding_plan")!),
     ]
+
+    /// Região da referência com o gateway CANÔNICO trocado pela base injetada
+    /// (testes/e2e) — dashboard/regionID/commodityCode continuam os canônicos.
+    static func region(_ id: String, gateway: URL) -> Region {
+        let canonical = canonicalRegion(id)
+        return Region(
+            id: canonical.id, gateway: gateway, regionID: canonical.regionID,
+            commodityCode: canonical.commodityCode, dashboardURL: canonical.dashboardURL)
+    }
 
     static func canonicalRegion(_ id: String) -> Region {
         regions.first { $0.id == id } ?? regions[0]
@@ -181,11 +205,7 @@ public final class AlibabaProvider: Sendable, UsageProvider {
         }
 
         let primaryID = Self.primaryRegionID(environment: credentialReader.environment)
-        let primary = Self.Region(
-            id: primaryID,
-            gateway: client.baseURL,
-            regionID: Self.canonicalRegion(primaryID).regionID,
-            commodityCode: Self.canonicalRegion(primaryID).commodityCode)
+        let primary = Self.region(primaryID, gateway: client.baseURL)
         let ordered = [primary, Self.canonicalRegion(primaryID == "cn" ? "intl" : "cn")]
 
         var rejectedUnauthorized = false
@@ -194,7 +214,7 @@ public final class AlibabaProvider: Sendable, UsageProvider {
                 let data = try await client.postJSON(
                     url: Self.quotaURL(region: region),
                     bearer: apiKey,
-                    headers: Self.requestHeaders(apiKey: apiKey),
+                    headers: Self.requestHeaders(apiKey: apiKey, region: region),
                     body: Self.requestBody(region: region))
                 let json = try JSONSerialization.jsonObject(with: data)
                 if let quota = Self.findQuotaInfo(in: json) {
@@ -216,12 +236,16 @@ public final class AlibabaProvider: Sendable, UsageProvider {
     // MARK: - Request (contrato da referência, modo API key)
 
     /// Headers da referência: a MESMA key vai em `Authorization` (Bearer, via
-    /// client), `x-api-key` e `X-DashScope-API-Key`.
-    static func requestHeaders(apiKey: String) -> [String: String] {
+    /// client), `x-api-key` e `X-DashScope-API-Key`; `Origin` = gateway da
+    /// região e `Referer` = dashboard da região (`AlibabaCodingPlanAPIRegion`
+    /// → `AlibabaCodingPlanUsageFetcher` — carry-forward T7: incluídos no port).
+    static func requestHeaders(apiKey: String, region: Region) -> [String: String] {
         [
             "User-Agent": userAgent,
             "x-api-key": apiKey,
             "X-DashScope-API-Key": apiKey,
+            "Origin": region.gateway.absoluteString,
+            "Referer": region.dashboardURL.absoluteString,
         ]
     }
 

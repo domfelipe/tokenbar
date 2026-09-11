@@ -10,8 +10,10 @@ import Foundation
 /// - `scheduler:idleIntervalSeconds` — refresh em background/ocioso
 ///   (default 300 s, spec §7).
 /// - `menubar:visibleProviders` — providers que aparecem no TEXTO do menu
-///   bar (JSON de rawValues; ausente = todos — default de quem nunca abriu
-///   settings).
+///   bar (JSON de rawValues; lida só quando `menubar:visibleProvidersTouched`
+///   existe — migração F5 T7: sem a flag, o default é TODOS os providers
+///   conhecidos HOJE, então providers novos ficam visíveis para quem nunca
+///   editou a lista).
 ///
 /// HONESTIDADE (mesmo padrão do AlertEngine/Red Team): valor corrompido ou
 /// fora de faixa → DEFAULT do campo (nunca crash, nunca chute intermediário);
@@ -81,9 +83,21 @@ public struct AppSettingsStore: Sendable {
     /// Default = TODOS (comportamento de quem nunca mexeu nas settings).
     public static let defaultVisibleProviders = Set(ProviderID.allCases)
 
+    /// Migração F5 T7 (carry-forward review T4/T5): a lista persistida era o
+    /// CONJUNTO COMPLETO da versão que gravou — um banco F4 (4 providers) fazia
+    /// os providers F5 NOVOS ficarem escondidos para sempre, mesmo sem o
+    /// usuário tê-los escondido. A flag `menubar:visibleProvidersTouched`
+    /// separa os dois mundos: AUSENTE = usuário nunca editou a lista → default
+    /// (todos, incluindo os novos); PRESENTE = conjunto persistido manda.
+    public static let visibleTouchedKey = "menubar:visibleProvidersTouched"
+
     public func loadVisibleProviders() -> Set<ProviderID> {
-        guard let database,
-              let raw = try? database.setting(forKey: Self.menuBarVisibleKey),
+        guard let database else { return Self.defaultVisibleProviders }
+        // Nunca editou (flag ausente) → todos os providers CONHECIDOS HOJE.
+        guard let touched = try? database.setting(forKey: Self.visibleTouchedKey) else {
+            return Self.defaultVisibleProviders
+        }
+        guard let raw = try? database.setting(forKey: Self.menuBarVisibleKey),
               let rawValues = try? JSONDecoder().decode([String].self, from: Data(raw.utf8))
         else { return Self.defaultVisibleProviders }
         let parsed = Set(rawValues.compactMap(ProviderID.init(rawValue:)))
@@ -98,5 +112,8 @@ public struct AppSettingsStore: Sendable {
         else { return }
         try? database.setSetting(
             String(decoding: data, as: UTF8.self), forKey: Self.menuBarVisibleKey)
+        // A partir daqui a lista persistida É a escolha do usuário (novos
+        // providers nascem escondidos — o checkbox na Settings é o caminho).
+        try? database.setSetting("true", forKey: Self.visibleTouchedKey)
     }
 }

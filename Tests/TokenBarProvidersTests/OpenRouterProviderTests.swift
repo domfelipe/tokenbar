@@ -262,3 +262,103 @@ final class OpenRouterUsageAPITests {
         }
     }
 }
+
+// MARK: - 2 keys simultâneas (carry-forward review T4/T5)
+
+/// `.multiAccount` REAL do OpenRouter: DUAS keys registradas em paralelo, cada
+/// uma com instância própria (mesmo wiring do `makeAccountProvider`) — o ciclo
+/// cobre as duas e cada request carrega a Bearer DA SUA key (zero cross-talk).
+@Suite(.serialized)
+final class OpenRouterMultiKeyTests {
+    static let host = "or-multi.example.com"
+    let dir: URL
+
+    init() throws {
+        dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ormulti-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: dir)
+    }
+
+    func writeKey(_ name: String, _ content: String) throws -> URL {
+        let url = dir.appendingPathComponent(name)
+        try content.write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+
+    func makeRegistry() throws -> (AppDatabase, AccountRegistry) {
+        let db = try AppDatabase.open(
+            at: dir.appendingPathComponent("db-\(UUID().uuidString).sqlite"),
+            calendar: Calendar.current)
+        return (db, AccountRegistry(database: db))
+    }
+
+    @Test("2 keys simultâneas: descoberta merge + instância por key + saldo/janela ISOLADOS por conta")
+    func twoKeysCycleInParallelWithoutCrossTalk() async throws {
+        let keyA = try writeKey("key-a.txt", "fake-or-key-a")
+        let keyB = try writeKey("key-b.txt", "fake-or-key-b")
+        let (db, registry) = try makeRegistry()
+        let accountA = try registry.add(provider: .openrouter, label: "Alpha", credentialPath: keyA.path)
+        let accountB = try registry.add(provider: .openrouter, label: "Beta", credentialPath: keyB.path)
+
+        // Resposta por key: saldos e janelas DISTINTOS (prova de isolamento).
+        F5StubURLProtocol.configure({ request in
+            guard let auth = request.value(forHTTPHeaderField: "Authorization") else {
+                return F5StubURLProtocol.Exchange(status: 401, body: Data(), error: nil)
+            }
+            let credits: String
+            let key: String
+            switch auth {
+            case "Bearer fake-or-key-a":
+                credits = #"{"data":{"total_credits":100,"total_usage":30}}"#  // saldo 70
+                key = #"{"data":{"limit":40,"limit_remaining":20}}"#           // 50%
+            default:
+                credits = #"{"data":{"total_credits":10,"total_usage":9}}"#    // saldo 1
+                key = #"{"data":{"limit":20,"usage":5,"limit_reset":"daily"}}"# // sem remaining → usage_daily? não veio; usage 5/20 = 25%
+            }
+            let body = request.url?.path.hasSuffix("/credits") == true ? credits : key
+            return F5StubURLProtocol.Exchange(status: 200, body: Data(body.utf8), error: nil)
+        }, host: Self.host)
+
+        func makeInstance(_ entry: RegisteredAccount) -> OpenRouterProvider {
+            OpenRouterProvider(
+                credentialReader: OpenRouterCredentialReader(keyFileURL: URL(filePath: entry.credentialPath)),
+                client: UsageHTTPClient(
+                    baseURL: URL(string: "https://\(Self.host)/api/v1")!,
+                    session: f5StubbedSession()),
+                accountKey: entry.accountKey,
+                label: entry.label)
+        }
+
+        // Descoberta da instância canônica (sem env key): só as 2 registradas.
+        let canonical = OpenRouterProvider(
+            credentialReader: OpenRouterCredentialReader(environment: [:]),
+            client: UsageHTTPClient(baseURL: URL(string: "https://\(Self.host)/api/v1")!),
+            accounts: registry)
+        let refs = await canonical.discoverAccounts()
+        #expect(refs.map(\.id.key) == [accountA.accountKey, accountB.accountKey],
+                "sem auto (sem env), as 2 registradas — 1 key = 1 conta")
+
+        let registered = try registry.activeAccounts(provider: .openrouter)
+        let instanceA = makeInstance(try #require(registered.first { $0.accountKey == accountA.accountKey }))
+        let instanceB = makeInstance(try #require(registered.first { $0.accountKey == accountB.accountKey }))
+        let snapshotA = try await instanceA.fetchUsage(instanceA.accountRef)
+        let snapshotB = try await instanceB.fetchUsage(instanceB.accountRef)
+
+        // Saldos e janelas da key CERTA em cada conta.
+        #expect(snapshotA.credits == CreditsInfo(remaining: 70, unlimited: false))
+        #expect(snapshotA.windows.count == 1)
+        #expect(snapshotA.windows[0].usedFraction == 0.5)
+        #expect(snapshotB.credits == CreditsInfo(remaining: 1, unlimited: false))
+        #expect(snapshotB.windows[0].usedFraction == 0.25)
+
+        // Cada request carregou a Bearer da PRÓPRIA key (nunca misturou).
+        let auths = Set(F5StubURLProtocol.requests(host: Self.host).compactMap {
+            $0.value(forHTTPHeaderField: "Authorization")
+        })
+        #expect(auths == ["Bearer fake-or-key-a", "Bearer fake-or-key-b"])
+    }
+}
