@@ -111,3 +111,54 @@ public struct UserNotificationGateway: NotificationSending {
         }
     }
 }
+
+/// Gateway de CAPTURA do e2e (F5 Task 7): mesma fronteira `NotificationSending`,
+/// mas grava cada evento como linha JSON (`{identifier, title, body, event}`) no
+/// arquivo indicado — prova objetiva de alerta disparado/dedupado SEM tocar no
+/// `UNUserNotificationCenter` real (o runner de e2e não tem app bancarizado nem
+/// permissão de notificação; ruling F5-NOTIF). Autorização: `.granted` simulado —
+/// o e2e planta `alerts:enabled` direto no banco, como faria o toggle da Settings.
+/// A renderização (title/body EN) e o identificador de dedupe são os MESMOS do
+/// gateway real (`UserNotificationGateway.render`/`identifier`).
+public actor E2EAlertCaptureGateway: NotificationSending {
+    private let fileURL: URL
+
+    public init(fileURL: URL) {
+        self.fileURL = fileURL
+    }
+
+    public func requestAuthorization() async -> Bool { true }
+
+    public func authorizationState() async -> NotificationAuthorizationState { .granted }
+
+    public func deliver(_ event: AlertEvent) async {
+        let rendered = UserNotificationGateway.render(event)
+        let resetsAt: Any = event.resetsAt.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull()
+        let line: [String: Any] = [
+            "identifier": UserNotificationGateway.identifier(for: event),
+            "title": rendered.title,
+            "body": rendered.body,
+            "event": [
+                "kind": event.kind.rawValue,
+                "provider": event.provider.rawValue,
+                "account": event.account.key,
+                "window": event.windowKind.rawValue,
+                "thresholdPct": event.thresholdPct.map { $0 as Any } ?? NSNull(),
+                "resetsAt": resetsAt,
+            ],
+        ]
+        guard var data = try? JSONSerialization.data(withJSONObject: line, options: [.sortedKeys]) else { return }
+        data.append(0x0A)
+        if !FileManager.default.fileExists(atPath: fileURL.path) {
+            try? FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? data.write(to: fileURL, options: .atomic)
+            return
+        }
+        if let handle = try? FileHandle(forWritingTo: fileURL) {
+            defer { try? handle.close() }
+            try? handle.seekToEnd()
+            try? handle.write(contentsOf: data)
+        }
+    }
+}

@@ -1,0 +1,1731 @@
+[0/1] Planning build
+Building for debugging...
+[0/7] Write swift-version--1AB21518FC5DEDBE.txt
+Build complete! (0.27s)
+[0/1] Planning build
+Building for debugging...
+[0/11] Write swift-version--1AB21518FC5DEDBE.txt
+[2/166] Compiling genfixtures GenFixtures.swift
+[3/166] Emitting module genfixtures
+[3/165] Linking genfixtures
+[4/165] Applying genfixtures
+[6/165] Compiling GRDB FTS3Pattern.swift
+[7/165] Compiling GRDB FTS3TokenizerDescriptor.swift
+[8/165] Compiling GRDB FTS4.swift
+[9/165] Compiling GRDB FTS5.swift
+[10/165] Compiling GRDB FTS5CustomTokenizer.swift
+[11/165] Compiling GRDB FTS5Pattern.swift
+[12/165] Compiling GRDB FTS5Tokenizer.swift
+[13/165] Compiling GRDB FTS5TokenizerDescriptor.swift
+[14/165] Compiling GRDB FTS5WrapperTokenizer.swift
+[15/165] Compiling GRDB Fixits.swift
+[16/165] Compiling GRDB JSONColumn.swift
+[17/165] Compiling GRDB SQLJSONExpressible.swift
+[18/165] Compiling GRDB SQLJSONFunctions.swift
+[19/165] Compiling GRDB DatabaseMigrator.swift
+[20/165] Compiling GRDB Migration.swift
+[21/165] Compiling GRDB FTS3+QueryInterface.swift
+[22/165] Compiling GRDB FTS5+QueryInterface.swift
+[23/181] Compiling GRDB DatabaseValueConvertible+RawRepresentable.swift
+[24/181] Compiling GRDB JSONRequiredEncoder.swift
+[25/181] Compiling GRDB Optional.swift
+[26/181] Compiling GRDB StandardLibrary.swift
+[27/181] Compiling GRDB TransactionClock.swift
+[28/181] Compiling GRDB TransactionObserver.swift
+[29/181] Compiling GRDB WALSnapshot.swift
+[30/181] Compiling GRDB WALSnapshotTransaction.swift
+[31/181] Compiling GRDB Database+Dump.swift
+[32/181] Compiling GRDB DatabaseReader+dump.swift
+[33/181] Compiling GRDB DumpFormat.swift
+[34/181] Compiling GRDB DebugDumpFormat.swift
+[35/181] Compiling GRDB JSONDumpFormat.swift
+[36/181] Compiling GRDB LineDumpFormat.swift
+[37/181] Compiling GRDB ListDumpFormat.swift
+[38/181] Compiling GRDB QuoteDumpFormat.swift
+[39/181] Compiling GRDB FTS3.swift
+[40/181] Compiling GRDB ForeignKey.swift
+[41/181] Compiling GRDB Association.swift
+[42/181] Compiling GRDB AssociationAggregate.swift
+[43/181] Compiling GRDB BelongsToAssociation.swift
+[44/181] Compiling GRDB HasManyAssociation.swift
+[45/181] Compiling GRDB HasManyThroughAssociation.swift
+[46/181] Compiling GRDB HasOneAssociation.swift
+[47/181] Compiling GRDB HasOneThroughAssociation.swift
+[48/181] Compiling GRDB JoinAssociation.swift
+[49/181] Compiling GRDB CommonTableExpression.swift
+[50/181] Compiling GRDB QueryInterfaceRequest.swift
+[51/181] Compiling GRDB RequestProtocols.swift
+[52/181] Compiling GRDB Column.swift
+[53/181] Compiling GRDB DatabasePromise.swift
+[54/181] Compiling GRDB SQLAssociation.swift
+[55/181] Compiling GRDB SQLCollection.swift
+[56/181] Compiling GRDB SQLExpression.swift
+[57/181] Compiling GRDB StatementAuthorizer.swift
+[58/181] Compiling GRDB StatementColumnConvertible.swift
+[59/181] Compiling GRDB CGFloat.swift
+[60/181] Compiling GRDB Data.swift
+[61/181] Compiling GRDB DatabaseDateComponents.swift
+[62/181] Compiling GRDB DatabaseValueConvertible+ReferenceConvertible.swift
+[63/181] Compiling GRDB Date.swift
+[64/181] Compiling GRDB Decimal.swift
+[65/181] Compiling GRDB NSData.swift
+[66/181] Compiling GRDB NSNull.swift
+[67/181] Compiling GRDB NSNumber.swift
+[68/181] Compiling GRDB NSString.swift
+[69/181] Compiling GRDB SQLiteDateParser.swift
+[70/181] Compiling GRDB URL.swift
+[71/181] Compiling GRDB UUID.swift
+[72/181] Compiling GRDB DatabaseValueConvertible+Decodable.swift
+[73/181] Compiling GRDB DatabaseValueConvertible+Encodable.swift
+[74/181] Compiling GRDB SQLForeignKeyRequest.swift
+[75/181] Compiling GRDB SQLFunctions.swift
+[76/181] Compiling GRDB SQLOperators.swift
+[77/181] Compiling GRDB SQLOrdering.swift
+[78/181] Compiling GRDB SQLRelation.swift
+[79/181] Compiling GRDB SQLSelection.swift
+[80/181] Compiling GRDB SQLSubquery.swift
+[81/181] Compiling GRDB Table.swift
+[82/181] Compiling GRDB SQLColumnGenerator.swift
+[83/181] Compiling GRDB SQLGenerationContext.swift
+[84/181] Compiling GRDB SQLIndexGenerator.swift
+[85/181] Compiling GRDB SQLQueryGenerator.swift
+[86/181] Compiling GRDB SQLTableAlterationGenerator.swift
+[87/181] Compiling GRDB SQLTableGenerator.swift
+[88/181] Compiling GRDB TableAlias.swift
+[89/181] Compiling GRDB SQLInterpolation+QueryInterface.swift
+[90/181] Compiling GRDB ColumnDefinition.swift
+[91/181] Compiling GRDB Database+SchemaDefinition.swift
+[92/181] Compiling GRDB ForeignKeyDefinition.swift
+[93/181] Compiling GRDB IndexDefinition.swift
+[94/181] Compiling GRDB TableAlteration.swift
+[95/181] Compiling GRDB TableDefinition.swift
+[96/181] Compiling GRDB VirtualTableModule.swift
+[97/181] Compiling GRDB TableRecord+Association.swift
+[98/181] Compiling GRDB TableRecord+QueryInterfaceRequest.swift
+[99/181] Compiling GRDB EncodableRecord+Encodable.swift
+[100/181] Compiling GRDB EncodableRecord.swift
+[101/181] Compiling GRDB FetchableRecord+Decodable.swift
+[102/181] Compiling GRDB FetchableRecord+TableRecord.swift
+[103/181] Compiling GRDB FetchableRecord.swift
+[104/181] Compiling GRDB MutablePersistableRecord+DAO.swift
+[105/181] Compiling GRDB MutablePersistableRecord+Delete.swift
+[106/181] Compiling GRDB MutablePersistableRecord+Insert.swift
+[107/181] Compiling GRDB MutablePersistableRecord+Save.swift
+[108/181] Compiling GRDB ReadWriteLock.swift
+[109/181] Compiling GRDB ReceiveValuesOn.swift
+[110/181] Compiling GRDB Refinable.swift
+[111/181] Compiling GRDB Utils.swift
+[112/181] Compiling GRDB DatabaseCancellable.swift
+[113/181] Compiling GRDB ValueConcurrentObserver.swift
+[114/181] Compiling GRDB ValueWriteOnlyObserver.swift
+[115/181] Compiling GRDB Fetch.swift
+[116/181] Compiling GRDB Map.swift
+[117/181] Compiling GRDB RemoveDuplicates.swift
+[118/181] Compiling GRDB Trace.swift
+[119/181] Compiling GRDB ValueReducer.swift
+[120/181] Compiling GRDB SharedValueObservation.swift
+[121/181] Compiling GRDB ValueObservation.swift
+[122/181] Compiling GRDB ValueObservationScheduler.swift
+[123/181] Compiling GRDB resource_bundle_accessor.swift
+[124/181] Emitting module GRDB
+[125/181] Compiling GRDB MutablePersistableRecord+Update.swift
+[126/181] Compiling GRDB MutablePersistableRecord+Upsert.swift
+[127/181] Compiling GRDB MutablePersistableRecord.swift
+[128/181] Compiling GRDB PersistableRecord+Insert.swift
+[129/181] Compiling GRDB PersistableRecord+Save.swift
+[130/181] Compiling GRDB PersistableRecord+Upsert.swift
+[131/181] Compiling GRDB PersistableRecord.swift
+[132/181] Compiling GRDB Record.swift
+[133/181] Compiling GRDB TableRecord.swift
+[134/181] Compiling GRDB CaseInsensitiveIdentifier.swift
+[135/181] Compiling GRDB Inflections+English.swift
+[136/181] Compiling GRDB Inflections.swift
+[137/181] Compiling GRDB Mutex.swift
+[138/181] Compiling GRDB OnDemandFuture.swift
+[139/181] Compiling GRDB OrderedDictionary.swift
+[140/181] Compiling GRDB Pool.swift
+[141/181] Compiling GRDB DatabaseSchemaSource.swift
+[142/181] Compiling GRDB DatabaseSnapshot.swift
+[143/181] Compiling GRDB DatabaseSnapshotPool.swift
+[144/181] Compiling GRDB DatabaseValue.swift
+[145/181] Compiling GRDB DatabaseValueConvertible.swift
+[146/181] Compiling GRDB DatabaseWriter.swift
+[147/181] Compiling GRDB DispatchQueueActor.swift
+[148/181] Compiling GRDB FetchRequest.swift
+[149/181] Compiling GRDB Row.swift
+[150/181] Compiling GRDB RowAdapter.swift
+[151/181] Compiling GRDB RowDecodingError.swift
+[152/181] Compiling GRDB SQL.swift
+[153/181] Compiling GRDB SQLInterpolation.swift
+[154/181] Compiling GRDB SQLRequest.swift
+[155/181] Compiling GRDB SchedulingWatchdog.swift
+[156/181] Compiling GRDB SerializedDatabase.swift
+[157/181] Compiling GRDB Statement.swift
+[158/181] Compiling GRDB Configuration.swift
+[159/181] Compiling GRDB Cursor.swift
+[160/181] Compiling GRDB Database+SQLCipher.swift
+[161/181] Compiling GRDB Database+Schema.swift
+[162/181] Compiling GRDB Database+Statements.swift
+[163/181] Compiling GRDB Database.swift
+[164/181] Compiling GRDB DatabaseBackupProgress.swift
+[165/181] Compiling GRDB DatabaseCollation.swift
+[166/181] Compiling GRDB DatabaseError.swift
+[167/181] Compiling GRDB DatabaseFunction.swift
+[168/181] Compiling GRDB DatabasePool.swift
+[169/181] Compiling GRDB DatabasePublishers.swift
+[170/181] Compiling GRDB DatabaseQueue.swift
+[171/181] Compiling GRDB DatabaseReader.swift
+[172/181] Compiling GRDB DatabaseRegion.swift
+[173/181] Compiling GRDB DatabaseRegionObservation.swift
+[174/181] Compiling GRDB DatabaseSchemaCache.swift
+[175/211] Compiling TokenBarCore AdaptiveScheduler.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Settings/AppSettingsStore.swift:97:19: warning: value 'touched' was defined but never used; consider replacing with boolean test [#no-usage]
+ 95 |         guard let database else { return Self.defaultVisibleProviders }
+ 96 |         // Nunca editou (flag ausente) → todos os providers CONHECIDOS HOJE.
+ 97 |         guard let touched = try? database.setting(forKey: Self.visibleTouchedKey) else {
+    |                   `- warning: value 'touched' was defined but never used; consider replacing with boolean test [#no-usage]
+ 98 |             return Self.defaultVisibleProviders
+ 99 |         }
+[176/211] Compiling TokenBarCore AppSettingsStore.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Settings/AppSettingsStore.swift:97:19: warning: value 'touched' was defined but never used; consider replacing with boolean test [#no-usage]
+ 95 |         guard let database else { return Self.defaultVisibleProviders }
+ 96 |         // Nunca editou (flag ausente) → todos os providers CONHECIDOS HOJE.
+ 97 |         guard let touched = try? database.setting(forKey: Self.visibleTouchedKey) else {
+    |                   `- warning: value 'touched' was defined but never used; consider replacing with boolean test [#no-usage]
+ 98 |             return Self.defaultVisibleProviders
+ 99 |         }
+[177/211] Compiling TokenBarCore LoginService.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Settings/AppSettingsStore.swift:97:19: warning: value 'touched' was defined but never used; consider replacing with boolean test [#no-usage]
+ 95 |         guard let database else { return Self.defaultVisibleProviders }
+ 96 |         // Nunca editou (flag ausente) → todos os providers CONHECIDOS HOJE.
+ 97 |         guard let touched = try? database.setting(forKey: Self.visibleTouchedKey) else {
+    |                   `- warning: value 'touched' was defined but never used; consider replacing with boolean test [#no-usage]
+ 98 |             return Self.defaultVisibleProviders
+ 99 |         }
+[178/214] Compiling TokenBarCore FileCursor.swift
+[179/214] Compiling TokenBarCore FileOffsetStore.swift
+[180/214] Compiling TokenBarCore LedgerSnapshot.swift
+[181/214] Compiling TokenBarCore HistorySeriesFormat.swift
+[182/214] Compiling TokenBarCore UsageEventPersisting.swift
+[183/214] Compiling TokenBarCore UsageEventRecord.swift
+[184/214] Compiling TokenBarCore PricingTable.swift
+[185/214] Compiling TokenBarCore ProviderRegistry.swift
+[186/214] Compiling TokenBarCore UsageProvider.swift
+[187/214] Compiling TokenBarCore PacingEngine.swift
+[188/214] Compiling TokenBarCore AppDatabase.swift
+[189/214] Compiling TokenBarCore CursorMigrator.swift
+[190/214] Compiling TokenBarCore ProviderID.swift
+[191/214] Compiling TokenBarCore TokenSums.swift
+[192/214] Compiling TokenBarCore UsageEvent.swift
+[193/214] Compiling TokenBarCore UsageSnapshot.swift
+[194/214] Compiling TokenBarCore DBOffsetStore.swift
+[195/214] Compiling TokenBarCore HistoryExport.swift
+[196/214] Compiling TokenBarCore HistoryQueries.swift
+[197/214] Compiling TokenBarCore AccountRegistry.swift
+[198/214] Compiling TokenBarCore AlertEngine.swift
+[199/214] Compiling TokenBarCore AccountID.swift
+[200/214] Compiling TokenBarCore FileKind.swift
+[201/214] Compiling TokenBarCore TokenBarCore.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Watcher/TranscriptWatcher.swift:81:9: warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+79 |         ) else { return }
+80 |         stream = streamRef
+81 |         FSEventStreamScheduleWithRunLoop(streamRef, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+   |         `- warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+82 |         FSEventStreamStart(streamRef)
+83 |     }
+
+[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+[202/214] Compiling TokenBarCore TranscriptWatcher.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Watcher/TranscriptWatcher.swift:81:9: warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+79 |         ) else { return }
+80 |         stream = streamRef
+81 |         FSEventStreamScheduleWithRunLoop(streamRef, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+   |         `- warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+82 |         FSEventStreamStart(streamRef)
+83 |     }
+
+[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+[203/214] Compiling TokenBarCore resource_bundle_accessor.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Watcher/TranscriptWatcher.swift:81:9: warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+79 |         ) else { return }
+80 |         stream = streamRef
+81 |         FSEventStreamScheduleWithRunLoop(streamRef, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+   |         `- warning: 'FSEventStreamScheduleWithRunLoop' was deprecated in macOS 13.0: Use FSEventStreamSetDispatchQueue instead. [#DeprecatedDeclaration]
+82 |         FSEventStreamStart(streamRef)
+83 |     }
+
+[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+[204/214] Compiling TokenBarCore TokenLedger.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:128:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+126 |                     let tail = pending - idx - 1
+127 |                     if tail > 0 {
+128 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+129 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+130 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:151:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+149 |                     let tail = pending - idx - 1
+150 |                     if tail > 0 {
+151 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+152 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+153 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:225:9: warning: no calls to throwing functions occur within 'try' expression
+223 |     ) throws {
+224 |         var batch: [UsageEvent] = []
+225 |         try autoreleasepool {
+    |         `- warning: no calls to throwing functions occur within 'try' expression
+226 |             for lineData in segment.split(separator: UInt8(ascii: "\n")) {
+227 |                 let line = String(decoding: lineData, as: UTF8.self)
+[205/214] Compiling TokenBarCore TranscriptIngester.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:128:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+126 |                     let tail = pending - idx - 1
+127 |                     if tail > 0 {
+128 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+129 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+130 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:151:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+149 |                     let tail = pending - idx - 1
+150 |                     if tail > 0 {
+151 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+152 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+153 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:225:9: warning: no calls to throwing functions occur within 'try' expression
+223 |     ) throws {
+224 |         var batch: [UsageEvent] = []
+225 |         try autoreleasepool {
+    |         `- warning: no calls to throwing functions occur within 'try' expression
+226 |             for lineData in segment.split(separator: UInt8(ascii: "\n")) {
+227 |                 let line = String(decoding: lineData, as: UTF8.self)
+[206/214] Compiling TokenBarCore UsageHTTPClient.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:128:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+126 |                     let tail = pending - idx - 1
+127 |                     if tail > 0 {
+128 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+129 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+130 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:151:32: warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+149 |                     let tail = pending - idx - 1
+150 |                     if tail > 0 {
+151 |                         window.withUnsafeMutableBytes { raw in
+    |                                `- warning: result of call to 'withUnsafeMutableBytes' is unused [#no-usage]
+152 |                             memmove(raw.baseAddress!, raw.baseAddress!.advanced(by: idx + 1), tail)
+153 |                         }
+
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarCore/Ingest/TranscriptIngester.swift:225:9: warning: no calls to throwing functions occur within 'try' expression
+223 |     ) throws {
+224 |         var batch: [UsageEvent] = []
+225 |         try autoreleasepool {
+    |         `- warning: no calls to throwing functions occur within 'try' expression
+226 |             for lineData in segment.split(separator: UInt8(ascii: "\n")) {
+227 |                 let line = String(decoding: lineData, as: UTF8.self)
+[207/214] Emitting module TokenBarCore
+[208/233] Compiling TokenBarProviders GrokProvider.swift
+[209/233] Compiling TokenBarProviders OpenRouterCredentialReader.swift
+[210/235] Compiling TokenBarProviders GeminiProvider.swift
+[211/235] Compiling TokenBarProviders GeminiSessionIngester.swift
+[212/235] Compiling TokenBarProviders CursorProvider.swift
+[213/235] Compiling TokenBarProviders DeepSeekProvider.swift
+[214/235] Compiling TokenBarProviders UsageDates.swift
+[215/235] Compiling TokenBarProviders TokenBarProviders.swift
+[216/235] Compiling TokenBarProviders AlibabaProvider.swift
+[217/235] Compiling TokenBarProviders AntigravityCredentialReader.swift
+[218/235] Compiling TokenBarProviders ClaudeTranscriptLine.swift
+[219/235] Compiling TokenBarProviders ClaudeTranscriptLocator.swift
+[220/235] Compiling TokenBarProviders ClaudeLineParser.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarProviders/Claude/ClaudeLineParser.swift:20:13: warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 18 |     // Decoder reutilizado: criar um JSONDecoder por linha custa caro em corpus
+ 19 |     // grande (Red Team caso 2) — o uso é single-thread no ingest.
+ 20 |     private nonisolated(unsafe) static let decoder = JSONDecoder()
+    |             `- warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 21 | 
+ 22 |     /// ISO8601 "yyyy-MM-ddTHH:mm:ss[.frac][Z|±HH:MM]" parseado à mão: ~0,06 µs
+[221/235] Compiling TokenBarProviders ClaudeProvider.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarProviders/Claude/ClaudeLineParser.swift:20:13: warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 18 |     // Decoder reutilizado: criar um JSONDecoder por linha custa caro em corpus
+ 19 |     // grande (Red Team caso 2) — o uso é single-thread no ingest.
+ 20 |     private nonisolated(unsafe) static let decoder = JSONDecoder()
+    |             `- warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 21 | 
+ 22 |     /// ISO8601 "yyyy-MM-ddTHH:mm:ss[.frac][Z|±HH:MM]" parseado à mão: ~0,06 µs
+[222/235] Emitting module TokenBarProviders
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarProviders/Claude/ClaudeLineParser.swift:20:13: warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 18 |     // Decoder reutilizado: criar um JSONDecoder por linha custa caro em corpus
+ 19 |     // grande (Red Team caso 2) — o uso é single-thread no ingest.
+ 20 |     private nonisolated(unsafe) static let decoder = JSONDecoder()
+    |             `- warning: 'nonisolated(unsafe)' is unnecessary for a constant with 'Sendable' type 'JSONDecoder', consider removing it
+ 21 | 
+ 22 |     /// ISO8601 "yyyy-MM-ddTHH:mm:ss[.frac][Z|±HH:MM]" parseado à mão: ~0,06 µs
+[223/235] Compiling TokenBarProviders CodexSessionIngester.swift
+[224/235] Compiling TokenBarProviders CursorCredentialReader.swift
+[225/235] Compiling TokenBarProviders CodexAuthReader.swift
+[226/235] Compiling TokenBarProviders CodexProvider.swift
+[227/235] Compiling TokenBarProviders ZaiCredentialReader.swift
+[228/235] Compiling TokenBarProviders ZaiProvider.swift
+[229/251] Compiling TokenBarUI TokenBarUI.swift
+[230/251] Compiling TokenBarUI SnapshotStore.swift
+[231/252] Compiling TokenBarUI resource_bundle_accessor.swift
+[232/252] Compiling TokenBarUI SettingsView.swift
+[233/252] Compiling TokenBarUI SMAppLoginService.swift
+[234/252] Compiling TokenBarUI SettingsModel.swift
+[235/252] Compiling TokenBarUI ProviderCoordinator.swift
+[236/252] Compiling TokenBarUI ProviderLogos.swift
+[237/252] Compiling TokenBarUI MenuBarContent.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarUI/NotificationGateway.swift:160:13: warning: result of 'try?' is unused [#no-usage]
+158 |         if let handle = try? FileHandle(forWritingTo: fileURL) {
+159 |             defer { try? handle.close() }
+160 |             try? handle.seekToEnd()
+    |             `- warning: result of 'try?' is unused [#no-usage]
+161 |             try? handle.write(contentsOf: data)
+162 |         }
+[238/252] Compiling TokenBarUI NotificationGateway.swift
+/Users/felipedomingues/Documents/Projetos/tokenbar/Sources/TokenBarUI/NotificationGateway.swift:160:13: warning: result of 'try?' is unused [#no-usage]
+158 |         if let handle = try? FileHandle(forWritingTo: fileURL) {
+159 |             defer { try? handle.close() }
+160 |             try? handle.seekToEnd()
+    |             `- warning: result of 'try?' is unused [#no-usage]
+161 |             try? handle.write(contentsOf: data)
+162 |         }
+[239/252] Compiling TokenBarUI AnalyticsModel.swift
+[240/252] Compiling TokenBarUI E2EHeartbeat.swift
+[241/252] Compiling TokenBarUI AccountsModel.swift
+[242/252] Compiling TokenBarUI AddAccountView.swift
+[243/252] Emitting module TokenBarUI
+[244/252] Compiling TokenBarUI ProviderPanelModel.swift
+[245/252] Compiling TokenBarUI ProviderPanelView.swift
+[246/260] Emitting module tokenbar
+[247/260] Compiling tokenbar SelfCheck.swift
+[248/260] Compiling tokenbar AnalyticsView.swift
+[249/260] Compiling tokenbar TokenBarApp.swift
+[250/260] Compiling tokenbar SupportDirectory.swift
+[251/260] Compiling tokenbar HistoryCommand.swift
+[252/260] Compiling tokenbar AppState.swift
+[253/259] Emitting module panelrender
+[254/259] Compiling panelrender PanelRenderMain.swift
+[254/258] Linking panelrender
+[255/258] Linking tokenbar
+[256/258] Applying panelrender
+[257/258] Applying tokenbar
+Build complete! (8.94s)
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ClaudeProviderTests started.
+◇ Suite TokenLedgerTests started.
+◇ Suite PricingPersistenceTests started.
+◇ Suite AlibabaProviderBasicsTests started.
+◇ Suite AlibabaUsageAPITests started.
+◇ Suite HTTPClientTests started.
+◇ Suite ParserFuzzTests started.
+◇ Suite HistoryExportTests started.
+◇ Suite AntigravityUsageAPITests started.
+◇ Suite CursorProviderBasicsTests started.
+◇ Suite RedTeamF5SettingsTamperTests started.
+◇ Suite OpenRouterMultiKeyTests started.
+◇ Suite AlertEngineTests started.
+◇ Suite OpenRouterProviderBasicsTests started.
+◇ Suite PacingInputTests started.
+◇ Suite DeepSeekProviderBasicsTests started.
+◇ Suite RedTeamF4Tests started.
+◇ Suite PersistenceTests started.
+◇ Suite RedTeamF5AlertTests started.
+◇ Suite GeminiProviderTests started.
+◇ Suite AntigravityCredentialReaderTests started.
+◇ Suite ProviderProtocolTests started.
+◇ Suite GrokUsageAPITests started.
+◇ Suite AppSettingsTests started.
+◇ Suite RedTeamF3Tests started.
+◇ Suite GrokProviderBasicsTests started.
+◇ Suite ZaiUsageAPITests started.
+◇ Suite GeminiLineParserTests started.
+◇ Suite HistorySeriesFormatTests started.
+◇ Suite FileOffsetStoreTests started.
+◇ Suite AntigravityProviderBasicsTests started.
+◇ Suite SmokeTests started.
+◇ Suite CodexProviderTests started.
+◇ Suite PacingEngineTests started.
+◇ Suite CodexLineParserTests started.
+◇ Suite CursorCredentialReaderTests started.
+◇ Suite TranscriptIngesterTests started.
+◇ Suite DeepSeekUsageAPITests started.
+◇ Suite AccountRegistryTests started.
+◇ Suite DomainTests started.
+◇ Suite CursorUsageAPITests started.
+◇ Suite SchedulerTests started.
+◇ Suite AlibabaCredentialReaderTests started.
+◇ Suite CodexAuthReaderTests started.
+◇ Suite F5RegistrySmokeTests started.
+◇ Suite HistoryQueryTests started.
+◇ Suite ClaudeUsageProviderConformanceTests started.
+◇ Suite DebounceTests started.
+◇ Suite ZaiCredentialReaderTests started.
+◇ Suite ClaudeLineParserTests started.
+◇ Suite OpenRouterUsageAPITests started.
+◇ Suite RedTeamF5HostileProviderTests started.
+◇ Suite ProviderPersistenceTests started.
+◇ Suite PanelCountdownTests started.
+◇ Suite PanelCoordinatorF4Tests started.
+◇ Suite CodexUsageAPITests started.
+◇ Suite MultiAccountProviderTests started.
+◇ Suite SettingsModelTests started.
+◇ Suite GrokCredentialReaderTests started.
+◇ Suite DeepSeekCredentialReaderTests started.
+◇ Suite OpenRouterCredentialReaderTests started.
+◇ Suite PanelPacingTests started.
+◇ Suite ZaiProviderTests started.
+◇ Suite NotificationGatewayTests started.
+◇ Suite AccountsModelTests started.
+◇ Suite PricingTableTests started.
+◇ Suite ProviderCoordinatorTests started.
+◇ Suite RedTeamF5UITests started.
+◇ Suite PanelRenderGateTests started.
+◇ Suite CoordinatorRedTeamTests started.
+◇ Suite RedTeamF4UITests started.
+◇ Suite HeartbeatHistoryTests started.
+◇ Suite RedTeamF4ProviderTests started.
+◇ Suite PanelDashboardTests started.
+◇ Suite PanelKPITests started.
+◇ Suite PanelHeaderTests started.
+◇ Suite PricingDisplayTests started.
+◇ Suite CoordinatorAlertsWiringTests started.
+◇ Suite PanelHistoryTests started.
+◇ Suite PanelSelectionTests started.
+◇ Suite RedTeamF5CaptureGatewayTests started.
+◇ Suite MultiAccountCoordinatorTests started.
+◇ Suite MenuBarContentTests started.
+◇ Suite PanelLogoTests started.
+◇ Suite SettingsCoordinatorWiringTests started.
+◇ Suite MenuBarVisibilityTests started.
+◇ Suite PanelPaceStripeTests started.
+◇ Suite AnalyticsModelTests started.
+◇ Suite PanelHeartbeatTests started.
+◇ Test resolveFallsBackToHomeClaude() started.
+◇ Suite PanelWindowRowTests started.
+◇ Test restartMidDayRestoresTodayTotals() started.
+◇ Test lostCursorsInvalidateSnapshotNoDoubleCount() started.
+◇ Test ingestOnceCountsTokensFromRealFormatFixture() started.
+◇ Test truncationAfterRestoreSelfCorrectsPerFile() started.
+◇ Test staleSnapshotPathsAreNotRestored() started.
+◇ Test corruptLedgerSnapshotIsIgnoredNotFatal() started.
+◇ Test testRestoreDayOnlyOncePerProcess() started.
+◇ Test ingestTwiceDoesNotDuplicate() started.
+◇ Test staleTotalsWithSurvivingCursorsAreNotRestored() started.
+◇ Test testRestoreDayDoesNotClobberLiveEntries() started.
+◇ Test testYesterdayEventsDoNotCountForToday() started.
+◇ Test testRestoreDayRecoversSnapshotAfterRestart() started.
+◇ Test testFirstCycleRecordsDayWithoutSpuriousRescan() started.
+◇ Test conformsToUsageProviderBasics() started.
+◇ Test testTruncationSelfCorrects() started.
+◇ Test missingDirectoryYieldsZero() started.
+◇ Test testDaySnapshotNilOnEmptyDayAndAfterRollover() started.
+◇ Test findQuotaInfoAndWindowMapping() started.
+◇ Test rejectsUnknownAccount() started.
+◇ Test testRestoreDayIgnoresOtherDay() started.
+◇ Test testTruncationAfterRestoreSelfCorrects() started.
+◇ Test "open com pricing: nil (degradação) → todo evento sai sem custo" started.
+◇ Test "todayCostUSD: dia só com eventos sem preço → nil (não 0)" started.
+◇ Test "todayCostUSD soma só o dia corrente e só eventos com custo" started.
+◇ Test resolvePrefersEnvironmentOverride() started.
+◇ Test testAccumulatesAcrossFilesAndCycles() started.
+◇ Test "modelo ausente ou nil → cost_usd NULL (nunca 0)" started.
+◇ Test "grupos com e sem preço ficam separados: um com custo, outro NULL" started.
+◇ Test controlLinesParseBeforeAndAfterBattery() started.
+◇ Test resolveBaseURLRegionOverride() started.
+◇ Test conformsToUsageProviderBasics() started.
+◇ Test testRolloverClearsTotalsAndFlagsRescan() started.
+◇ Test "daily_agg acumula custo por grupo na mesma transação" started.
+◇ Test fetchUsageMapsQuotaWindowsAndSendsContract() started.
+◇ Test "csvField: cita só quando precisa e dobra aspas" started.
+◇ Test testMultiProviderBreakdown() started.
+◇ Test "intervalos/visibilidade tamperados → defaults do campo (AppSettingsStore)" started.
+◇ Test "exportAll com banco vazio: arquivos válidos (header + rows vazio)" started.
+◇ Test "thresholds tamperados [95,50] → sanitizados para [50,95] no apply E no readConfig" started.
+◇ Test fetchUsageMapsModelQuotasAndSendsContract() started.
+◇ Test "exportAll: escreve CSV e JSON em <support>/exports/ com mesmo conteúdo e timestamp UTC" started.
+◇ Test "frações absurdas saturam em 0...1 antes de comparar" started.
+◇ Test "CSV golden: header, escape RFC 4180, custo NULL vazio, formatCost aparado" started.
+◇ Test "ordem dos eventos é determinística (provider, conta, janela, threshold)" started.
+◇ Test getJSON200ReturnsBodyWithContractedHeaders() started.
+◇ Test "lembrete de reset: 1× por janela dentro de [resetsAt−N, resetsAt)" started.
+◇ Test "JSON golden: chaves ordenadas, nulos explícitos, metadados versão/período" started.
+◇ Test "pacingInput: série por (provider, conta) com dias no calendar do banco" started.
+◇ Test "formatCost: 6 casas com zeros aparados, determinístico" started.
+◇ Test "estado de dedupe sobrevive restart: nada re-dispara após reabrir o banco" started.
+◇ Test "contas isoladas: alerta de uma conta não vaza na outra" started.
+◇ Test "eventos persistidos sem custo NÃO são re-precificados (hwm impede re-leitura)" started.
+◇ Test "estado corrompido em settings → tratado como vazio, sem crash" started.
+◇ Test "cruzamento para cima dispara 1×; segue suprimido até re-armar" started.
+◇ Test "parse de day string: inverso do dayString; lixo → nil (nunca inventa data)" started.
+◇ Test "janelas independentes: session e weekly dedupam separados" started.
+◇ Test "ingest com tabela: cost_usd na linha do evento (input+output+cache)" started.
+◇ Test "2 keys simultâneas: descoberta merge + instância por key + saldo/janela ISOLADOS por conta" started.
+◇ Test "sem DB: dedupe funciona em memória (sessão), persistência é aditiva" started.
+◇ Test conformsToUsageProviderBasics() started.
+◇ Test "JSON lixo em alerts:* → defaults campo a campo; estado corrompido → vazio sem crash" started.
+◇ Test "pacingInput → PacingEngine: integração com números exatos (estoura)" started.
+◇ Test conformsToUsageProviderBasics() started.
+◇ Test "re-arm por queda: fração cai abaixo do threshold e cruza de novo" started.
+◇ Test rejectsUnknownAccount() started.
+◇ Test "config desligada (default) → nenhum evento e nenhum estado gravado" started.
+◇ Test "FileKind: regular file vs. diretório vs. inexistente vs. FIFO" started.
+◇ Test "config corrompida em settings → default por campo, sem crash" started.
+◇ Test "lembrete disparado sobrevive a restart (1× por janela MESMO reabrindo)" started.
+◇ Test "pacing: 1 ponto de dados → nil (sem tendência, mesmo com janela completa)" started.
+◇ Test "fração nil ou não-finita é ignorada — nada inventado, nada trapando" started.
+◇ Test "registry com 50 contas OpenRouter: add/activeAccounts/labels ordenados, sem colisão de keys" started.
+◇ Test "pacing: resetsAt distante (ano 9999) com taxa gigante → saturação finita, sem overflow" started.
+◇ Test "pacingInput: day strings não-ISO descartadas; ISO leniente rola; agregado negativo só morre no ENGINE" started.
+◇ Test "config em settings: thresholds customizados via apply sobrevivem a restart" started.
+◇ Test "pacing: fração adversarial (NaN, infinito, fora de 0...1) → nil ou saturada, nunca crash" started.
+◇ Test "pacing: todos os totais negativos são descartados (dados corrompidos → <2 pontos → nil)" started.
+◇ Test "alert storm: oscilação 0.94↔0.96 no threshold 95 re-dispara a cada cruzamento (1 evento por cruzamento — contrato sem histerese)" started.
+◇ Test parsesOAuthCredsShapes() started.
+◇ Test deduplicatesReattachedIdAcrossCycles() started.
+◇ Test staleTotalsWithSurvivingCursorsAreNotRestored() started.
+◇ Test "pacing: resetsAt no PASSADO → projeção = uso atual (horizonte zero, nunca esgotamento negativo)" started.
+◇ Test resolveHonorsEnvOverrideAndDefault() started.
+◇ Test "50 contas: um evaluate cobre todas — 50 eventos determinísticos, dedupe no 2º ciclo" started.
+◇ Test "dedupe por marca d'água: re-ingest (rollover/cursor perdido) NÃO duplica o histórico" started.
+◇ Test invalidAndMissingYieldNil() started.
+◇ Test missingSessionsDirectoryYieldsZero() started.
+◇ Test "pacing: Int64.max + negativos → sem crash, resultado finito ou nil" started.
+◇ Test "persistBatch: usage_events + daily_agg consistentes (soma por dia/provider/modelo)" started.
+◇ Test restartMidDayRestoresTodayTotals() started.
+◇ Test "re-arm por renovação: resetsAt renovado re-dispara na mesma fração" started.
+◇ Test rolloverDropsInFileDuplicateDuringRescan() started.
+◇ Test "flip resetsAt nil↔data: re-arma por renovação (1 disparo por flip, fração constante)" started.
+◇ Test "resetToZero (arquivo encolheu): marca d'água descartada e conteúdo re-lido persiste" started.
+◇ Test "settings roundtrip: set/get/delete" started.
+◇ Test "migração de cursor legado Gemini/Codex é independente por provider" started.
+◇ Test discoverAccountsRequiresDotGeminiDirectory() started.
+◇ Test "migration v1 cria o schema §6 completo e é idempotente" started.
+◇ Test deduplicatesSameIdWithinSameFile() started.
+◇ Test conformsToUsageProviderBasics() started.
+◇ Test ingestLocalRejectsUnknownAccount() started.
+◇ Test ingestCountsOnlyGeminiRootLinesWithRealTokens() started.
+◇ Test protocolDispatchThroughExistential() started.
+◇ Test registryRegisterAndResolve() started.
+◇ Test fetchUsageReturnsLocalOnlySnapshot() started.
+◇ Test fetchUsageRejectsUnknownAccount() started.
+◇ Test resolveGeminiDirectoryOverrideAndDefault() started.
+◇ Test "migração de cursor legado: settings + marcas d'água + rename .migrated + reuso dos offsets" started.
+◇ Test registryAllSortedByID() started.
+◇ Test "abertura em path inválido lança (coordinator degrada) — sem crash" started.
+◇ Test accountRefCodableRoundtrip() started.
+◇ Test "intervalos: roundtrip na tabela settings" started.
+◇ Test snapshotCodableRoundtripLocalModeWithNils() started.
+◇ Test "re-migração nunca REBAIXA marca d'água já avançada pela ingest" started.
+◇ Test "visibilidade: conjunto vazio é escolha válida (menu vira 'TB'); ids desconhecidos não contam" started.
+◇ Test capabilityMath() started.
+◇ Test enumRawValues() started.
+◇ Test "DB truncado no meio de uma página: open lança ou abre sem corromper mais (nunca crash)" started.
+◇ Test ingestCursorWrapsFileOffsets() started.
+◇ Test "visibilidade: default = todos; roundtrip preserva o conjunto salvo" started.
+◇ Test registryDuplicateRegistrationReplaces() started.
+◇ Test creditsUnlimitedCodableRoundtrip() started.
+◇ Test fetchUsageMapsBillingPercent() started.
+◇ Test "intervalos: default da spec §7 quando nunca salvos" started.
+◇ Test "migração: após o 1º save a flag existe — lista persistida manda (novos nascem escondidos)" started.
+◇ Test "intervalos: valor corrompido ou fora de faixa no banco → default" started.
+◇ Test rolloverRescansFullFileOnDayChangeWithoutDoubleCounting() started.
+◇ Test snapshotCodableRoundtripFull() started.
+◇ Test rejectsUnknownAccount() started.
+◇ Test "migração: banco F4 legado (lista SEM flag touched) → novos providers ficam VISÍVEIS" started.
+◇ Test incrementalAppendCountsOnlyNewRootLine() started.
+◇ Test "sem DB: leitura dá default e escrita é no-op (nunca crash)" started.
+◇ Test "export hostil: 10k eventos com model , " quebra-de-linha → CSV RFC 4180 parseia de volta exato" started.
+◇ Test "JSON vazio: [] compacto (não o pretty-printed quebrado do encoder)" started.
+◇ Test invalidTimestampYieldsNoEvent() started.
+◇ Test "AlertEngine.readConfig: janela de Settings lê o que o engine aplicou" started.
+◇ Test registryResolveUnknownReturnsNil() started.
+◇ Test "JSON golden: pretty, chaves ordenadas, nulo de custo EXPLÍCITO" started.
+◇ Test skipsUserAndInfoRootLinesMetaAndSetDeltas() started.
+◇ Test "intervalos: escrita fora da faixa da UI é recusada (valor anterior intacto)" started.
+◇ Test parsesGeminiRootLineWithRealTokens() started.
+◇ Test "provider sem histórico na janela: CSV header-only pelo filtro" started.
+◇ Test conformsToUsageProviderBasics() started.
+◇ Test "SQL injection em model/path: prepared statements seguram — banco íntegro e dado recuperável" started.
+◇ Test "--provider: CSV só do provider pedido (codex)" started.
+◇ Test mismatchedTotalChecksumStillParsesComponents() started.
+◇ Test withoutCredentialProviderIsDisabled() started.
+◇ Test "JSON round-trip: decode sintetizado preserva costUsd nil ≠ 0 e ordena igual ao CSV" started.
+◇ Test cachedMapsToCacheReadAndToolSumsIntoOutput() started.
+◇ Test rejectsUnknownAccount() started.
+◇ Test "CSV golden 7d: ordenado (day, provider), custo NULL vazio, zero real = 0" started.
+◇ Test "re-migração stale (rename falho): cursor re-semeado atrás do hwm não duplica o banco e auto-recupera na próxima escrita do store" started.
+◇ Test "--days 1: só hoje (janela de 1 dia)" started.
+◇ Test nearInt64MaxComponentSumIsRejectedNotCrash() started.
+◇ Test zeroTotalYieldsNoEvent() started.
+◇ Test geminiLineWithoutTokensYieldsNoEvent() started.
+◇ Test coreVersionIsSet() started.
+◇ Test "--days 8: inclui d-7 (2026-08-23, 80 tok) que o default 7d exclui" started.
+◇ Test testRemoveWithNil() started.
+◇ Test testMissingFileStartsEmpty() started.
+◇ Test resolveSessionsDirectoryOverrideAndDefault() started.
+◇ Test missingTimestampFallsBackToMtime() started.
+◇ Test missingSessionsDirectoryYieldsZero() started.
+◇ Test "DB com bytes lixo (não-SQLite): open lança erro — degrada F2, nunca crash" started.
+◇ Test "DB vazio: CSV só header (LF final) e JSON [] — exit 0 é contrato" started.
+◇ Test fetchUsageMapsQuotaShapeAndSendsContractedHeaders() started.
+◇ Test ingestTwiceDoesNotDuplicate() started.
+◇ Test rolloverRescansFullFileOnDayChange() started.
+◇ Test "sem dados dentro do início da janela: relação inderivável → sem projeção" started.
+◇ Test "flat (taxa zero): projected = usedFraction, exhaustedIn nil" started.
+◇ Test ingestCountsOnlyLastTokenUsageDeltas() started.
+◇ Test resolveBaseURLOverrideAndDefault() started.
+◇ Test "honestidade: 0 e 1 pontos → nil" started.
+◇ Test testSetThenReloadRoundtrip() started.
+◇ Test ingestLocalRejectsUnknownAccount() started.
+◇ Test "adversarial: subida ~Int64.max → projeção finita, sem crash" started.
+◇ Test "todos os pontos no mesmo dia: sem variação temporal → nil" started.
+◇ Test "adversarial: dois dias ~Int64.max → flat, sem crash" started.
+◇ Test "adversarial: pontos separados por dias gigantes → finito, sem crash" started.
+◇ Test "gap de dias usa DATA real (não zero-fill, não índice): slope = 1M/dia" started.
+◇ Test testSeenIDsRoundtripAndLegacyCursorWithoutSeenIDs() started.
+◇ Test testTruncateToZeroEmitsResetEvenWithoutNewLines() started.
+◇ Test staleTotalsWithSurvivingCursorsAreNotRestored() started.
+◇ Test restartMidDayRestoresTodayTotals() started.
+◇ Test "janela .session: sem span derivável de agregados diários → sem projeção" started.
+◇ Test testStreamingResetFlagOnlyOnFirstBatchOfShrunkFile() started.
+◇ Test "honestidade: resetsAt nil → nil (nunca chuta)" started.
+◇ Test testGarbageLinesAreSkippedButConsumed() started.
+◇ Test testTenThousandEventsUnderOneSecond() started.
+◇ Test conformsToUsageProviderBasics() started.
+◇ Test testSecondIngestReadsOnlyAppend() started.
+◇ Test "crescente que estoura: exhaustedIn finito, projected > 1, deficit > 0" started.
+◇ Test "resetsAt no passado: horizonte zero → projeção = uso atual" started.
+◇ Test "crescente que NÃO estoura: projected < 1, exhaustedIn e deficit nil" started.
+◇ Test "regressão usa os ÚLTIMOS 14 pontos (boundary de dias)" started.
+◇ Test testStreamingCarriesPartialLineAcrossChunks() started.
+◇ Test "adversarial: só totais negativos → <2 pontos válidos → nil" started.
+◇ Test "decrescente (taxa negativa): projected = usedFraction, exhaustedIn nil" started.
+◇ Test multipleLinesAfterOversizedLineSurvive() started.
+◇ Test oversizedAtEOFWithoutTrailingNewlineKeepsCursorExact() started.
+◇ Test linesAfterOversizedLineAreStillCounted() started.
+◇ Test "adversarial: total negativo é dado corrompido → descartado, não vira uso" started.
+◇ Test testStreamingDeliversLargeFileInBoundedBatches() started.
+◇ Test testTokenSumsCodableRoundtrip() started.
+◇ Test testTruncatedFileResetsToZero() started.
+◇ Test testTokenSumsArithmetic() started.
+◇ Test testUsageEventCodableRoundtrip() started.
+◇ Test testFirstIngestReadsWholeFile() started.
+◇ Test "honestidade: usedFraction nil ou não-finita → nil" started.
+◇ Test "remove apaga a linha; remover chave inexistente é no-op" started.
+◇ Test "validação: label vazio e credential path vazio são rejeitados" started.
+◇ Test testCorruptedFileStartsEmpty() started.
+◇ Test testTokenSumsSaturatesInsteadOfTrapping() started.
+◇ Test "usedFraction 0: relação tokens↔fração inderivável → sem projeção" started.
+◇ Test skipsNonUsageLines() started.
+◇ Test "setActive(false) remove das ativas sem apagar o registro; reativa volta" started.
+◇ Test firstEventOfNewFileWithoutTurnContextHasNoModel() started.
+◇ Test testProviderIDCodableRoundtrip() started.
+◇ Test fetchUsageMapsBalance() started.
+◇ Test invalidTimestampYieldsNoEvent() started.
+◇ Test "add + list: persiste com key gerada e ativa por default" started.
+◇ Test "persistência: reabrir o banco mantém as contas" started.
+◇ Test tokenCountWithoutInfoYieldsNoEvent() started.
+◇ Test testIncompleteTrailingLineIsNotConsumed() started.
+◇ Test reregisterReplacesHandlerWithoutDoubleFiring() started.
+◇ Test "isolamento por provider: contas de claude não aparecem para codex" started.
+◇ Test jitterLowerBoundIsMinusTenPercent() started.
+◇ Test testUnchangedFileIsNotReturned() started.
+◇ Test parsesTokenCountDeltasWithAllFields() started.
+◇ Test setIdleIntervalChangesCadenceWithoutRestart() started.
+◇ Test setMenuIntervalAppliesToOpenMenuCadence() started.
+◇ Test initialIntervalsFromConstructorReflectPersistedSettings() started.
+◇ Test "trim: label e paths com espaços nas bordas são normalizados" started.
+◇ Test "migration v2: colunas credential_path/directory_path existem" started.
+◇ Test jitterUpperBoundIsPlusTenPercent() started.
+◇ Test zeroTotalUsageYieldsNoEvent() started.
+◇ Test testSubdirectoriesAreScanned() started.
+◇ Test idleCadenceFiresEveryFiveMinutes() started.
+◇ Test testAccountIDHashAndEquality() started.
+◇ Test pressureBeatsMenuInterval() started.
+◇ Test pressureCadenceIsThirtySecondsWithBoundaryAtPointEight() started.
+◇ Test backoffGrowsFromCurrentIntervalEvenInMenuMode() started.
+◇ Test readsRawJWTTokenFileAndBuildsCookie() started.
+◇ Test singleFlightNeverRunsTwoFiresForSameProvider() started.
+◇ Test intervalSettersIgnoreZeroAndNegative() started.
+◇ Test jitterAppliesToMenuInterval() started.
+◇ Test menuOpenedSwitchesToSixtySecondCadenceAndDecaysBackToIdle() started.
+◇ Test resolvePrefersEnvironmentOverride() started.
+◇ Test providersAreIndependent() started.
+◇ Test errorBackoffDoublesWithThirtyMinuteCeilingAndSuccessResets() started.
+◇ Test "eventsForExport: janela, ordenação estável (ts,id) e NULL de custo/model no registro" started.
+◇ Test accountIDFallsBackToJWTClaim() started.
+◇ Test resolveDefaultsToHomeDotCodex() started.
+◇ Test malformedFileReturnsNil() started.
+◇ Test fetchUsageMapsProSummaryAndSendsCookie() started.
+◇ Test readParsesAccessTokenAndAccount() started.
+◇ Test pauseStopsAllFiresAndResumeFiresImmediately() started.
+◇ Test modelComesFromLastTurnContext() started.
+◇ Test apikeyModeHasNoOAuth() started.
+◇ Test missingFileReturnsNil() started.
+◇ Test "weekTotal: total 7d do painel; provider sem histórico → 0 tok, custo nil" started.
+◇ Test successDecaysToTheNewIdleIntervalAfterEdit() started.
+◇ Test "dailySeries: filtros por provider e por model" started.
+◇ Test "multi-conta: conta registrada aparece na descoberta dos 6 novos" started.
+◇ Test "dailySeries: soma conhecida por (dia, provider) na janela 7d" started.
+◇ Test fetchUsageRejectsUnknownAccount() started.
+◇ Test "totals: totais por provider na janela com a mesma semântica de custo" started.
+◇ Test "dailySeries: janela de dias (d-7 fora do 7d, dentro do 30d; d-30 fora)" started.
+◇ Test testWaitReturnsOnlyAfterQuiesceWindow() started.
+◇ Test rolloverRescansFullFileOnDayChange() started.
+◇ Test rolloverViaProtocolKeepsNextCursorCoherent() started.
+◇ Test testTouchResetsWindow() started.
+◇ Test noteResultForUnknownProviderDoesNotCrash() started.
+◇ Test fetchUsageReturnsLocalOnlySnapshot() started.
+◇ Test "isolamento: guardKnownAccount nos 6 novos" started.
+◇ Test readParsesAPIKeyAndRegionFromConfig() started.
+◇ Test ingestLocalMatchesIngestOnce() started.
+◇ Test envKeyOrderAndFile() started.
+◇ Test resolveHonorsEnvOverridesAndDefaults() started.
+◇ Test filesWithoutUsableKeysReturnNil() started.
+◇ Test assistantWithoutUsageIsSkipped() started.
+◇ Test conformsToUsageProviderBasics() started.
+◇ Test "modelBreakdown: ordenado por tokens desc; NULL de custo preservado por modelo" started.
+◇ Test ingestLocalFromProtocolCursorCountsOnce() started.
+◇ Test usageFieldsAtSanityCapBoundaryStillCounted() started.
+◇ Test "registry: 10 providers registrados, ids e capabilities corretos" started.
+◇ Test ingestLocalThroughExistentialUsesWallClock() started.
+◇ Test zaiEntryPreferredOverBigmodel() started.
+◇ Test assistantLineWithUsageProducesEvent() started.
+◇ Test fetchUsageMapsCreditsAndKey() started.
+◇ Test unknownBaseHostGivesNoRegionHint() started.
+◇ Test ingestLocalRejectsUnknownAccount() started.
+◇ Test binaryGarbageIsSkippedNotFatal() started.
+◇ Test fastISO8601MatchesFormatterOnCorpusTimestamps() started.
+◇ Test negativeTokensAreClampedToZero() started.
+◇ Test readCollectsAPIKeyAndOAuthTogether() started.
+◇ Test malformedFilesReturnNil() started.
+◇ Test missingFilesReturnNil() started.
+◇ Test bigmodelEntryAloneYieldsCNRegion() started.
+◇ Test truncatedJSONIsSkippedNotFatal() started.
+◇ Test "custo NULL ≠ 0: dia inteiro sem preço → nil; dia com custo zero real → 0" started.
+◇ Test userLineIsSkipped() started.
+◇ Test usageFieldsNearInt64MaxAreRejectedNotCrash() started.
+◇ Test "falha de persistência NÃO derruba o ingest (degrada para comportamento F2)" started.
+◇ Test fastISO8601MatchesFormatterOnAcceptedForms() started.
+◇ Test "claude: rollover re-escaneia o arquivo e o histórico do DB NÃO dobra" started.
+◇ Test readFallsBackToOAuthTokenWithoutConfig() started.
+◇ Test entryWithoutAPIKeyStillHintsRegionForOAuth() started.
+◇ Test "codex: ingest persiste eventos" started.
+◇ Test invalidTimestampIsSkipped() started.
+◇ Test "gemini: dedupe por id ANTES da persistência — duplicata não vira linha no DB" started.
+◇ Test "reset no passado → 'renewed' / 'Renewed' (nada a prometer da janela velha)" started.
+◇ Test "coordinator: ciclo publica monthTokens/série 30d, janelas do snapshot e pacing honesto (nil local)" started.
+◇ Test hugeLineDoesNotCrash() started.
+◇ Test "abaixo de 1h só minutos; mínimo 1m" started.
+◇ Test "OpenRouter hostil: JSON lixo → rethrow; data sem números → erro tipado; 1e308 → saldo finito; negativo → clamp 0" started.
+◇ Test "claude: descoberta merge registry + auto, sem registry fica [local]" started.
+◇ Test "formato '6d 16h' acima de um dia" started.
+◇ Test allZeroUsageIsSkipped() started.
+◇ Test "codex por conta: auth file registrado alimenta o snapshot da conta" started.
+◇ Test "codex: merge com auth sintética + 2 registradas; zai idem sem credencial" started.
+◇ Test "perf smoke: 100k eventos sintéticos ingest+persistence <10s, memória bounded" started.
+◇ Test "formato '2h 44m' entre 1h e 24h" started.
+◇ Test "ligar alerts pede permissão UMA vez; concedida → engine ligado" started.
+◇ Test "permissão NEGADA → alerts ficam DESLIGADOS com aviso honesto na janela" started.
+◇ Test "claude: ingest persiste eventos e daily_agg; segunda ingest não duplica" started.
+◇ Test "claude por conta: instância com accountKey próprio stampa eventos da conta" started.
+◇ Test "lembrete de reset: off/5/15/30 chegam ao engine; nil desliga" started.
+◇ Test "thresholds editados chegam ao AlertEngine (e ao banco)" started.
+◇ Test "roundtrip completo: edições do modelo sobrevivem a um 'restart'" started.
+◇ Test "intervalos: clamp nas faixas da UI e aplicação VIVA no scheduler" started.
+◇ Test "dedupe por key: registrada com key já visível não repete" started.
+◇ Test "launch at login: toggle liga → register; desliga → unregister; estado reflete o serviço" started.
+◇ Test "desligar alerts NÃO pede permissão (nunca prompt escondido)" started.
+◇ Test "visibilidade: persiste e republisha o conjunto atualizado" started.
+◇ Test "edição de thresholds mantém ordem CRESCENTE e faixa 10...100" started.
+◇ Test "sem forecast → linha some (menos de 2 pontos, janela sem reset/fração)" started.
+◇ Test envAndFileSources() started.
+◇ Test resolveHonorsOverridesAndDefault() started.
+◇ Test "launch at login: requiresApproval é honesto — NÃO conta como ligado" started.
+◇ Test rawTokenFileAccepted() started.
+◇ Test "janela carrega o que está persistido (intervalos, visibilidade, alertas)" started.
+◇ Test "isolamento: instância canônica rejeita conta de outra instância" started.
+◇ Test prefersOIDCScopeOverLegacy() started.
+◇ Test "disclaimer de estimativa (port do hint da referência) acompanha o dashboard" started.
+◇ Test readsKeyFileTrimmedAndUnquoted() started.
+◇ Test "forecast encostando em 100% sem déficit → 'On pace · Lasts until reset'" started.
+◇ Test "forecast com déficit e esgotamento → '20% in deficit · Exhausts in 2h 44m'" started.
+◇ Test resolveBaseURLPrefersEnvThenRegionHintThenDefault() started.
+◇ Test "model: add/remove/toggle refletem no registry e disparam onMutation" started.
+◇ Test discoverAccountsRequiresAuthFile() started.
+◇ Test invalidShapesYieldNil() started.
+◇ Test "model: raízes em uso = canônica + registradas; guard pina overlap por provider" started.
+◇ Test "identificador de entrega é estável por causa (substitui, não empilha)" started.
+◇ Test "render lembrete: título de renovação com countdown" started.
+◇ Test "texto do painel: só o estado OK fica em silêncio (honesto)" started.
+◇ Test fetchUsageWithoutCredentialReportsMissing() started.
+◇ Test "render threshold: título e body com countdown do reset" started.
+◇ Test "nomes de provider (D5) cobrem todos os ProviderID" started.
+◇ Test "validação: path inexistente é aviso (conta pode nascer degradada)" started.
+◇ Test "match exato e por sufixo datado" started.
+◇ Test discoverAccountsRequiresCredential() started.
+◇ Test "validação: vazio bloqueia; existente passa limpo" started.
+◇ Test "model: sem registry (degradação F2) não opera e não crasha" started.
+◇ Test "longest match vence o prefixo curto" started.
+◇ Test "fake captura eventos; requestAuthorization reflete o injetado" started.
+◇ Test "validação: diretório sobreposto a raiz em uso é BLOQUEADO; irmão passa" started.
+◇ Test "forecast sem déficit mas com folga → 'N% in reserve · Lasts until reset'" started.
+◇ Test "custo soma input+output+cache read+cache write (1M tokens = preço cheio)" started.
+◇ Test fetchUsageRejectsUnknownAccount() started.
+◇ Test "bundled: carrega, versionada, e cobre as famílias dos transcripts" started.
+◇ Test "overlapsCanonical: igual, descendente e ancestral sobrepõem; irmão e fronteira de componente não" started.
+◇ Test "tier sem preço público (null) contribui 0, mas custo segue não-nil" started.
+◇ Test "modelo ausente ou nil → nil (nunca chute)" started.
+◇ Test "provider degradado com throw no 1º ciclo permanece no heartbeat com erro" started.
+◇ Test "render sem resetsAt ou já vencido → 'Reset time unknown' (nada inventado)" started.
+◇ Test "wiring F3: ingest do coordinator persiste no SQLite (store de cursores no settings)" started.
+◇ Test "match é case-insensitive" started.
+◇ Test "launch at login: erro de registro é HONESTO (aviso na janela, estado do serviço)" started.
+◇ Test "bundled faltando/corrompido → nil (degradação, nunca crash)" started.
+◇ Test "modo selfcheck (support dir inexistente, stores injetados): DB abre e history7d presente" started.
+◇ Test "caso 1: tokenbar.sqlite corrompido → app vivo em modo F2, history7d omitido, sem crash" started.
+◇ Test "seleção de aba é estado do painel e não toca no gate" started.
+◇ Test "M1 por provider: ciclo concorrente do mesmo provider vira skip" started.
+◇ Test "coordinator: state.json ganha history7d do DB no claude e NADA no zai" started.
+◇ Test "evento zerado de modelo precificado custa 0.0" started.
+◇ Test "caso 2: support dir sem permissão de escrita (disco cheio/readonly) → app vivo, sem history7d, sem crash" started.
+◇ Test "history7d presente com tokens e custo numérico quando a leitura foi bem-sucedida" started.
+◇ Test "degradação sem DB: coordinator segue vivo com comportamento F2" started.
+◇ Test "payload completo: provider com histórico e provider sem (zai) no MESMO payload" started.
+◇ Test "countdown: distanteFuture/anômalo → texto finito, sem crash" started.
+◇ Test "history7d com custo null EXPLÍCITO quando nada é computável (nulo ≠ omitido)" started.
+◇ Test "validate: /dev/null, FIFO e symlink quebrado avisam/aceitam sem crash — nada bloqueia indevidamente" started.
+◇ Test conformsToUsageProviderBasics() started.
+◇ Test "bundled: toda entrada tem fonte pública documentada" started.
+◇ Test "history7d OMITIDO quando a leitura não ocorreu/falhou (flag false)" started.
+◇ Test "windows/30d/pacing/série não mudam a string do menu bar nem re-renderizam o label" started.
+◇ Test "AccountsModel.add: dir sobreposta BLOQUEIA também programaticamente (defesa além do form)" started.
+◇ Test "bypass programático (INSERT direto com dir == raiz canônica): ciclo NÃO dobra — conta sobreposta não ingere e continua visível p/ remoção" started.
+◇ Test "heartbeat com 30 contas hostis: labels/paths/ids de conta NÃO vazam no payload e o tamanho é limitado" started.
+◇ Test "countdown: passado/epoch/distantPast → 'Renewed'/'renewed', NUNCA dígitos negativos" started.
+◇ Test "readers de credencial: FIFO/diretório/device/quebrado → nil (nunca bloqueia)" started.
+◇ Test "chartModel: série com custo → barras em USD e pico '$282'; só tokens → pico abreviado" started.
+◇ Test "tokenCountString: '216M', '8.9B', '3.1K' — um decimal e '.0' cortado" started.
+◇ Test "showsDashboard: qualquer dado de histórico/custo/tokens/série liga; sem nada, some" started.
+◇ Test "windowRows: resetsAt nil → countdown nil; fração fora de 0...1 satura; fração nil → sem barra/invenção" started.
+◇ Test "grid completo: 'Today $0.08' (ênfase) · '30d $2.10' · 'Recent tokens 12.4K' · '30d tokens 8.9B'" started.
+◇ Test "shortModelName: nomes longos truncam em 25 + '…'; curtos passam intactos" started.
+◇ Test "custo ausente (NULL ≠ 0) → célula '—' (formato da referência); nada computável → grid some" started.
+◇ Test "badge: local / auth / no auth / auth invalid" started.
+◇ Test "sub-centavo mantém 4 decimais ($0.0050 não vira $0.00); agrupamento de milhar" started.
+◇ Test "alerts ligado: ciclo entrega eventos no gateway e publica estado granted" started.
+◇ Test "render gate: custo novo NÃO re-renderiza o label do ícone" started.
+◇ Test "pacing/updated adversarial: déficit sem etá válido mostra só o déficit; fetchedAt no futuro → delta nunca negativo" started.
+◇ Test "linha de percent também exibe o custo do dia" started.
+◇ Test "formatEstimatedUSD: 2 decimais; abaixo de 1 centavo, 4" started.
+◇ Test "heartbeat: todayCostUsd presente como número quando há custo" started.
+◇ Test "coordinator: ciclo com DB publica todayCostUsd no display e heartbeat" started.
+◇ Test "detailLines: 7d com custo+tokens, top model truncado em 26, disclaimer condicional" started.
+◇ Test "heartbeat: sem custo o campo é OMITIDO (contrato v2 não muda)" started.
+◇ Test "linha de percent também exibe o 7d (antes do sufixo de reset)" started.
+◇ Test "linha de tokens ganha o custo do dia" started.
+◇ Test "sem histórico na janela (0 tokens) o segmento 7d é omitido" started.
+◇ Test "'Updated just now' (<60s) / 'Updated Xm ago' / 'Updated Xh ago' — capitalização CONFERIDA contra UsageFormatter MIT (T6); nunca ciclado → 'not updated yet'" started.
+◇ Test "history7d não aparece na string do menu bar e não re-renderiza o label" started.
+◇ Test "permissão não determinada: painel mostra notConfigured" started.
+◇ Test "ciclo completo com alerts ligado: janelas sem fração (local) não geram evento" started.
+◇ Test "wiring degradado: 10 providers no heartbeat v2, sem crash, credencial não vaza" started.
+◇ Test "alerts desligado (default): nada toca o gateway e o painel diz off" started.
+◇ Test "7d não aparece na string do menu bar e não re-renderiza o label" started.
+◇ Test "7d sem custo computável mantém só tokens (NULL ≠ 0)" started.
+◇ Test "custo não aparece na string do menu bar (formato F1 preservado)" started.
+◇ Test "seleção nil → primeira aba com dado; escolha válida é preservada" started.
+◇ Test "abas = providers com dado, ordem D5 (C, X, G, Z)" started.
+◇ Test "creditsText (F5 T6): saldo real → 'Credits: $X'; unlimited → texto; nil/null → linha omitida (verdicto wham/usage)" started.
+◇ Test "toggle ativa pela VIEW-MODEL: conta inativa sai do ciclo e do agregado; reativa volta" started.
+◇ Test "heartbeat: credits presente só com dado real; alertsStatus top-level" started.
+◇ Test "provider sem custo nenhum mantém só tokens" started.
+◇ Test "linha de tokens ganha o segmento 7d com custo" started.
+◇ Test "seleção de provider que perdeu dado cai na primeira aba viva (nunca aba morta)" started.
+◇ Test "permissão negada: deliver no-op e painel mostra blocked (honesto)" started.
+◇ Test "E2EAlertCaptureGateway: deliver grava JSONL com identifier/render reais; mesma causa → mesmo identifier" started.
+◇ Test "agregado: janela da conta de maior fração vence; tokens somados" started.
+◇ Test "ciclo com 2 contas: eventos, cursores e hwm por conta; agregado soma" started.
+◇ Test "união registry ⊕ ciclo: sem duplicata; inativa vira linha com badge; regra de visibilidade da seção" started.
+◇ Test "cursores por conta: crescer o corpus da conta registrada não re-inge a local" started.
+◇ Test "overlap programático (bypass do form): dobragem documentada, sem crash" started.
+◇ Test "cores de marca = tokens exatos da referência MIT (ProviderBranding)" started.
+◇ Test testSingleProviderTokens() started.
+◇ Test "frota de 30 contas: um ciclo cobre todas com soma exata; remoção em lote poda" started.
+◇ Test "provider sem SVG (cursor) → nil: painel cai no fallback da sigla D5" started.
+◇ Test "os 4 SVGs portados (ProviderIcon-*) existem no bundle e carregam como NSImage template" started.
+◇ Test testRenderGateSkipsEqualContent() started.
+◇ Test "coordinator: ciclo publica weekTokens/weekCostUsd do DB na linha do painel" started.
+◇ Test "painel união registry ⊕ ciclo: toggle-off mantém a linha (inactive) e remove alcançável; reativar volta" started.
+◇ Test testAbbrevTokens() started.
+◇ Test testSiglasD5() started.
+◇ Test testCriticalWindowPicksHighestFraction() started.
+◇ Test "visibilidade persistida carrega no launch; texto some/volta ao vivo" started.
+◇ Test "conta com path inválido degrada sozinha: badge na linha, provider de pé" started.
+◇ Test testPercentBeatsTokensWhenWindowKnown() started.
+◇ Test testMenuLinesExposePanelState() started.
+◇ Test testResetSuffixBounds() started.
+◇ Test hiddenProviderWithDataDisappearsFromText() started.
+◇ Test defaultVisibilityKeepsEverything() started.
+◇ Test testFixedOrderClaudeCodexGeminiZai() started.
+◇ Test testHeartbeatV2PayloadShape() started.
+◇ Test testTokensWhenNoWindow() started.
+◇ Test testProviderWithoutDataDisappears() started.
+◇ Test testEmptyContentShowsPlaceholder() started.
+◇ Test hidingProviderWithoutDataChangesNothing() started.
+◇ Test testDisplayFragmentAndMenuLines() started.
+◇ Test hidingEverythingShowsTB() started.
+◇ Test "sem pacing → nenhuma faixa (nada inventado)" started.
+◇ Test "projeção dentro da janela → faixa verde na posição projetada" started.
+◇ Test "faixa de pacing vai na janela CRÍTICA (âncora do engine); déficit → vermelha" started.
+◇ Test "dayCosts: dia misto soma conhecidos; dia 100% NULL sai do chart; 0 real fica" started.
+◇ Test "clear: fechar a janela solta os dados (orçamento de RAM)" started.
+◇ Test "sem banco (degradação F2): reload mantém janela vazia, nada inventado" started.
+◇ Test "troca de período: 24h mostra só hoje (buckets diários)" started.
+◇ Test "reload em banco vazio: vazio, não nil-ruim" started.
+◇ Test "dayCosts: dia com provider nil-custo antes do precificado aparece 1×" started.
+◇ Test "reload (7d default): séries, totais, custo/dia derivado e top-5" started.
+◇ Test "query 30d não rodou → monthTokens/monthCostUsd omitidos mesmo com totais velhos" started.
+◇ Test "monthTokens/monthCostUsd/pacing aparecem só quando existem; chaves v2/v3 intactas" started.
+◇ Test "janela com fração: 'Weekly 74% used' + barra + countdown 'Renews in 6d 16h'" started.
+◇ Test "janela sem resetsAt → só contagem (sem countdown inventado); ids únicos p/ janelas repetidas" started.
+◇ Test "fração desconhecida (modo local): sem barra, título 'Daily window', countdown mantido" started.
+✔ Test resolveFallsBackToHomeClaude() passed after 0.381 seconds.
+✔ Test testRestoreDayDoesNotClobberLiveEntries() passed after 0.381 seconds.
+✔ Test testRestoreDayOnlyOncePerProcess() passed after 0.381 seconds.
+✔ Test testYesterdayEventsDoNotCountForToday() passed after 0.381 seconds.
+✔ Test testFirstCycleRecordsDayWithoutSpuriousRescan() passed after 0.381 seconds.
+✔ Test testTruncationSelfCorrects() passed after 0.381 seconds.
+✔ Test missingDirectoryYieldsZero() passed after 0.381 seconds.
+✔ Test testDaySnapshotNilOnEmptyDayAndAfterRollover() passed after 0.381 seconds.
+✔ Test findQuotaInfoAndWindowMapping() passed after 0.381 seconds.
+✔ Test ingestOnceCountsTokensFromRealFormatFixture() passed after 0.381 seconds.
+✔ Test testRestoreDayIgnoresOtherDay() passed after 0.381 seconds.
+✔ Test testRestoreDayRecoversSnapshotAfterRestart() passed after 0.381 seconds.
+✔ Test ingestTwiceDoesNotDuplicate() passed after 0.381 seconds.
+✔ Test testTruncationAfterRestoreSelfCorrects() passed after 0.381 seconds.
+✔ Test staleSnapshotPathsAreNotRestored() passed after 0.381 seconds.
+✔ Test staleTotalsWithSurvivingCursorsAreNotRestored() passed after 0.381 seconds.
+✔ Test corruptLedgerSnapshotIsIgnoredNotFatal() passed after 0.381 seconds.
+✔ Test resolvePrefersEnvironmentOverride() passed after 0.381 seconds.
+✔ Test conformsToUsageProviderBasics() passed after 0.381 seconds.
+✔ Test testAccumulatesAcrossFilesAndCycles() passed after 0.381 seconds.
+✔ Test lostCursorsInvalidateSnapshotNoDoubleCount() passed after 0.381 seconds.
+✔ Test rejectsUnknownAccount() passed after 0.381 seconds.
+✔ Test resolveBaseURLRegionOverride() passed after 0.381 seconds.
+✔ Test testRolloverClearsTotalsAndFlagsRescan() passed after 0.381 seconds.
+✔ Test truncationAfterRestoreSelfCorrectsPerFile() passed after 0.381 seconds.
+✔ Test conformsToUsageProviderBasics() passed after 0.381 seconds.
+✔ Test restartMidDayRestoresTodayTotals() passed after 0.381 seconds.
+✔ Test testMultiProviderBreakdown() passed after 0.381 seconds.
+✔ Test "csvField: cita só quando precisa e dobra aspas" passed after 0.381 seconds.
+✔ Test "daily_agg acumula custo por grupo na mesma transação" passed after 0.381 seconds.
+✔ Test "modelo ausente ou nil → cost_usd NULL (nunca 0)" passed after 0.381 seconds.
+✔ Test "grupos com e sem preço ficam separados: um com custo, outro NULL" passed after 0.381 seconds.
+✔ Test "open com pricing: nil (degradação) → todo evento sai sem custo" passed after 0.381 seconds.
+✔ Test "todayCostUSD soma só o dia corrente e só eventos com custo" passed after 0.381 seconds.
+✔ Test "todayCostUSD: dia só com eventos sem preço → nil (não 0)" passed after 0.381 seconds.
+✔ Test "intervalos/visibilidade tamperados → defaults do campo (AppSettingsStore)" passed after 0.381 seconds.
+✔ Test "thresholds tamperados [95,50] → sanitizados para [50,95] no apply E no readConfig" passed after 0.381 seconds.
+✔ Test "frações absurdas saturam em 0...1 antes de comparar" passed after 0.381 seconds.
+✔ Test "JSON golden: chaves ordenadas, nulos explícitos, metadados versão/período" passed after 0.381 seconds.
+✔ Test "exportAll com banco vazio: arquivos válidos (header + rows vazio)" passed after 0.381 seconds.
+✔ Test "formatCost: 6 casas com zeros aparados, determinístico" passed after 0.381 seconds.
+✔ Test "CSV golden: header, escape RFC 4180, custo NULL vazio, formatCost aparado" passed after 0.381 seconds.
+✔ Test "ordem dos eventos é determinística (provider, conta, janela, threshold)" passed after 0.383 seconds.
+✔ Test "exportAll: escreve CSV e JSON em <support>/exports/ com mesmo conteúdo e timestamp UTC" passed after 0.383 seconds.
+✔ Test "lembrete de reset: 1× por janela dentro de [resetsAt−N, resetsAt)" passed after 0.383 seconds.
+✔ Test "pacingInput: série por (provider, conta) com dias no calendar do banco" passed after 0.383 seconds.
+✔ Test "contas isoladas: alerta de uma conta não vaza na outra" passed after 0.383 seconds.
+✔ Test conformsToUsageProviderBasics() passed after 0.383 seconds.
+✔ Test "sem DB: dedupe funciona em memória (sessão), persistência é aditiva" passed after 0.383 seconds.
+✔ Test "estado corrompido em settings → tratado como vazio, sem crash" passed after 0.392 seconds.
+✔ Test "parse de day string: inverso do dayString; lixo → nil (nunca inventa data)" passed after 0.392 seconds.
+✔ Test conformsToUsageProviderBasics() passed after 0.392 seconds.
+✔ Test "cruzamento para cima dispara 1×; segue suprimido até re-armar" passed after 0.392 seconds.
+✔ Test rejectsUnknownAccount() passed after 0.392 seconds.
+✔ Test "estado de dedupe sobrevive restart: nada re-dispara após reabrir o banco" passed after 0.392 seconds.
+✔ Test "janelas independentes: session e weekly dedupam separados" passed after 0.392 seconds.
+✔ Test "FileKind: regular file vs. diretório vs. inexistente vs. FIFO" passed after 0.392 seconds.
+✔ Test "eventos persistidos sem custo NÃO são re-precificados (hwm impede re-leitura)" passed after 0.392 seconds.
+✔ Test "pacing: 1 ponto de dados → nil (sem tendência, mesmo com janela completa)" passed after 0.392 seconds.
+✔ Test "ingest com tabela: cost_usd na linha do evento (input+output+cache)" passed after 0.392 seconds.
+✔ Test "pacing: resetsAt distante (ano 9999) com taxa gigante → saturação finita, sem overflow" passed after 0.392 seconds.
+✔ Test "config desligada (default) → nenhum evento e nenhum estado gravado" passed after 0.392 seconds.
+✔ Test "pacingInput → PacingEngine: integração com números exatos (estoura)" passed after 0.393 seconds.
+✔ Test "pacing: todos os totais negativos são descartados (dados corrompidos → <2 pontos → nil)" passed after 0.393 seconds.
+✔ Test "pacing: fração adversarial (NaN, infinito, fora de 0...1) → nil ou saturada, nunca crash" passed after 0.393 seconds.
+✔ Test "re-arm por queda: fração cai abaixo do threshold e cruza de novo" passed after 0.393 seconds.
+✔ Test parsesOAuthCredsShapes() passed after 0.393 seconds.
+✔ Test "config corrompida em settings → default por campo, sem crash" passed after 0.393 seconds.
+✔ Test "JSON lixo em alerts:* → defaults campo a campo; estado corrompido → vazio sem crash" passed after 0.394 seconds.
+✔ Test "pacing: resetsAt no PASSADO → projeção = uso atual (horizonte zero, nunca esgotamento negativo)" passed after 0.393 seconds.
+✔ Test resolveHonorsEnvOverrideAndDefault() passed after 0.393 seconds.
+✔ Test "lembrete disparado sobrevive a restart (1× por janela MESMO reabrindo)" passed after 0.394 seconds.
+✔ Test "fração nil ou não-finita é ignorada — nada inventado, nada trapando" passed after 0.393 seconds.
+✔ Test invalidAndMissingYieldNil() passed after 0.393 seconds.
+✔ Test missingSessionsDirectoryYieldsZero() passed after 0.393 seconds.
+✔ Test "pacing: Int64.max + negativos → sem crash, resultado finito ou nil" passed after 0.393 seconds.
+✔ Test staleTotalsWithSurvivingCursorsAreNotRestored() passed after 0.393 seconds.
+✔ Test "pacingInput: day strings não-ISO descartadas; ISO leniente rola; agregado negativo só morre no ENGINE" passed after 0.393 seconds.
+✔ Test "config em settings: thresholds customizados via apply sobrevivem a restart" passed after 0.394 seconds.
+✔ Test rolloverDropsInFileDuplicateDuringRescan() passed after 0.393 seconds.
+✔ Test "50 contas: um evaluate cobre todas — 50 eventos determinísticos, dedupe no 2º ciclo" passed after 0.393 seconds.
+✔ Test restartMidDayRestoresTodayTotals() passed after 0.393 seconds.
+✔ Test "dedupe por marca d'água: re-ingest (rollover/cursor perdido) NÃO duplica o histórico" passed after 0.393 seconds.
+✔ Test discoverAccountsRequiresDotGeminiDirectory() passed after 0.394 seconds.
+✔ Test "persistBatch: usage_events + daily_agg consistentes (soma por dia/provider/modelo)" passed after 0.393 seconds.
+✔ Test "re-arm por renovação: resetsAt renovado re-dispara na mesma fração" passed after 0.393 seconds.
+✔ Test conformsToUsageProviderBasics() passed after 0.393 seconds.
+✔ Test "alert storm: oscilação 0.94↔0.96 no threshold 95 re-dispara a cada cruzamento (1 evento por cruzamento — contrato sem histerese)" passed after 0.394 seconds.
+✔ Test deduplicatesSameIdWithinSameFile() passed after 0.393 seconds.
+✔ Test protocolDispatchThroughExistential() passed after 0.393 seconds.
+✔ Test fetchUsageReturnsLocalOnlySnapshot() passed after 0.393 seconds.
+✔ Test registryRegisterAndResolve() passed after 0.393 seconds.
+✔ Test fetchUsageRejectsUnknownAccount() passed after 0.393 seconds.
+✔ Test registryAllSortedByID() passed after 0.393 seconds.
+✔ Test ingestLocalRejectsUnknownAccount() passed after 0.393 seconds.
+✔ Test "flip resetsAt nil↔data: re-arma por renovação (1 disparo por flip, fração constante)" passed after 0.393 seconds.
+✔ Test accountRefCodableRoundtrip() passed after 0.393 seconds.
+✔ Test snapshotCodableRoundtripLocalModeWithNils() passed after 0.393 seconds.
+✔ Test ingestCountsOnlyGeminiRootLinesWithRealTokens() passed after 0.393 seconds.
+✔ Test "migração de cursor legado Gemini/Codex é independente por provider" passed after 0.393 seconds.
+✔ Test "abertura em path inválido lança (coordinator degrada) — sem crash" passed after 0.393 seconds.
+✔ Test enumRawValues() passed after 0.393 seconds.
+✔ Test capabilityMath() passed after 0.393 seconds.
+✔ Test "migration v1 cria o schema §6 completo e é idempotente" passed after 0.393 seconds.
+✔ Test "settings roundtrip: set/get/delete" passed after 0.393 seconds.
+✔ Test ingestCursorWrapsFileOffsets() passed after 0.393 seconds.
+✔ Test registryDuplicateRegistrationReplaces() passed after 0.393 seconds.
+✔ Test creditsUnlimitedCodableRoundtrip() passed after 0.393 seconds.
+✔ Test "resetToZero (arquivo encolheu): marca d'água descartada e conteúdo re-lido persiste" passed after 0.394 seconds.
+✔ Test "registry com 50 contas OpenRouter: add/activeAccounts/labels ordenados, sem colisão de keys" passed after 0.394 seconds.
+✔ Test resolveGeminiDirectoryOverrideAndDefault() passed after 0.393 seconds.
+✔ Test "intervalos: roundtrip na tabela settings" passed after 0.393 seconds.
+✔ Test "visibilidade: conjunto vazio é escolha válida (menu vira 'TB'); ids desconhecidos não contam" passed after 0.394 seconds.
+✔ Test rejectsUnknownAccount() passed after 0.393 seconds.
+✔ Test snapshotCodableRoundtripFull() passed after 0.394 seconds.
+✔ Test "migração de cursor legado: settings + marcas d'água + rename .migrated + reuso dos offsets" passed after 0.394 seconds.
+✔ Test "intervalos: default da spec §7 quando nunca salvos" passed after 0.394 seconds.
+✔ Test "re-migração nunca REBAIXA marca d'água já avançada pela ingest" passed after 0.394 seconds.
+✔ Test "visibilidade: default = todos; roundtrip preserva o conjunto salvo" passed after 0.394 seconds.
+✔ Test "sem DB: leitura dá default e escrita é no-op (nunca crash)" passed after 0.394 seconds.
+✔ Test rolloverRescansFullFileOnDayChangeWithoutDoubleCounting() passed after 0.394 seconds.
+✔ Test "intervalos: valor corrompido ou fora de faixa no banco → default" passed after 0.394 seconds.
+✔ Test registryResolveUnknownReturnsNil() passed after 0.394 seconds.
+✔ Test "migração: após o 1º save a flag existe — lista persistida manda (novos nascem escondidos)" passed after 0.394 seconds.
+✔ Test incrementalAppendCountsOnlyNewRootLine() passed after 0.394 seconds.
+✔ Test skipsUserAndInfoRootLinesMetaAndSetDeltas() passed after 0.394 seconds.
+✔ Test "migração: banco F4 legado (lista SEM flag touched) → novos providers ficam VISÍVEIS" passed after 0.394 seconds.
+✔ Test parsesGeminiRootLineWithRealTokens() passed after 0.396 seconds.
+✔ Test deduplicatesReattachedIdAcrossCycles() passed after 0.393 seconds.
+✔ Test conformsToUsageProviderBasics() passed after 0.397 seconds.
+✔ Test invalidTimestampYieldsNoEvent() passed after 0.397 seconds.
+✔ Test "JSON vazio: [] compacto (não o pretty-printed quebrado do encoder)" passed after 0.397 seconds.
+✔ Test mismatchedTotalChecksumStillParsesComponents() passed after 0.397 seconds.
+✔ Test withoutCredentialProviderIsDisabled() passed after 0.397 seconds.
+✔ Test "JSON golden: pretty, chaves ordenadas, nulo de custo EXPLÍCITO" passed after 0.397 seconds.
+✔ Test cachedMapsToCacheReadAndToolSumsIntoOutput() passed after 0.397 seconds.
+✔ Test "AlertEngine.readConfig: janela de Settings lê o que o engine aplicou" passed after 0.397 seconds.
+✔ Test rejectsUnknownAccount() passed after 0.397 seconds.
+✔ Test "intervalos: escrita fora da faixa da UI é recusada (valor anterior intacto)" passed after 0.397 seconds.
+✔ Test "provider sem histórico na janela: CSV header-only pelo filtro" passed after 0.397 seconds.
+✔ Test zeroTotalYieldsNoEvent() passed after 0.399 seconds.
+✔ Test geminiLineWithoutTokensYieldsNoEvent() passed after 0.399 seconds.
+✔ Test "JSON round-trip: decode sintetizado preserva costUsd nil ≠ 0 e ordena igual ao CSV" passed after 0.399 seconds.
+✔ Test coreVersionIsSet() passed after 0.399 seconds.
+✔ Test "SQL injection em model/path: prepared statements seguram — banco íntegro e dado recuperável" passed after 0.400 seconds.
+✔ Test "--provider: CSV só do provider pedido (codex)" passed after 0.399 seconds.
+✔ Test nearInt64MaxComponentSumIsRejectedNotCrash() passed after 0.398 seconds.
+✔ Test missingTimestampFallsBackToMtime() passed after 0.399 seconds.
+✔ Test testMissingFileStartsEmpty() passed after 0.399 seconds.
+✔ Test missingSessionsDirectoryYieldsZero() passed after 0.399 seconds.
+✔ Test "--days 1: só hoje (janela de 1 dia)" passed after 0.399 seconds.
+✔ Test "--days 8: inclui d-7 (2026-08-23, 80 tok) que o default 7d exclui" passed after 0.400 seconds.
+✔ Test resolveSessionsDirectoryOverrideAndDefault() passed after 0.399 seconds.
+✔ Test "CSV golden 7d: ordenado (day, provider), custo NULL vazio, zero real = 0" passed after 0.399 seconds.
+✔ Test "sem dados dentro do início da janela: relação inderivável → sem projeção" passed after 0.399 seconds.
+✔ Test testRemoveWithNil() passed after 0.399 seconds.
+✔ Test "flat (taxa zero): projected = usedFraction, exhaustedIn nil" passed after 0.399 seconds.
+✔ Test "DB com bytes lixo (não-SQLite): open lança erro — degrada F2, nunca crash" passed after 0.400 seconds.
+✔ Test resolveBaseURLOverrideAndDefault() passed after 0.399 seconds.
+✔ Test "re-migração stale (rename falho): cursor re-semeado atrás do hwm não duplica o banco e auto-recupera na próxima escrita do store" passed after 0.400 seconds.
+✔ Test "honestidade: 0 e 1 pontos → nil" passed after 0.399 seconds.
+✔ Test "todos os pontos no mesmo dia: sem variação temporal → nil" passed after 0.399 seconds.
+✔ Test "adversarial: pontos separados por dias gigantes → finito, sem crash" passed after 0.399 seconds.
+✔ Test "adversarial: dois dias ~Int64.max → flat, sem crash" passed after 0.399 seconds.
+✔ Test ingestLocalRejectsUnknownAccount() passed after 0.399 seconds.
+✔ Test "gap de dias usa DATA real (não zero-fill, não índice): slope = 1M/dia" passed after 0.399 seconds.
+✔ Test "adversarial: subida ~Int64.max → projeção finita, sem crash" passed after 0.399 seconds.
+✔ Test testSetThenReloadRoundtrip() passed after 0.400 seconds.
+✔ Test ingestCountsOnlyLastTokenUsageDeltas() passed after 0.399 seconds.
+✔ Test "janela .session: sem span derivável de agregados diários → sem projeção" passed after 0.399 seconds.
+✔ Test ingestTwiceDoesNotDuplicate() passed after 0.400 seconds.
+✔ Test testSeenIDsRoundtripAndLegacyCursorWithoutSeenIDs() passed after 0.399 seconds.
+✔ Test "honestidade: resetsAt nil → nil (nunca chuta)" passed after 0.399 seconds.
+✔ Test rolloverRescansFullFileOnDayChange() passed after 0.400 seconds.
+✔ Test testGarbageLinesAreSkippedButConsumed() passed after 0.399 seconds.
+✔ Test conformsToUsageProviderBasics() passed after 0.399 seconds.
+✔ Test testStreamingResetFlagOnlyOnFirstBatchOfShrunkFile() passed after 0.399 seconds.
+✔ Test testTruncateToZeroEmitsResetEvenWithoutNewLines() passed after 0.399 seconds.
+✔ Test "resetsAt no passado: horizonte zero → projeção = uso atual" passed after 0.399 seconds.
+✔ Test "crescente que estoura: exhaustedIn finito, projected > 1, deficit > 0" passed after 0.399 seconds.
+✔ Test "crescente que NÃO estoura: projected < 1, exhaustedIn e deficit nil" passed after 0.399 seconds.
+✔ Test "adversarial: só totais negativos → <2 pontos válidos → nil" passed after 0.400 seconds.
+✔ Test "regressão usa os ÚLTIMOS 14 pontos (boundary de dias)" passed after 0.399 seconds.
+✔ Test testSecondIngestReadsOnlyAppend() passed after 0.399 seconds.
+✔ Test "decrescente (taxa negativa): projected = usedFraction, exhaustedIn nil" passed after 0.399 seconds.
+✔ Test restartMidDayRestoresTodayTotals() passed after 0.399 seconds.
+✔ Test testStreamingCarriesPartialLineAcrossChunks() passed after 0.399 seconds.
+✔ Test testTokenSumsCodableRoundtrip() passed after 0.399 seconds.
+✔ Test "DB vazio: CSV só header (LF final) e JSON [] — exit 0 é contrato" passed after 0.400 seconds.
+✔ Test testTokenSumsArithmetic() passed after 0.399 seconds.
+✔ Test testFirstIngestReadsWholeFile() passed after 0.399 seconds.
+✔ Test testUsageEventCodableRoundtrip() passed after 0.399 seconds.
+✔ Test "honestidade: usedFraction nil ou não-finita → nil" passed after 0.399 seconds.
+✔ Test staleTotalsWithSurvivingCursorsAreNotRestored() passed after 0.400 seconds.
+✔ Test testTenThousandEventsUnderOneSecond() passed after 0.400 seconds.
+✔ Test testTruncatedFileResetsToZero() passed after 0.399 seconds.
+✔ Test "remove apaga a linha; remover chave inexistente é no-op" passed after 0.399 seconds.
+✔ Test "usedFraction 0: relação tokens↔fração inderivável → sem projeção" passed after 0.400 seconds.
+✔ Test testCorruptedFileStartsEmpty() passed after 0.400 seconds.
+✔ Test skipsNonUsageLines() passed after 0.399 seconds.
+✔ Test firstEventOfNewFileWithoutTurnContextHasNoModel() passed after 0.399 seconds.
+✔ Test testProviderIDCodableRoundtrip() passed after 0.399 seconds.
+✔ Test "validação: label vazio e credential path vazio são rejeitados" passed after 0.399 seconds.
+✔ Test invalidTimestampYieldsNoEvent() passed after 0.399 seconds.
+✔ Test linesAfterOversizedLineAreStillCounted() passed after 0.399 seconds.
+✔ Test "add + list: persiste com key gerada e ativa por default" passed after 0.399 seconds.
+✔ Test tokenCountWithoutInfoYieldsNoEvent() passed after 0.399 seconds.
+✔ Test testIncompleteTrailingLineIsNotConsumed() passed after 0.399 seconds.
+✔ Test oversizedAtEOFWithoutTrailingNewlineKeepsCursorExact() passed after 0.400 seconds.
+✔ Test "setActive(false) remove das ativas sem apagar o registro; reativa volta" passed after 0.399 seconds.
+✔ Test parsesTokenCountDeltasWithAllFields() passed after 0.399 seconds.
+✔ Test testUnchangedFileIsNotReturned() passed after 0.399 seconds.
+✔ Test "persistência: reabrir o banco mantém as contas" passed after 0.399 seconds.
+✔ Test zeroTotalUsageYieldsNoEvent() passed after 0.399 seconds.
+✔ Test testTokenSumsSaturatesInsteadOfTrapping() passed after 0.400 seconds.
+✔ Test testAccountIDHashAndEquality() passed after 0.399 seconds.
+✔ Test "adversarial: total negativo é dado corrompido → descartado, não vira uso" passed after 0.399 seconds.
+✔ Test readsRawJWTTokenFileAndBuildsCookie() passed after 0.399 seconds.
+✔ Test testSubdirectoriesAreScanned() passed after 0.400 seconds.
+✔ Test resolvePrefersEnvironmentOverride() passed after 0.399 seconds.
+✔ Test intervalSettersIgnoreZeroAndNegative() passed after 0.399 seconds.
+✔ Test accountIDFallsBackToJWTClaim() passed after 0.399 seconds.
+✔ Test resolveDefaultsToHomeDotCodex() passed after 0.399 seconds.
+✔ Test "isolamento por provider: contas de claude não aparecem para codex" passed after 0.400 seconds.
+✔ Test malformedFileReturnsNil() passed after 0.399 seconds.
+✔ Test modelComesFromLastTurnContext() passed after 0.399 seconds.
+✔ Test missingFileReturnsNil() passed after 0.399 seconds.
+✔ Test "trim: label e paths com espaços nas bordas são normalizados" passed after 0.400 seconds.
+✔ Test multipleLinesAfterOversizedLineSurvive() passed after 0.400 seconds.
+✔ Test readParsesAccessTokenAndAccount() passed after 0.399 seconds.
+✔ Test apikeyModeHasNoOAuth() passed after 0.399 seconds.
+✔ Test testStreamingDeliversLargeFileInBoundedBatches() passed after 0.400 seconds.
+✔ Test fetchUsageRejectsUnknownAccount() passed after 0.399 seconds.
+✔ Test "eventsForExport: janela, ordenação estável (ts,id) e NULL de custo/model no registro" passed after 0.399 seconds.
+✔ Test rolloverRescansFullFileOnDayChange() passed after 0.399 seconds.
+✔ Test "weekTotal: total 7d do painel; provider sem histórico → 0 tok, custo nil" passed after 0.399 seconds.
+✔ Test noteResultForUnknownProviderDoesNotCrash() passed after 0.399 seconds.
+✔ Test fetchUsageReturnsLocalOnlySnapshot() passed after 0.399 seconds.
+✔ Test rolloverViaProtocolKeepsNextCursorCoherent() passed after 0.399 seconds.
+✔ Test "dailySeries: filtros por provider e por model" passed after 0.399 seconds.
+✔ Test resolveHonorsEnvOverridesAndDefaults() passed after 0.399 seconds.
+✔ Test "totals: totais por provider na janela com a mesma semântica de custo" passed after 0.399 seconds.
+✔ Test "multi-conta: conta registrada aparece na descoberta dos 6 novos" passed after 0.399 seconds.
+✔ Test assistantWithoutUsageIsSkipped() passed after 0.399 seconds.
+✔ Test readParsesAPIKeyAndRegionFromConfig() passed after 0.399 seconds.
+✔ Test controlLinesParseBeforeAndAfterBattery() passed after 0.403 seconds.
+✔ Test usageFieldsAtSanityCapBoundaryStillCounted() passed after 0.399 seconds.
+✔ Test "dailySeries: janela de dias (d-7 fora do 7d, dentro do 30d; d-30 fora)" passed after 0.399 seconds.
+✔ Test conformsToUsageProviderBasics() passed after 0.399 seconds.
+✔ Test filesWithoutUsableKeysReturnNil() passed after 0.399 seconds.
+✔ Test ingestLocalMatchesIngestOnce() passed after 0.399 seconds.
+✔ Test assistantLineWithUsageProducesEvent() passed after 0.399 seconds.
+✔ Test zaiEntryPreferredOverBigmodel() passed after 0.399 seconds.
+✔ Test binaryGarbageIsSkippedNotFatal() passed after 0.399 seconds.
+✔ Test ingestLocalRejectsUnknownAccount() passed after 0.399 seconds.
+✔ Test "isolamento: guardKnownAccount nos 6 novos" passed after 0.399 seconds.
+✔ Test negativeTokensAreClampedToZero() passed after 0.399 seconds.
+✔ Test ingestLocalThroughExistentialUsesWallClock() passed after 0.399 seconds.
+✔ Test unknownBaseHostGivesNoRegionHint() passed after 0.399 seconds.
+✔ Test truncatedJSONIsSkippedNotFatal() passed after 0.399 seconds.
+✔ Test ingestLocalFromProtocolCursorCountsOnce() passed after 0.399 seconds.
+✔ Test missingFilesReturnNil() passed after 0.399 seconds.
+✔ Test userLineIsSkipped() passed after 0.399 seconds.
+✔ Test usageFieldsNearInt64MaxAreRejectedNotCrash() passed after 0.399 seconds.
+✔ Test malformedFilesReturnNil() passed after 0.399 seconds.
+✔ Test fastISO8601MatchesFormatterOnAcceptedForms() passed after 0.399 seconds.
+✔ Test bigmodelEntryAloneYieldsCNRegion() passed after 0.399 seconds.
+✔ Test readCollectsAPIKeyAndOAuthTogether() passed after 0.399 seconds.
+✔ Test envKeyOrderAndFile() passed after 0.400 seconds.
+✔ Test readFallsBackToOAuthTokenWithoutConfig() passed after 0.399 seconds.
+✔ Test entryWithoutAPIKeyStillHintsRegionForOAuth() passed after 0.399 seconds.
+✔ Test invalidTimestampIsSkipped() passed after 0.399 seconds.
+✔ Test "reset no passado → 'renewed' / 'Renewed' (nada a prometer da janela velha)" passed after 0.399 seconds.
+✔ Test "falha de persistência NÃO derruba o ingest (degrada para comportamento F2)" passed after 0.399 seconds.
+✔ Test "abaixo de 1h só minutos; mínimo 1m" passed after 0.399 seconds.
+✔ Test "registry: 10 providers registrados, ids e capabilities corretos" passed after 0.400 seconds.
+✔ Test "formato '6d 16h' acima de um dia" passed after 0.399 seconds.
+✔ Test allZeroUsageIsSkipped() passed after 0.399 seconds.
+✔ Test "modelBreakdown: ordenado por tokens desc; NULL de custo preservado por modelo" passed after 0.400 seconds.
+✔ Test "custo NULL ≠ 0: dia inteiro sem preço → nil; dia com custo zero real → 0" passed after 0.400 seconds.
+✔ Test "formato '2h 44m' entre 1h e 24h" passed after 0.399 seconds.
+✔ Test "claude: descoberta merge registry + auto, sem registry fica [local]" passed after 0.399 seconds.
+✔ Test "codex: merge com auth sintética + 2 registradas; zai idem sem credencial" passed after 0.399 seconds.
+✔ Test "codex: ingest persiste eventos" passed after 0.399 seconds.
+✔ Test "sem forecast → linha some (menos de 2 pontos, janela sem reset/fração)" passed after 0.399 seconds.
+✔ Test "gemini: dedupe por id ANTES da persistência — duplicata não vira linha no DB" passed after 0.399 seconds.
+✔ Test "claude: ingest persiste eventos e daily_agg; segunda ingest não duplica" passed after 0.399 seconds.
+✔ Test resolveHonorsOverridesAndDefault() passed after 0.399 seconds.
+✔ Test envAndFileSources() passed after 0.399 seconds.
+✔ Test "isolamento: instância canônica rejeita conta de outra instância" passed after 0.399 seconds.
+✔ Test "disclaimer de estimativa (port do hint da referência) acompanha o dashboard" passed after 0.399 seconds.
+✔ Test "forecast encostando em 100% sem déficit → 'On pace · Lasts until reset'" passed after 0.399 seconds.
+✔ Test rawTokenFileAccepted() passed after 0.399 seconds.
+✔ Test "forecast com déficit e esgotamento → '20% in deficit · Exhausts in 2h 44m'" passed after 0.399 seconds.
+✔ Test "claude: rollover re-escaneia o arquivo e o histórico do DB NÃO dobra" passed after 0.400 seconds.
+✔ Test resolveBaseURLPrefersEnvThenRegionHintThenDefault() passed after 0.399 seconds.
+✔ Test invalidShapesYieldNil() passed after 0.399 seconds.
+✔ Test "identificador de entrega é estável por causa (substitui, não empilha)" passed after 0.399 seconds.
+✔ Test "texto do painel: só o estado OK fica em silêncio (honesto)" passed after 0.399 seconds.
+✔ Test "render lembrete: título de renovação com countdown" passed after 0.399 seconds.
+✔ Test prefersOIDCScopeOverLegacy() passed after 0.399 seconds.
+✔ Test "render threshold: título e body com countdown do reset" passed after 0.399 seconds.
+✔ Test "nomes de provider (D5) cobrem todos os ProviderID" passed after 0.399 seconds.
+✔ Test "match exato e por sufixo datado" passed after 0.399 seconds.
+✔ Test "fake captura eventos; requestAuthorization reflete o injetado" passed after 0.399 seconds.
+✔ Test "longest match vence o prefixo curto" passed after 0.399 seconds.
+✔ Test "forecast sem déficit mas com folga → 'N% in reserve · Lasts until reset'" passed after 0.399 seconds.
+✔ Test fetchUsageWithoutCredentialReportsMissing() passed after 0.399 seconds.
+✔ Test "custo soma input+output+cache read+cache write (1M tokens = preço cheio)" passed after 0.399 seconds.
+✔ Test "bundled: carrega, versionada, e cobre as famílias dos transcripts" passed after 0.399 seconds.
+✔ Test "tier sem preço público (null) contribui 0, mas custo segue não-nil" passed after 0.399 seconds.
+✔ Test "modelo ausente ou nil → nil (nunca chute)" passed after 0.399 seconds.
+✔ Test "render sem resetsAt ou já vencido → 'Reset time unknown' (nada inventado)" passed after 0.399 seconds.
+✔ Test "match é case-insensitive" passed after 0.399 seconds.
+✔ Test "bundled faltando/corrompido → nil (degradação, nunca crash)" passed after 0.399 seconds.
+✔ Test "evento zerado de modelo precificado custa 0.0" passed after 0.399 seconds.
+✔ Test "history7d presente com tokens e custo numérico quando a leitura foi bem-sucedida" passed after 0.399 seconds.
+✔ Test readsKeyFileTrimmedAndUnquoted() passed after 0.400 seconds.
+✔ Test discoverAccountsRequiresAuthFile() passed after 0.400 seconds.
+✔ Test "history7d com custo null EXPLÍCITO quando nada é computável (nulo ≠ omitido)" passed after 0.399 seconds.
+✔ Test "payload completo: provider com histórico e provider sem (zai) no MESMO payload" passed after 0.399 seconds.
+✔ Test "history7d OMITIDO quando a leitura não ocorreu/falhou (flag false)" passed after 0.399 seconds.
+✔ Test "bundled: toda entrada tem fonte pública documentada" passed after 0.399 seconds.
+✔ Test conformsToUsageProviderBasics() passed after 0.399 seconds.
+✔ Test "tokenCountString: '216M', '8.9B', '3.1K' — um decimal e '.0' cortado" passed after 0.399 seconds.
+✔ Test "migration v2: colunas credential_path/directory_path existem" passed after 0.400 seconds.
+✔ Test "grid completo: 'Today $0.08' (ênfase) · '30d $2.10' · 'Recent tokens 12.4K' · '30d tokens 8.9B'" passed after 0.399 seconds.
+✔ Test "shortModelName: nomes longos truncam em 25 + '…'; curtos passam intactos" passed after 0.399 seconds.
+✔ Test "showsDashboard: qualquer dado de histórico/custo/tokens/série liga; sem nada, some" passed after 0.399 seconds.
+✔ Test "dailySeries: soma conhecida por (dia, provider) na janela 7d" passed after 0.399 seconds.
+✔ Test fetchUsageRejectsUnknownAccount() passed after 0.399 seconds.
+✔ Test "custo ausente (NULL ≠ 0) → célula '—' (formato da referência); nada computável → grid some" passed after 0.399 seconds.
+✔ Test "linha de percent também exibe o custo do dia" passed after 0.399 seconds.
+✔ Test "badge: local / auth / no auth / auth invalid" passed after 0.399 seconds.
+✔ Test "formatEstimatedUSD: 2 decimais; abaixo de 1 centavo, 4" passed after 0.399 seconds.
+✔ Test "heartbeat: todayCostUsd presente como número quando há custo" passed after 0.399 seconds.
+✔ Test "chartModel: série com custo → barras em USD e pico '$282'; só tokens → pico abreviado" passed after 0.399 seconds.
+✔ Test "detailLines: 7d com custo+tokens, top model truncado em 26, disclaimer condicional" passed after 0.399 seconds.
+✔ Test "heartbeat: sem custo o campo é OMITIDO (contrato v2 não muda)" passed after 0.399 seconds.
+✔ Test "linha de tokens ganha o custo do dia" passed after 0.399 seconds.
+✔ Test "sem histórico na janela (0 tokens) o segmento 7d é omitido" passed after 0.399 seconds.
+✔ Test "'Updated just now' (<60s) / 'Updated Xm ago' / 'Updated Xh ago' — capitalização CONFERIDA contra UsageFormatter MIT (T6); nunca ciclado → 'not updated yet'" passed after 0.399 seconds.
+✔ Test "sub-centavo mantém 4 decimais ($0.0050 não vira $0.00); agrupamento de milhar" passed after 0.399 seconds.
+✔ Test "linha de percent também exibe o 7d (antes do sufixo de reset)" passed after 0.399 seconds.
+✔ Test "custo não aparece na string do menu bar (formato F1 preservado)" passed after 0.399 seconds.
+✔ Test "7d sem custo computável mantém só tokens (NULL ≠ 0)" passed after 0.399 seconds.
+✔ Test "creditsText (F5 T6): saldo real → 'Credits: $X'; unlimited → texto; nil/null → linha omitida (verdicto wham/usage)" passed after 0.399 seconds.
+✔ Test "abas = providers com dado, ordem D5 (C, X, G, Z)" passed after 0.399 seconds.
+✔ Test "seleção nil → primeira aba com dado; escolha válida é preservada" passed after 0.399 seconds.
+✔ Test "linha de tokens ganha o segmento 7d com custo" passed after 0.399 seconds.
+✔ Test fastISO8601MatchesFormatterOnCorpusTimestamps() passed after 0.399 seconds.
+✔ Test "seleção de provider que perdeu dado cai na primeira aba viva (nunca aba morta)" passed after 0.399 seconds.
+✔ Test testAbbrevTokens() passed after 0.399 seconds.
+✔ Test "provider sem custo nenhum mantém só tokens" passed after 0.399 seconds.
+✔ Test testPercentBeatsTokensWhenWindowKnown() passed after 0.399 seconds.
+✔ Test testSingleProviderTokens() passed after 0.399 seconds.
+✔ Test testSiglasD5() passed after 0.399 seconds.
+✔ Test testResetSuffixBounds() passed after 0.399 seconds.
+✔ Test hiddenProviderWithDataDisappearsFromText() passed after 0.399 seconds.
+✔ Test testFixedOrderClaudeCodexGeminiZai() passed after 0.399 seconds.
+✔ Test defaultVisibilityKeepsEverything() passed after 0.399 seconds.
+✔ Test testCriticalWindowPicksHighestFraction() passed after 0.399 seconds.
+✔ Test "claude por conta: instância com accountKey próprio stampa eventos da conta" passed after 0.400 seconds.
+✔ Test "heartbeat: credits presente só com dado real; alertsStatus top-level" passed after 0.399 seconds.
+✔ Test testProviderWithoutDataDisappears() passed after 0.399 seconds.
+✔ Test testEmptyContentShowsPlaceholder() passed after 0.398 seconds.
+✔ Test hidingProviderWithoutDataChangesNothing() passed after 0.399 seconds.
+✔ Test testDisplayFragmentAndMenuLines() passed after 0.398 seconds.
+✔ Test hidingEverythingShowsTB() passed after 0.399 seconds.
+✔ Test "sem pacing → nenhuma faixa (nada inventado)" passed after 0.393 seconds.
+✔ Test "projeção dentro da janela → faixa verde na posição projetada" passed after 0.393 seconds.
+✔ Test testHeartbeatV2PayloadShape() passed after 0.399 seconds.
+✔ Test "faixa de pacing vai na janela CRÍTICA (âncora do engine); déficit → vermelha" passed after 0.389 seconds.
+✔ Test getJSON200ReturnsBodyWithContractedHeaders() passed after 0.405 seconds.
+✔ Test fetchUsageMapsModelQuotasAndSendsContract() passed after 0.405 seconds.
+✔ Test fetchUsageMapsQuotaWindowsAndSendsContract() passed after 0.406 seconds.
+✔ Test discoverAccountsRequiresCredential() passed after 0.400 seconds.
+✔ Test testTokensWhenNoWindow() passed after 0.399 seconds.
+✔ Test "readers de credencial: FIFO/diretório/device/quebrado → nil (nunca bloqueia)" passed after 0.400 seconds.
+✔ Test "dayCosts: dia misto soma conhecidos; dia 100% NULL sai do chart; 0 real fica" passed after 0.314 seconds.
+✔ Test "dayCosts: dia com provider nil-custo antes do precificado aparece 1×" passed after 0.293 seconds.
+✔ Test "E2EAlertCaptureGateway: deliver grava JSONL com identifier/render reais; mesma causa → mesmo identifier" passed after 0.400 seconds.
+✔ Test fetchUsageMapsBillingPercent() passed after 0.405 seconds.
+✔ Test "monthTokens/monthCostUsd/pacing aparecem só quando existem; chaves v2/v3 intactas" passed after 0.196 seconds.
+✔ Test "query 30d não rodou → monthTokens/monthCostUsd omitidos mesmo com totais velhos" passed after 0.196 seconds.
+✔ Test fetchUsageMapsBalance() passed after 0.404 seconds.
+✔ Test fetchUsageMapsQuotaShapeAndSendsContractedHeaders() passed after 0.404 seconds.
+✔ Test fetchUsageMapsProSummaryAndSendsCookie() passed after 0.403 seconds.
+✔ Test "fração desconhecida (modo local): sem barra, título 'Daily window', countdown mantido" passed after 0.028 seconds.
+✔ Test "janela com fração: 'Weekly 74% used' + barra + countdown 'Renews in 6d 16h'" passed after 0.028 seconds.
+✔ Test "janela sem resetsAt → só contagem (sem countdown inventado); ids únicos p/ janelas repetidas" passed after 0.028 seconds.
+✔ Suite ClaudeProviderTests passed after 0.409 seconds.
+✔ Suite HistoryExportTests passed after 0.409 seconds.
+✔ Suite RedTeamF5SettingsTamperTests passed after 0.409 seconds.
+✔ Suite PricingPersistenceTests passed after 0.409 seconds.
+✔ Suite PacingInputTests passed after 0.409 seconds.
+✔ Suite DeepSeekProviderBasicsTests passed after 0.409 seconds.
+✔ Suite AlertEngineTests passed after 0.409 seconds.
+✔ Suite RedTeamF4Tests passed after 0.409 seconds.
+✔ Suite AntigravityCredentialReaderTests passed after 0.409 seconds.
+✔ Suite RedTeamF5AlertTests passed after 0.409 seconds.
+✔ Suite ProviderProtocolTests passed after 0.409 seconds.
+✔ Suite GeminiProviderTests passed after 0.409 seconds.
+✔ Suite PersistenceTests passed after 0.409 seconds.
+✔ Suite TokenLedgerTests passed after 0.410 seconds.
+✔ Suite AppSettingsTests passed after 0.409 seconds.
+✔ Suite GrokProviderBasicsTests passed after 0.409 seconds.
+✔ Suite AntigravityProviderBasicsTests passed after 0.409 seconds.
+✔ Suite SmokeTests passed after 0.409 seconds.
+✔ Suite GeminiLineParserTests passed after 0.409 seconds.
+✔ Suite FileOffsetStoreTests passed after 0.409 seconds.
+✔ Test "codex por conta: auth file registrado alimenta o snapshot da conta" passed after 0.403 seconds.
+✔ Suite HistorySeriesFormatTests passed after 0.409 seconds.
+✔ Suite CodexProviderTests passed after 0.410 seconds.
+✔ Suite TranscriptIngesterTests passed after 0.409 seconds.
+✔ Suite PacingEngineTests passed after 0.409 seconds.
+✔ Suite DomainTests passed after 0.409 seconds.
+✔ Suite AccountRegistryTests passed after 0.409 seconds.
+✔ Suite CodexLineParserTests passed after 0.410 seconds.
+✔ Suite HistoryQueryTests passed after 0.409 seconds.
+✔ Suite CodexAuthReaderTests passed after 0.409 seconds.
+✔ Suite ClaudeUsageProviderConformanceTests passed after 0.409 seconds.
+✔ Suite ZaiCredentialReaderTests passed after 0.409 seconds.
+✔ Suite F5RegistrySmokeTests passed after 0.410 seconds.
+✔ Suite AlibabaCredentialReaderTests passed after 0.410 seconds.
+✔ Suite PanelCountdownTests passed after 0.409 seconds.
+✔ Suite PanelPacingTests passed after 0.409 seconds.
+✔ Suite DeepSeekCredentialReaderTests passed after 0.409 seconds.
+✔ Suite GrokCredentialReaderTests passed after 0.409 seconds.
+✔ Suite ZaiProviderTests passed after 0.409 seconds.
+✔ Suite AlibabaProviderBasicsTests passed after 0.410 seconds.
+✔ Suite NotificationGatewayTests passed after 0.409 seconds.
+✔ Suite PricingTableTests passed after 0.409 seconds.
+✔ Suite PanelDashboardTests passed after 0.409 seconds.
+✔ Suite PanelKPITests passed after 0.409 seconds.
+✔ Suite PanelHeaderTests passed after 0.409 seconds.
+✔ Suite PanelSelectionTests passed after 0.409 seconds.
+✔ Suite RedTeamF5CaptureGatewayTests passed after 0.409 seconds.
+✔ Suite MenuBarVisibilityTests passed after 0.409 seconds.
+✔ Suite RedTeamF4ProviderTests passed after 0.410 seconds.
+✔ Test "dedupe por key: registrada com key já visível não repete" passed after 0.403 seconds.
+✔ Suite PanelHeartbeatTests passed after 0.410 seconds.
+✔ Suite PanelWindowRowTests passed after 0.410 seconds.
+◇ Test discoverAccountsWithoutCredentialIsEmpty() started.
+✔ Test fetchUsageMapsCreditsAndKey() passed after 0.404 seconds.
+◇ Test discoverAccountsWithoutKeyIsEmpty() started.
+◇ Test envFallbackAndMissing() started.
+✔ Suite PanelPaceStripeTests passed after 0.409 seconds.
+◇ Test getJSONJoinsNestedPath() started.
+◇ Test readsCookieHeaderFileAsIs() started.
+◇ Test onDemandFallbackMapping() started.
+◇ Test withoutProjectSendsEmptyBody() started.
+◇ Test emptyBalanceThrows() started.
+✔ Suite MultiAccountProviderTests passed after 0.410 seconds.
+◇ Test finiteHugeDoublesDoNotTrapIntConversions() started.
+◇ Test fetchUsageFallsBackToOAuthWhenAPIKeyRejected() started.
+◇ Test fetchUsageEnterpriseOverallFallback() started.
+◇ Test fetchUsageToleratesSnakeRootAndStringNumbers() started.
+◇ Test fetchUsageMapsWhamShapeAndSendsContractedHeaders() started.
+✔ Test discoverAccountsWithoutCredentialIsEmpty() passed after 0.003 seconds.
+✔ Test discoverAccountsWithoutKeyIsEmpty() passed after 0.003 seconds.
+✔ Test finiteHugeDoublesDoNotTrapIntConversions() passed after 0.003 seconds.
+✔ Test getJSONJoinsNestedPath() passed after 0.004 seconds.
+✔ Test readsCookieHeaderFileAsIs() passed after 0.004 seconds.
+◇ Test keyFailureIsSoftDegradation() started.
+✔ Test emptyBalanceThrows() passed after 0.004 seconds.
+✔ Test fetchUsageToleratesSnakeRootAndStringNumbers() passed after 0.004 seconds.
+✔ Test "2 keys simultâneas: descoberta merge + instância por key + saldo/janela ISOLADOS por conta" passed after 0.413 seconds.
+◇ Test resolveBaseURLEnvThenDefault() started.
+◇ Test resolveBaseURLOrder() started.
+◇ Test codexAPIDecoderSurvivesHostilePayloads() started.
+◇ Test customTimeoutIsAppliedToRequest() started.
+✔ Test envFallbackAndMissing() passed after 0.003 seconds.
+✔ Suite OpenRouterMultiKeyTests passed after 0.416 seconds.
+◇ Test expiredTokenIsNotUsable() started.
+✔ Test onDemandFallbackMapping() passed after 0.005 seconds.
+✔ Test resolveBaseURLOrder() passed after 0.001 seconds.
+◇ Test unauthorizedDegrades() started.
+✔ Test resolveBaseURLEnvThenDefault() passed after 0.001 seconds.
+◇ Test regionFallbackOnMissingQuota() started.
+✔ Test fetchUsageMapsWhamShapeAndSendsContractedHeaders() passed after 0.005 seconds.
+✔ Test "OpenRouter hostil: JSON lixo → rethrow; data sem números → erro tipado; 1e308 → saldo finito; negativo → clamp 0" passed after 0.410 seconds.
+✔ Test fetchUsageFallsBackToOAuthWhenAPIKeyRejected() passed after 0.005 seconds.
+✔ Test fetchUsageEnterpriseOverallFallback() passed after 0.005 seconds.
+✔ Test keyFailureIsSoftDegradation() passed after 0.001 seconds.
+◇ Test keyFileBeatsEnvironment() started.
+◇ Test emptyBillingThrowsAnd401Degrades() started.
+◇ Test mapWindowPrecedenceAndClamps() started.
+◇ Test ingestLocalIsNoOpWithoutEvents() started.
+◇ Test fetchUsageToleratesAliasesAndStringNumbers() started.
+◇ Test "Alibaba hostil: JSON lixo → rethrow; aninhamento profundo com quota → mapeia sem crash; quota com total 0 → snapshot vazio HONESTO (sem janela, não erro)" started.
+✔ Test withoutProjectSendsEmptyBody() passed after 0.006 seconds.
+✔ Test mapWindowPrecedenceAndClamps() passed after 0.001 seconds.
+◇ Test oauthOnlyCredentialMakesSingleRequest() started.
+◇ Test fetchUsageEmptyPayloadYieldsNoWindows() started.
+✔ Test keyFileBeatsEnvironment() passed after 0.001 seconds.
+✔ Test ingestLocalIsNoOpWithoutEvents() passed after 0.001 seconds.
+◇ Test keyWithoutLimitYieldsNoWindow() started.
+✔ Test unauthorizedDegrades() passed after 0.002 seconds.
+✔ Suite OpenRouterProviderBasicsTests passed after 0.419 seconds.
+✔ Test customTimeoutIsAppliedToRequest() passed after 0.003 seconds.
+✔ Suite OpenRouterCredentialReaderTests passed after 0.419 seconds.
+◇ Test expiredTokenDegradesWithoutRequest() started.
+✔ Test fetchUsageToleratesAliasesAndStringNumbers() passed after 0.003 seconds.
+◇ Test planPercentPrecedenceChain() started.
+✔ Test fetchUsageEmptyPayloadYieldsNoWindows() passed after 0.002 seconds.
+✔ Test oauthOnlyCredentialMakesSingleRequest() passed after 0.002 seconds.
+◇ Test withoutKeyReportsMissing() started.
+◇ Test unauthorizedOn401And403() started.
+✔ Test planPercentPrecedenceChain() passed after 0.001 seconds.
+✔ Test expiredTokenIsNotUsable() passed after 0.005 seconds.
+◇ Test fetchUsageDegradesOn401And403() started.
+✔ Suite CursorProviderBasicsTests passed after 0.421 seconds.
+◇ Test fetchUsageDegradesOn401And403() started.
+◇ Test fetchUsageDegradesOn401And403() started.
+✔ Test emptyBillingThrowsAnd401Degrades() passed after 0.005 seconds.
+✔ Test keyWithoutLimitYieldsNoWindow() passed after 0.005 seconds.
+◇ Test hostileSubjectRejected() started.
+✔ Test withoutKeyReportsMissing() passed after 0.003 seconds.
+✔ Test unauthorizedOn401And403() passed after 0.004 seconds.
+◇ Test expiredTokenDegradesWithoutRequest() started.
+✔ Test hostileSubjectRejected() passed after 0.001 seconds.
+◇ Test credits401DegradesInvalid() started.
+✔ Test "Alibaba hostil: JSON lixo → rethrow; aninhamento profundo com quota → mapeia sem crash; quota com total 0 → snapshot vazio HONESTO (sem janela, não erro)" passed after 0.007 seconds.
+◇ Test networkErrorRethrows() started.
+✔ Test fetchUsageDegradesOn401And403() passed after 0.004 seconds.
+◇ Test otherErrorStatusesMapToHTTP() started.
+✔ Test regionFallbackOnMissingQuota() passed after 0.009 seconds.
+◇ Test nonJWTContentRejected() started.
+◇ Test "DeepSeek hostil: saldo não-numérico → erro tipado; 1e308 como string → finito; array vazio → erro tipado" started.
+✔ Test expiredTokenDegradesWithoutRequest() passed after 0.001 seconds.
+◇ Test missingCredentialReportsMissingAndLocalOnly() started.
+✔ Test fetchUsageDegradesOn401And403() passed after 0.005 seconds.
+✔ Test expiredTokenDegradesWithoutRequest() passed after 0.007 seconds.
+✔ Test nonJWTContentRejected() passed after 0.001 seconds.
+◇ Test unauthorizedOnBothRegionsDegrades() started.
+✔ Test credits401DegradesInvalid() passed after 0.001 seconds.
+✔ Test missingCredentialReportsMissingAndLocalOnly() passed after 0.001 seconds.
+◇ Test missingCredentialAndNetworkError() started.
+◇ Test fetchUsageWithoutCredentialReportsMissing() started.
+◇ Test unauthorizedDegradesAndEmptyModelsThrows() started.
+◇ Test readsAccessTokenFromAppDatabase() started.
+◇ Test networkErrorRethrows() started.
+◇ Test apikeyModeHasAccountButNoAPIUsage() started.
+✔ Test networkErrorRethrows() passed after 0.002 seconds.
+✔ Suite DeepSeekUsageAPITests passed after 0.428 seconds.
+✔ Test otherErrorStatusesMapToHTTP() passed after 0.002 seconds.
+◇ Test networkErrorMapsToNetworkAndNeverRetries() started.
+✔ Test readsAccessTokenFromAppDatabase() passed after 0.002 seconds.
+✔ Test networkErrorRethrows() passed after 0.001 seconds.
+✔ Test unauthorizedOnBothRegionsDegrades() passed after 0.002 seconds.
+✔ Test networkErrorMapsToNetworkAndNeverRetries() passed after 0.001 seconds.
+◇ Test missingOrInvalidDatabaseYieldsNil() started.
+◇ Test creditsWithoutDataThrows() started.
+◇ Test withoutCredentialReportsMissing() started.
+◇ Test malformedJSONOn200MapsToDecode() started.
+✔ Test fetchUsageWithoutCredentialReportsMissing() passed after 0.003 seconds.
+✔ Test apikeyModeHasAccountButNoAPIUsage() passed after 0.002 seconds.
+✔ Test withoutCredentialReportsMissing() passed after 0.001 seconds.
+✔ Test fetchUsageDegradesOn401And403() passed after 0.008 seconds.
+✔ Test "DeepSeek hostil: saldo não-numérico → erro tipado; 1e308 como string → finito; array vazio → erro tipado" passed after 0.004 seconds.
+✔ Test malformedJSONOn200MapsToDecode() passed after 0.001 seconds.
+✔ Test unauthorizedDegradesAndEmptyModelsThrows() passed after 0.003 seconds.
+◇ Test fetchUsageRejectsUnknownAccount() started.
+◇ Test networkErrorRethrows() started.
+◇ Test networkErrorRethrows() started.
+◇ Test successFalseThrowsTypedError() started.
+◇ Test "Grok hostil: JSON lixo → rethrow; config sem percent calculável → erro tipado; percent absurdo satura na janela" started.
+◇ Test noAuthorizationHeaderWhenBearerIsNil() started.
+◇ Test networkErrorRethrows() started.
+✔ Test missingCredentialAndNetworkError() passed after 0.005 seconds.
+✔ Test fetchUsageRejectsUnknownAccount() passed after 0.001 seconds.
+✔ Test missingOrInvalidDatabaseYieldsNil() passed after 0.003 seconds.
+✔ Test creditsWithoutDataThrows() passed after 0.003 seconds.
+✔ Test networkErrorRethrows() passed after 0.002 seconds.
+✔ Suite GrokUsageAPITests passed after 0.432 seconds.
+✔ Suite AlibabaUsageAPITests passed after 0.433 seconds.
+◇ Test resolveHonorsEnvOverrideAndDefault() started.
+◇ Test networkErrorRethrows() started.
+◇ Test withoutKeyReportsMissingAndSkipsNetwork() started.
+✔ Test withoutKeyReportsMissingAndSkipsNetwork() passed after 0.001 seconds.
+✔ Test noAuthorizationHeaderWhenBearerIsNil() passed after 0.001 seconds.
+✔ Test networkErrorRethrows() passed after 0.003 seconds.
+✔ Test resolveHonorsEnvOverrideAndDefault() passed after 0.001 seconds.
+✔ Suite HTTPClientTests passed after 0.434 seconds.
+◇ Test rejectsUnknownAccount() started.
+✔ Suite CursorCredentialReaderTests passed after 0.434 seconds.
+◇ Test fetchUsageRejectsUnknownAccount() started.
+✔ Test rejectsUnknownAccount() passed after 0.001 seconds.
+✔ Suite OpenRouterUsageAPITests passed after 0.434 seconds.
+✔ Test fetchUsageRejectsUnknownAccount() passed after 0.001 seconds.
+✔ Suite CodexUsageAPITests passed after 0.434 seconds.
+✔ Test successFalseThrowsTypedError() passed after 0.004 seconds.
+◇ Test successTrueWithNon200CodeThrowsTypedError() started.
+✔ Test networkErrorRethrows() passed after 0.004 seconds.
+✔ Test networkErrorRethrows() passed after 0.003 seconds.
+✔ Suite CursorUsageAPITests passed after 0.436 seconds.
+✔ Suite AntigravityUsageAPITests passed after 0.436 seconds.
+✔ Test successTrueWithNon200CodeThrowsTypedError() passed after 0.001 seconds.
+◇ Test networkErrorRethrows() started.
+✔ Test "Grok hostil: JSON lixo → rethrow; config sem percent calculável → erro tipado; percent absurdo satura na janela" passed after 0.008 seconds.
+◇ Test "Antigravity hostil: JSON lixo → rethrow; models sem fração → erro tipado; remainingFraction objeto → decode/erro, sem crash" started.
+✔ Test networkErrorRethrows() passed after 0.003 seconds.
+◇ Test serverErrorRethrowsWithoutCredentialFallback() started.
+✔ Test serverErrorRethrowsWithoutCredentialFallback() passed after 0.001 seconds.
+◇ Test fetchUsageToleratesNewTypesStringNumbersAndLossyEntries() started.
+✔ Test "Antigravity hostil: JSON lixo → rethrow; models sem fração → erro tipado; remainingFraction objeto → decode/erro, sem crash" passed after 0.003 seconds.
+◇ Test "Cursor hostil: JSON lixo → rethrow; shape novo (plan string onde objeto espera) → rethrow, sem crash" started.
+✔ Test "visibilidade: persiste e republisha o conjunto atualizado" passed after 0.439 seconds.
+✔ Test fetchUsageToleratesNewTypesStringNumbersAndLossyEntries() passed after 0.003 seconds.
+✔ Suite ZaiUsageAPITests passed after 0.446 seconds.
+✔ Test "Cursor hostil: JSON lixo → rethrow; shape novo (plan string onde objeto espera) → rethrow, sem crash" passed after 0.003 seconds.
+✔ Suite RedTeamF5HostileProviderTests passed after 0.446 seconds.
+✔ Test testWaitReturnsOnlyAfterQuiesceWindow() passed after 0.463 seconds.
+✔ Test testTouchResetsWindow() passed after 0.463 seconds.
+✔ Suite DebounceTests passed after 0.469 seconds.
+✔ Test codexAPIDecoderSurvivesHostilePayloads() passed after 0.059 seconds.
+◇ Test zaiAPIDecoderSurvivesHostilePayloads() started.
+✔ Test "DB truncado no meio de uma página: open lança ou abre sem corromper mais (nunca crash)" passed after 0.507 seconds.
+✔ Test zaiAPIDecoderSurvivesHostilePayloads() passed after 0.048 seconds.
+✔ Suite ParserFuzzTests passed after 0.523 seconds.
+✔ Test jitterLowerBoundIsMinusTenPercent() passed after 0.522 seconds.
+✔ Test initialIntervalsFromConstructorReflectPersistedSettings() passed after 0.522 seconds.
+✔ Test reregisterReplacesHandlerWithoutDoubleFiring() passed after 0.522 seconds.
+✔ Test jitterUpperBoundIsPlusTenPercent() passed after 0.522 seconds.
+✔ Test "seleção de aba é estado do painel e não toca no gate" passed after 0.524 seconds.
+✔ Test "windows/30d/pacing/série não mudam a string do menu bar nem re-renderizam o label" passed after 0.544 seconds.
+✔ Suite PanelRenderGateTests passed after 0.551 seconds.
+✔ Test "render gate: custo novo NÃO re-renderiza o label do ícone" passed after 0.555 seconds.
+✔ Test pauseStopsAllFiresAndResumeFiresImmediately() passed after 0.582 seconds.
+✔ Test "7d não aparece na string do menu bar e não re-renderiza o label" passed after 0.581 seconds.
+✔ Test "history7d não aparece na string do menu bar e não re-renderiza o label" passed after 0.592 seconds.
+✔ Test "cores de marca = tokens exatos da referência MIT (ProviderBranding)" passed after 0.604 seconds.
+✔ Test jitterAppliesToMenuInterval() passed after 0.640 seconds.
+✔ Test singleFlightNeverRunsTwoFiresForSameProvider() passed after 0.640 seconds.
+✔ Test idleCadenceFiresEveryFiveMinutes() passed after 0.640 seconds.
+✔ Test "provider sem SVG (cursor) → nil: painel cai no fallback da sigla D5" passed after 0.655 seconds.
+✔ Test testRenderGateSkipsEqualContent() passed after 0.656 seconds.
+✔ Test "os 4 SVGs portados (ProviderIcon-*) existem no bundle e carregam como NSImage template" passed after 0.661 seconds.
+✔ Suite PanelLogoTests passed after 0.669 seconds.
+✔ Test testMenuLinesExposePanelState() passed after 0.686 seconds.
+✔ Suite MenuBarContentTests passed after 0.695 seconds.
+✔ Test "sem banco (degradação F2): reload mantém janela vazia, nada inventado" passed after 0.602 seconds.
+✔ Test "desligar alerts NÃO pede permissão (nunca prompt escondido)" passed after 0.695 seconds.
+✔ Test setIdleIntervalChangesCadenceWithoutRestart() passed after 0.699 seconds.
+✔ Test pressureBeatsMenuInterval() passed after 0.699 seconds.
+✔ Test setMenuIntervalAppliesToOpenMenuCadence() passed after 0.700 seconds.
+✔ Test providersAreIndependent() passed after 0.699 seconds.
+✔ Test pressureCadenceIsThirtySecondsWithBoundaryAtPointEight() passed after 0.699 seconds.
+✔ Test "janela carrega o que está persistido (intervalos, visibilidade, alertas)" passed after 0.717 seconds.
+✔ Test hugeLineDoesNotCrash() passed after 0.719 seconds.
+✔ Suite ClaudeLineParserTests passed after 0.725 seconds.
+✔ Test "alerts desligado (default): nada toca o gateway e o painel diz off" passed after 0.729 seconds.
+✔ Test "clear: fechar a janela solta os dados (orçamento de RAM)" passed after 0.644 seconds.
+✔ Test "roundtrip completo: edições do modelo sobrevivem a um 'restart'" passed after 0.736 seconds.
+✔ Test "model: add/remove/toggle refletem no registry e disparam onMutation" passed after 0.738 seconds.
+✔ Test "validação: path inexistente é aviso (conta pode nascer degradada)" passed after 0.738 seconds.
+✔ Test "validação: vazio bloqueia; existente passa limpo" passed after 0.738 seconds.
+✔ Test "model: raízes em uso = canônica + registradas; guard pina overlap por provider" passed after 0.738 seconds.
+✔ Test "model: sem registry (degradação F2) não opera e não crasha" passed after 0.738 seconds.
+✔ Test "validação: diretório sobreposto a raiz em uso é BLOQUEADO; irmão passa" passed after 0.738 seconds.
+✔ Test "overlapsCanonical: igual, descendente e ancestral sobrepõem; irmão e fronteira de componente não" passed after 0.738 seconds.
+✔ Suite AccountsModelTests passed after 0.745 seconds.
+✔ Test "reload (7d default): séries, totais, custo/dia derivado e top-5" passed after 0.632 seconds.
+✔ Test "reload em banco vazio: vazio, não nil-ruim" passed after 0.634 seconds.
+✔ Test "countdown: distanteFuture/anômalo → texto finito, sem crash" passed after 0.741 seconds.
+✔ Test "validate: /dev/null, FIFO e symlink quebrado avisam/aceitam sem crash — nada bloqueia indevidamente" passed after 0.741 seconds.
+✔ Test "AccountsModel.add: dir sobreposta BLOQUEIA também programaticamente (defesa além do form)" passed after 0.741 seconds.
+✔ Test "heartbeat com 30 contas hostis: labels/paths/ids de conta NÃO vazam no payload e o tamanho é limitado" passed after 0.741 seconds.
+✔ Test "countdown: passado/epoch/distantPast → 'Renewed'/'renewed', NUNCA dígitos negativos" passed after 0.741 seconds.
+✔ Test "windowRows: resetsAt nil → countdown nil; fração fora de 0...1 satura; fração nil → sem barra/invenção" passed after 0.741 seconds.
+✔ Test "pacing/updated adversarial: déficit sem etá válido mostra só o déficit; fetchedAt no futuro → delta nunca negativo" passed after 0.742 seconds.
+✔ Suite RedTeamF4UITests passed after 0.749 seconds.
+✔ Test "união registry ⊕ ciclo: sem duplicata; inativa vira linha com badge; regra de visibilidade da seção" passed after 0.744 seconds.
+✔ Test "agregado: janela da conta de maior fração vence; tokens somados" passed after 0.744 seconds.
+✔ Test "launch at login: toggle liga → register; desliga → unregister; estado reflete o serviço" passed after 0.750 seconds.
+✔ Test "launch at login: requiresApproval é honesto — NÃO conta como ligado" passed after 0.750 seconds.
+✔ Test "launch at login: erro de registro é HONESTO (aviso na janela, estado do serviço)" passed after 0.750 seconds.
+✔ Test "troca de período: 24h mostra só hoje (buckets diários)" passed after 0.663 seconds.
+✔ Suite AnalyticsModelTests passed after 0.757 seconds.
+✔ Test "permissão NEGADA → alerts ficam DESLIGADOS com aviso honesto na janela" passed after 0.756 seconds.
+✔ Test backoffGrowsFromCurrentIntervalEvenInMenuMode() passed after 0.759 seconds.
+✔ Test "lembrete de reset: off/5/15/30 chegam ao engine; nil desliga" passed after 0.759 seconds.
+✔ Test "ligar alerts pede permissão UMA vez; concedida → engine ligado" passed after 0.762 seconds.
+✔ Test "permissão não determinada: painel mostra notConfigured" passed after 0.766 seconds.
+✔ Test "permissão negada: deliver no-op e painel mostra blocked (honesto)" passed after 0.768 seconds.
+✔ Test "intervalos: clamp nas faixas da UI e aplicação VIVA no scheduler" passed after 0.772 seconds.
+✔ Test "edição de thresholds mantém ordem CRESCENTE e faixa 10...100" passed after 0.782 seconds.
+✔ Test "thresholds editados chegam ao AlertEngine (e ao banco)" passed after 0.785 seconds.
+✔ Suite SettingsModelTests passed after 0.791 seconds.
+✔ Test successDecaysToTheNewIdleIntervalAfterEdit() passed after 0.809 seconds.
+✔ Test "alerts ligado: ciclo entrega eventos no gateway e publica estado granted" passed after 0.808 seconds.
+✔ Test menuOpenedSwitchesToSixtySecondCadenceAndDecaysBackToIdle() passed after 0.868 seconds.
+✔ Test "M1 por provider: ciclo concorrente do mesmo provider vira skip" passed after 0.931 seconds.
+✔ Test "caso 2: support dir sem permissão de escrita (disco cheio/readonly) → app vivo, sem history7d, sem crash" passed after 1.046 seconds.
+✔ Test "caso 1: tokenbar.sqlite corrompido → app vivo em modo F2, history7d omitido, sem crash" passed after 1.051 seconds.
+✔ Suite CoordinatorRedTeamTests passed after 1.058 seconds.
+✔ Test "coordinator: ciclo com DB publica todayCostUsd no display e heartbeat" passed after 1.091 seconds.
+✔ Suite PricingDisplayTests passed after 1.099 seconds.
+✔ Test "modo selfcheck (support dir inexistente, stores injetados): DB abre e history7d presente" passed after 1.095 seconds.
+✔ Test "coordinator: state.json ganha history7d do DB no claude e NADA no zai" passed after 1.099 seconds.
+✔ Suite HeartbeatHistoryTests passed after 1.106 seconds.
+✔ Test "coordinator: ciclo publica weekTokens/weekCostUsd do DB na linha do painel" passed after 1.101 seconds.
+✔ Suite PanelHistoryTests passed after 1.109 seconds.
+✔ Test "coordinator: ciclo publica monthTokens/série 30d, janelas do snapshot e pacing honesto (nil local)" passed after 1.112 seconds.
+✔ Suite PanelCoordinatorF4Tests passed after 1.118 seconds.
+✔ Test "degradação sem DB: coordinator segue vivo com comportamento F2" passed after 1.113 seconds.
+✔ Test "ciclo com 2 contas: eventos, cursores e hwm por conta; agregado soma" passed after 1.119 seconds.
+✔ Test "conta com path inválido degrada sozinha: badge na linha, provider de pé" passed after 1.126 seconds.
+✔ Test "provider degradado com throw no 1º ciclo permanece no heartbeat com erro" passed after 1.139 seconds.
+✔ Test "visibilidade persistida carrega no launch; texto some/volta ao vivo" passed after 1.154 seconds.
+✔ Suite SettingsCoordinatorWiringTests passed after 1.161 seconds.
+✔ Test "ciclo completo com alerts ligado: janelas sem fração (local) não geram evento" passed after 1.193 seconds.
+✔ Suite CoordinatorAlertsWiringTests passed after 1.201 seconds.
+✔ Test errorBackoffDoublesWithThirtyMinuteCeilingAndSuccessResets() passed after 1.293 seconds.
+✔ Suite SchedulerTests passed after 1.298 seconds.
+✔ Test "cursores por conta: crescer o corpus da conta registrada não re-inge a local" passed after 1.316 seconds.
+✔ Test "wiring F3: ingest do coordinator persiste no SQLite (store de cursores no settings)" passed after 1.322 seconds.
+✔ Test "wiring degradado: 10 providers no heartbeat v2, sem crash, credencial não vaza" passed after 1.324 seconds.
+✔ Suite ProviderCoordinatorTests passed after 1.332 seconds.
+✔ Test "overlap programático (bypass do form): dobragem documentada, sem crash" passed after 1.346 seconds.
+✔ Test "painel união registry ⊕ ciclo: toggle-off mantém a linha (inactive) e remove alcançável; reativar volta" passed after 1.431 seconds.
+✔ Test "toggle ativa pela VIEW-MODEL: conta inativa sai do ciclo e do agregado; reativa volta" passed after 1.435 seconds.
+✔ Test "bypass programático (INSERT direto com dir == raiz canônica): ciclo NÃO dobra — conta sobreposta não ingere e continua visível p/ remoção" passed after 1.440 seconds.
+✔ Suite RedTeamF5UITests passed after 1.447 seconds.
+✔ Test "frota de 30 contas: um ciclo cobre todas com soma exata; remoção em lote poda" passed after 1.476 seconds.
+✔ Suite MultiAccountCoordinatorTests passed after 1.483 seconds.
+✔ Test "export hostil: 10k eventos com model , " quebra-de-linha → CSV RFC 4180 parseia de volta exato" passed after 3.145 seconds.
+✔ Suite RedTeamF3Tests passed after 3.148 seconds.
+✔ Test "perf smoke: 100k eventos sintéticos ingest+persistence <10s, memória bounded" passed after 15.886 seconds.
+✔ Suite ProviderPersistenceTests passed after 15.893 seconds.
+✔ Test run with 565 tests in 90 suites passed after 15.893 seconds.

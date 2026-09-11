@@ -44,11 +44,18 @@ final class AppState: NSObject, NSWindowDelegate {
         }
         // Locais primeiro: closures abaixo capturam a constante, não self
         // (self só é utilizável após super.init — NSObject).
+        // Gateway de captura do e2e (F5 T7): `TOKENBAR_E2E_ALERTS_CAPTURE` no
+        // ambiente troca o UNUserNotificationCenter real pelo gateway que grava
+        // os alertas em arquivo (prova de disparo sem centro de notificação —
+        // o caminho de render/identificador é o mesmo do gateway real).
+        let e2eAlertsCapture = env["TOKENBAR_E2E_ALERTS_CAPTURE"]
+            .map { E2EAlertCaptureGateway(fileURL: URL(filePath: $0)) }
         let coord = ProviderCoordinator(config: ProviderCoordinatorConfig(
             environment: env,
             home: URL(filePath: NSHomeDirectory()),
             supportDirectory: supportDir,
-            e2eDirectory: e2eDir
+            e2eDirectory: e2eDir,
+            notificationGateway: e2eAlertsCapture
         ))
         coordinator = coord
         let multiAccount = Set(ProviderID.allCases.filter { coord.supportsMultiAccount($0) })

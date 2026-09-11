@@ -17,10 +17,14 @@ import TokenBarCore
 public enum E2EHeartbeat {
     /// Monta o payload v3. `errors` (selfcheck) é opcional e tokenizado —
     /// nunca inclui mensagem de erro crua (pode conter URL/shape).
+    /// Aditivos F5: `credits` por provider (saldo real do snapshot; ausente =
+    /// sem dado) e `alertsStatus` top-level (estado honesto do rodapé do
+    /// painel; `nil` = não informado — selfcheck). Menu bar intocado.
     public static func payload(
         menuBarText: String,
         providers: [ProviderID: ProviderDisplay],
         errors: [ProviderID: String] = [:],
+        alertsStatus: AlertsPanelStatus? = nil,
         now: Date = Date()
     ) -> [String: Any] {
         var providerPayload: [String: Any] = [:]
@@ -77,16 +81,29 @@ public enum E2EHeartbeat {
                     "deficitPct": deficit,
                 ]
             }
+            if let credits = display.credits, credits.unlimited || credits.remaining != nil {
+                // F5 T6 (ADITIVO): saldo de credits do snapshot — presente só
+                // quando há dado UTILIZÁVEL (mesma regra da linha do painel):
+                // um objeto credits com balance null (Codex de plano) → chave
+                // ausente, nunca null fake; unlimited é false explícito.
+                entry["credits"] = [
+                    "remaining": credits.remaining.map { $0 as Any } ?? NSNull(),
+                    "unlimited": credits.unlimited,
+                ]
+            }
             if let error = errors[id] {
                 entry["error"] = error
             }
             providerPayload[id.rawValue] = entry
         }
-        let payload: [String: Any] = [
+        var payload: [String: Any] = [
             "menuBarText": menuBarText,
             "providers": providerPayload,
             "updatedAt": ISO8601DateFormatter().string(from: now),
         ]
+        if let alertsStatus {
+            payload["alertsStatus"] = String(describing: alertsStatus)
+        }
         return payload
     }
 
@@ -94,9 +111,12 @@ public enum E2EHeartbeat {
         menuBarText: String,
         providers: [ProviderID: ProviderDisplay],
         directory: URL,
+        alertsStatus: AlertsPanelStatus? = nil,
         now: Date = Date()
     ) {
-        let payload = payload(menuBarText: menuBarText, providers: providers, now: now)
+        let payload = payload(
+            menuBarText: menuBarText, providers: providers,
+            alertsStatus: alertsStatus, now: now)
         guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]) else { return }
         try? data.write(to: directory.appendingPathComponent("state.json"), options: .atomic)
     }
