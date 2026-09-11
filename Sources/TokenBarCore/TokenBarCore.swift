@@ -1,3 +1,3 @@
 public enum TokenBarCoreInfo {
-    public static let version = "0.1.0-f1"
+    public static let version = "1.0.0"
 }

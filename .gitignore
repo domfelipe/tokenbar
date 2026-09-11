@@ -5,3 +5,4 @@ xcuserdata/
 *.sqlite*
 .DS_Store
 .superpowers/
+*.zip

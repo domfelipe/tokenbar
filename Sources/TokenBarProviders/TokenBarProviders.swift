@@ -1,3 +1,3 @@
 public enum ProvidersInfo {
-    public static let version = "0.2.0-f2"
+    public static let version = "1.0.0"
 }

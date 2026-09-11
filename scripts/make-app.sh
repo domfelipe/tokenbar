@@ -4,13 +4,16 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 CONFIG="${1:-release}"
+# Versão do app estampada no Info.plist (scripts/release.sh e o job de
+# release do CI passam TOKENBAR_VERSION da tag; default = release corrente).
+VERSION="${TOKENBAR_VERSION:-1.0.0}"
 swift build -c "$CONFIG"
 BIN=".build/$CONFIG/tokenbar"
 APP="build/TokenBar.app"
 rm -rf build
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/tokenbar"
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -18,7 +21,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleIdentifier</key><string>app.tokenbar.TokenBar</string>
   <key>CFBundleName</key><string>TokenBar</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>CFBundleIconFile</key><string>TokenBar</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
