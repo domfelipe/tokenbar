@@ -1,0 +1,90 @@
+# TokenBar — CI + release.
+#
+# Test job: build release + full test suite on a macOS runner. GitHub's
+# macOS images ship the FULL Xcode toolchain, so plain `swift test` works
+# here (Swift Testing is bundled with Xcode 16+). The CLT false-green
+# warning in run-tests.sh applies ONLY to standalone Command Line Tools
+# installs — locally, always use ./run-tests.sh.
+#
+# Release job: on tag push `v*`, builds the .app bundle (scripts/make-app.sh
+# already runs `swift build -c release`), zips it, generates the sha256
+# checksum and attaches both to the GitHub Release.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build & Test (macOS)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Select Xcode (full toolchain — Swift Testing available)
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Build (release)
+        run: swift build -c release
+
+      - name: Test
+        run: swift test
+
+  release:
+    name: Release (.app bundle)
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: macos-14
+    needs: test
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Select Xcode (full toolchain)
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      # make-app.sh: swift build -c release + bundle + icon + ad-hoc codesign.
+      # TOKENBAR_VERSION stamps CFBundleShortVersionString from the tag.
+      - name: Build .app (release)
+        run: ./scripts/make-app.sh release
+        env:
+          TOKENBAR_VERSION: ${{ github.ref_name }}
+
+      - name: Zip + sha256
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd build
+          ditto -c -k --keepParent TokenBar.app "TokenBar-${VERSION}.zip"
+          shasum -a 256 "TokenBar-${VERSION}.zip" > "TokenBar-${VERSION}.zip.sha256"
+          ls -la
+
+      - name: Attach artifacts to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/TokenBar-*.zip
+            build/TokenBar-*.zip.sha256
+          generate_release_notes: true
