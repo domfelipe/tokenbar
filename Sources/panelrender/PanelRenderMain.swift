@@ -74,7 +74,11 @@ struct PanelRenderMain {
             authState: .ok,
             source: .api,
             resetsAt: labNow.addingTimeInterval(6 * 86_400 + 16 * 3_600),
-            fetchedAt: labNow)
+            fetchedAt: labNow,
+            // Pin EXPLÍCITO do topModel7d no gate (carry-forward review T1):
+            // a linha "Top model" entra no render de evidência pelo init, não
+            // por mutação pós-init (o estado do lab é todo declarado aqui).
+            topModel7d: "gpt-5.6-sonnet")
         display.windows = [
             UsageWindow(
                 kind: .weekly, usedFraction: 0.74,
@@ -108,7 +112,9 @@ struct PanelRenderMain {
             series.append(PanelDayPoint(day: key, tokens: tokens, costUSD: cost))
         }
         display.monthSeries = series
-        display.topModel7d = "gpt-5.6-sonnet"
+        // F5 T6: linha "Credits" do painel no lab (dado sintético — o
+        // veredito de credits está em docs/specs/f5-providers.md).
+        display.credits = CreditsInfo(remaining: 4.20, unlimited: false)
         return display
     }
 
@@ -138,7 +144,7 @@ struct PanelRenderMain {
             Divider()
             ProviderDetailContent(
                 provider: .codex, display: display, now: labNow,
-                accounts: nil, addAccountAction: nil,
+                accounts: nil, addAccountAction: { _ in },
                 analyticsAction: {}, exportAction: {})
                 .padding(.horizontal, 20)
                 .padding(.top, 6)

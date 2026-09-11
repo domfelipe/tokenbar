@@ -323,12 +323,27 @@ struct PanelDashboardTests {
 struct PanelHeaderTests {
     private let now = Date(timeIntervalSince1970: 1_000_000)
 
-    @Test("'Updated just now' (<60s, formato da referência) / minutos/horas/dia; nunca ciclado → 'not updated yet'")
+    @Test("'Updated just now' (<60s) / 'Updated Xm ago' / 'Updated Xh ago' — capitalização CONFERIDA contra UsageFormatter MIT (T6); nunca ciclado → 'not updated yet'")
     func updatedText() {
         #expect(ProviderPanelModel.updatedText(now: now, fetchedAt: now.addingTimeInterval(-42)) == "Updated just now")
-        #expect(ProviderPanelModel.updatedText(now: now, fetchedAt: now.addingTimeInterval(-90)) == "updated 1m ago")
-        #expect(ProviderPanelModel.updatedText(now: now, fetchedAt: now.addingTimeInterval(-2 * 3_600)) == "updated 2h ago")
+        #expect(ProviderPanelModel.updatedText(now: now, fetchedAt: now.addingTimeInterval(-90)) == "Updated 1m ago")
+        #expect(ProviderPanelModel.updatedText(now: now, fetchedAt: now.addingTimeInterval(-2 * 3_600)) == "Updated 2h ago")
         #expect(ProviderPanelModel.updatedText(now: now, fetchedAt: Date(timeIntervalSince1970: 0)) == "not updated yet")
+    }
+
+    @Test("creditsText (F5 T6): saldo real → 'Credits: $X'; unlimited → texto; nil/null → linha omitida (verdicto wham/usage)")
+    func creditsText() {
+        // Sem credits no snapshot → linha NÃO existe (nada inventado).
+        #expect(ProviderPanelModel.creditsText(nil) == nil)
+        // Shape observado do wham/usage em contas Plus/Pro: balance null.
+        #expect(ProviderPanelModel.creditsText(CreditsInfo(remaining: nil, unlimited: false)) == nil)
+        // Saldo real → formato monetário do painel (2 decimais; sub-centavo 4).
+        #expect(ProviderPanelModel.creditsText(CreditsInfo(remaining: 4.2, unlimited: false)) == "Credits: $4.20")
+        #expect(ProviderPanelModel.creditsText(CreditsInfo(remaining: 1_116.52, unlimited: false)) == "Credits: $1,116.52")
+        #expect(ProviderPanelModel.creditsText(CreditsInfo(remaining: 0.005, unlimited: false)) == "Credits: $0.0050")
+        // unlimited → texto honesto, sem número.
+        #expect(ProviderPanelModel.creditsText(CreditsInfo(remaining: nil, unlimited: true)) == "Credits: unlimited")
+        #expect(ProviderPanelModel.creditsText(CreditsInfo(remaining: 0, unlimited: true)) == "Credits: unlimited")
     }
 
     @Test("badge: local / auth / no auth / auth invalid")

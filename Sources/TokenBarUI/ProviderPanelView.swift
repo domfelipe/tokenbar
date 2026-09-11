@@ -298,6 +298,15 @@ struct ProviderDetailContent: View {
         return VStack(alignment: .leading, spacing: 12) {
             header
             usageSection(rows: rows)
+            // Linha de credits (F5 T6): só com saldo REAL do snapshot —
+            // `nil` → omitida (verdicto da investigação do wham/usage).
+            if let creditsText = ProviderPanelModel.creditsText(display.credits) {
+                Text(creditsText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .accessibilityIdentifier("creditsLine")
+            }
             dashboardSection
             accountsSection(rows: rows, visible: accountsVisible)
             actionRows(separated: accountsVisible)
@@ -412,10 +421,17 @@ struct ProviderDetailContent: View {
 
     // MARK: Linhas de ação (chevron — port do menu da referência)
 
+    /// ORDEM DA REFERÊNCIA (carry-forward review T1, conferida no screenshot:
+    /// "+ Add account…" PRIMEIRO, depois "Usage dashboard", depois "Export").
     @ViewBuilder
     private func actionRows(separated: Bool) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             if separated { Divider() }
+            if let addAccountAction {
+                ActionRowView(
+                    icon: "plus", title: "Add account…", showsChevron: false)
+                { addAccountAction(provider) }
+            }
             if let analyticsAction {
                 ActionRowView(icon: "chart.bar", title: "Usage dashboard")
                     { analyticsAction() }
@@ -423,11 +439,6 @@ struct ProviderDetailContent: View {
             if let exportAction {
                 ActionRowView(icon: "square.and.arrow.up", title: "Export")
                     { exportAction() }
-            }
-            if let addAccountAction {
-                ActionRowView(
-                    icon: "plus", title: "Add account…", showsChevron: false)
-                { addAccountAction(provider) }
             }
         }
     }

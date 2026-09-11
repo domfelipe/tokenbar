@@ -174,8 +174,8 @@ public enum ProviderPanelModel {
     // MARK: - Pacing (meta da linha, formato da referência)
 
     /// Meta da linha de janela com forecast — port de `UsagePaceText`:
-    /// - déficit: "69% in deficit · Exhausts in 2h 44m" (etá válido);
-    ///   etá inválido/zero com déficit → só o déficit (nada a prometer);
+    /// - déficit: "69% in deficit · Exhausts in 2h 44m" (eta válido);
+    ///   eta inválido/zero com déficit → só o déficit (nada a prometer);
     /// - folga: "N% in reserve · Lasts until reset" (projeção < 100%);
     /// - no ritmo: "On pace · Lasts until reset".
     /// `nil` = sem forecast (menos de 2 pontos, janela sem reset/fração) →
@@ -200,19 +200,21 @@ public enum ProviderPanelModel {
 
     // MARK: - Header
 
-    /// "Updated just now" (< 60s — port de `UsageFormatter.updatedString`),
-    /// "updated 42m ago" / "updated 3h ago"; ≥ 24h cai para o dia absoluto
-    /// ("updated Sep 8"). Nunca ciclado (fetchedAt na época zero) → "not
-    /// updated yet" (honesto, nada fake). Delta negativo (clock do snapshot
-    /// no futuro) satura em "just now" — nunca número negativo.
+    /// "Updated just now" (< 60s — port de `UsageFormatter.updatedString`), 
+    /// "Updated 42m ago" / "Updated 3h ago"; ≥ 24h cai para o dia absoluto
+    /// ("Updated Sep 8"). Capitalização CONFERIDA contra o upstream MIT
+    /// (T6/carry-forward: todos os ramos usam "Updated" com U maiúsculo).
+    /// Nunca ciclado (fetchedAt na época zero) → "not updated yet" (honesto,
+    /// extensão nossa — o upstream não tem esse caso). Delta negativo (clock
+    /// do snapshot no futuro) satura em "just now" — nunca número negativo.
     public static func updatedText(now: Date, fetchedAt: Date) -> String {
         guard fetchedAt.timeIntervalSince1970 > 0 else { return "not updated yet" }
         let delta = max(0, now.timeIntervalSince(fetchedAt))
         if delta < 60 { return "Updated just now" }
-        if delta < 3_600 { return "updated \(Int(delta / 60))m ago" }
-        if delta < 86_400 { return "updated \(Int(delta / 3_600))h ago" }
+        if delta < 3_600 { return "Updated \(Int(delta / 60))m ago" }
+        if delta < 86_400 { return "Updated \(Int(delta / 3_600))h ago" }
         let day = fetchedAt.formatted(.dateTime.month(.abbreviated).day())
-        return "updated \(day)"
+        return "Updated \(day)"
     }
 
     /// Badge do header (posição do plan/level da referência — não temos dado
@@ -225,6 +227,24 @@ public enum ProviderPanelModel {
         case .missing: return "no auth"
         case .invalid: return "auth invalid"
         }
+    }
+
+    // MARK: - Credits (F5 T6 — verdicto da investigação do wham/usage)
+
+    /// Linha "Credits" do painel — verdicto T6 (ver `docs/specs/f5-providers.md`
+    /// § Codex): o `wham/usage` TRAZ `credits.balance` (utilizável quando não
+    /// nulo; já decodificado no snapshot desde a F2), mas NÃO traz o inventário
+    /// "Limit Reset Credits" da referência — esse vive no endpoint dedicado
+    /// `/wham/rate-limit-reset-credits` (fora do escopo F5, documentado).
+    /// Portanto: saldo real → linha; `unlimited` → "Credits: unlimited";
+    /// saldo ausente/nulo → linha omitida (NUNCA "Limit reset credits" — a
+    /// semântica da linha da referência é o inventário de grants, não o saldo).
+    /// `nil` = nada a mostrar (nada inventado).
+    public static func creditsText(_ credits: CreditsInfo?) -> String? {
+        guard let credits else { return nil }
+        if credits.unlimited { return "Credits: unlimited" }
+        guard let remaining = credits.remaining else { return nil }
+        return "Credits: " + kpiCostString(remaining)
     }
 
     // MARK: - Dashboard (KPIs + chart + linhas de detalhe)

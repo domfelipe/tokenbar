@@ -121,6 +121,10 @@ public struct ProviderDisplay: Equatable, Sendable {
     /// omitida — nada inventado). Painel-only: a string do menu bar NÃO muda
     /// (render gate da F1 intocado).
     public var topModel7d: String?
+    /// Créditos do último snapshot (F5 T6: saldo de API do Codex/OpenRouter/
+    /// DeepSeek; linha "Credits" do painel). `nil` = provider sem crédito no
+    /// ciclo (linha omitida). Painel/heartbeat-only: menu bar intocado.
+    public var credits: CreditsInfo?
 
     public init(
         percent: Double? = nil,
@@ -140,7 +144,8 @@ public struct ProviderDisplay: Equatable, Sendable {
         pacing: PacingForecast? = nil,
         monthSeries: [PanelDayPoint] = [],
         accounts: [AccountDisplay] = [],
-        topModel7d: String? = nil
+        topModel7d: String? = nil,
+        credits: CreditsInfo? = nil
     ) {
         self.percent = percent
         self.todayTokens = todayTokens
@@ -160,6 +165,7 @@ public struct ProviderDisplay: Equatable, Sendable {
         self.monthSeries = monthSeries
         self.accounts = accounts
         self.topModel7d = topModel7d
+        self.credits = credits
     }
 
     /// Estado inicial (nada ciclo ainda): sem dado — some da string do menu.

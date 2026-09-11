@@ -58,9 +58,9 @@ alfabética — tabela estendida documentada em `docs/decisoes-f5.md` (T7).
   plan → razão overall → razão pooled); janela `Plano` (`.weekly`,
   `resetsAt = billingCycleEnd`) + janela `On-demand` quando há limit > 0.
 - **Não portado** (motivo): `POST /api/dashboard/get-sand-usage-status` e
-  `GET /api/usage?user=ID` (planos legados por request) — end extras da UI da
-  referência; não alimentam a janela principal e o legado exige `/api/auth/me`
-  primeiro. Sem perda de percent principal.
+  `GET /api/usage?user=ID` (planos legados por request) — endpoints extras da
+  UI da referência; não alimentam a janela principal e o legado exige
+  `/api/auth/me` primeiro. Sem perda de percent principal.
 
 ## OpenRouter
 
@@ -68,7 +68,7 @@ alfabética — tabela estendida documentada em `docs/decisoes-f5.md` (T7).
   + plugin `Sources/CodexBarCore/Resources/Plugins/openrouter.js` (endpoints e
   lógica de quota `keyUsedForQuota`).
 - **Credencial**: API key — env `OPENROUTER_API_KEY` (auto, como a
-  referência) ou arquivo cruo da conta registrada (entrada manual da UI
+  referência) ou arquivo cru da conta registrada (entrada manual da UI
   multi-conta F4). `.multiAccount` real: 1 key = 1 conta.
 - **Endpoints** (base `https://openrouter.ai/api/v1`; override env
   `TOKENBAR_OPENROUTER_API` → `OPENROUTER_API_URL`):
@@ -98,7 +98,9 @@ alfabética — tabela estendida documentada em `docs/decisoes-f5.md` (T7).
   (cn, `cn-beijing`); corpo JSON
   `{"queryCodingPlanInstanceInfoRequest":{"commodityCode":"sfm_codingplan_public_intl"|"sfm_codingplan_public_cn"}}`;
   headers `Authorization: Bearer` + `x-api-key` + `X-DashScope-API-Key`
-  (mesma key nos três, como a referência). Fallback de região: intl → cn
+  (mesma key nos três, como a referência) + `Origin` (gateway da região) e
+  `Referer` (dashboard da região — `dashboardURL` da referência; carry-forward
+  T7: omitidos no port inicial, portados agora). Fallback de região: intl → cn
   (1 retry por ciclo, como `shouldRetryOnAlternateRegion` da referência).
   Override: env `TOKENBAR_ALIBABA_REGION=cn`.
 - **Payload** (busca recursiva por `codingPlanQuotaInfo`/
@@ -184,6 +186,33 @@ alfabética — tabela estendida documentada em `docs/decisoes-f5.md` (T7).
   de campos fixed32 — acoplado ao wire format do grok.com, marcado na
   referência como quebrado sem WKE keypair do browser) e o scanner de sessões
   locais do CLI (não há transcript com contagem mapeada).
+
+## Codex — credits (veredito da investigação, F5 Task 6)
+
+Pergunta do plano: o `wham/usage` traz "reset credits / credits balance"
+utilizável para a linha "Limit reset credits" do painel (padrão da
+referência)? Investigação contra as fixtures existentes (spec §1.3/F2), este
+doc e a fonte MIT (`CodexOAuthUsageFetcher`/`UsageStore+CodexResetCredits`/
+`MenuCardView+CodexResetCredits`):
+
+1. **`wham/usage` NÃO traz o inventário "Limit Reset Credits".** A seção da
+   referência (título "Limit Reset Credits", texto "N available" + "Expires
+   in…", e a notificação de expiração) é alimentada por
+   `CodexRateLimitResetCreditsSnapshot`, vindo do endpoint DEDICADO
+   `GET /wham/rate-limit-reset-credits` (header extra `OpenAI-Beta: codex-1`,
+   payload `{credits: [{id, status, expires_at, …}]}`) — registrado como fora
+   de escopo desde a F2 (`docs/specs/f2-data-sources.md`). O `wham/usage`
+   apenas tem o objeto `credits: {has_credits, unlimited, balance}`.
+2. **`credits.balance` é utilizável quando não nulo** — e nosso decoder F2 já
+   o mapeia para `UsageSnapshot.credits` (F5 T6: agora chega ao painel). Em
+   payloads observados de contas Plus/Pro o `balance` é `null`
+   (`has_credits: false`) — a linha então NÃO aparece (omitir ≠ inventar).
+
+**Decisão (sem invenção):** painel ganha a linha "Credits: $X.XX" (ou
+"Credits: unlimited") SOMENTE com saldo real do snapshot — nunca sob o título
+"Limit reset credits", cuja semântica na referência é o inventário de grants
+expiráveis de OUTRO endpoint. O endpoint de reset credits fica registrado
+como exercício futuro (mesmo critério dos demais "não portados").
 
 ## Contratos comuns (todas as 6)
 
