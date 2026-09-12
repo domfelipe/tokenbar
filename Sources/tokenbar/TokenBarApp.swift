@@ -70,7 +70,9 @@ struct TokenBarApp: App {
                 .onAppear { appState.menuDidOpen() }
                 .onDisappear { appState.menuDidClose() }
         } label: {
-            Text(appState.store.menuBarText)
+            // Logos dos providers ao lado do relógio (pedido do usuário) —
+            // a string canônica continua no label de acessibilidade.
+            ProviderMenuBarLabel(store: appState.store)
         }
         .menuBarExtraStyle(.window)
 

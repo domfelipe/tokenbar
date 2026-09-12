@@ -46,6 +46,16 @@ public final class SnapshotStore {
     /// Estado de exibição por provider (inclui os sem dados — heartbeat v2).
     public var providers: [ProviderID: ProviderDisplay] { content.providers }
 
+    /// Pares (provider, valor) para a label com LOGOS da menu bar
+    /// (`ProviderMenuBarLabel`): mesma seleção/ordem da string canônica,
+    /// valor = `menuBarFragment` (o logo substitui a sigla). Observa
+    /// `content` (publicação por ciclo), não só `menuBarText` — o par
+    /// logo+valor precisa do conjunto de providers, que a string sozinha
+    /// não carrega.
+    public var menuBarItems: [(id: ProviderID, value: String)] {
+        content.providersWithLogos
+    }
+
     /// Linhas do painel (uma por provider ativo); vazio quando nada a mostrar.
     public var menuLines: [String] { content.menuLines() }
 
