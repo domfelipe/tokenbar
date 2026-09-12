@@ -377,6 +377,31 @@ struct PanelLogoTests {
         }
     }
 
+    @Test("bitmaps 3x da menu bar rasterizam com pixels visíveis (nunca em branco)")
+    @MainActor
+    func bitmapsHaveVisiblePixels() {
+        // Regressão: rasterize sem flush devolvia NSImage em branco — o item
+        // media normal no AX mas pintava só texto. Pixels mandam (Regra 9).
+        for id in [ProviderID.claude, .codex, .gemini, .zai, .cursor, .openrouter, .alibaba, .antigravity, .deepseek, .grok] {
+            let bitmap = ProviderLogo.bitmap(for: id, points: 15)
+            guard let bitmap else {
+                Issue.record("bitmap nil para \(id.rawValue) — cairia no fallback de sigla")
+                continue
+            }
+            var visible = 0
+            for rep in bitmap.representations.compactMap({ $0 as? NSBitmapImageRep }) {
+                for x in 0..<rep.pixelsWide {
+                    for y in 0..<rep.pixelsHigh {
+                        if (rep.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.01 {
+                            visible += 1
+                        }
+                    }
+                }
+            }
+            #expect(visible > 0, "bitmap em branco para \(id.rawValue)")
+        }
+    }
+
     @Test("provider sem SVG (copilot) → nil: painel cai no fallback da sigla D5")
     @MainActor
     func missingLogoFallsBack() {

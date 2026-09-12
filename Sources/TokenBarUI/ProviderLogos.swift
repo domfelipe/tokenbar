@@ -74,9 +74,22 @@ public enum ProviderLogo {
         }
         NSGraphicsContext.current = context
         svg.draw(in: NSRect(x: 0, y: 0, width: points, height: points))
+        // Normaliza p/ silhueta BRANCA (look de template): o host do
+        // MenuBarExtra não pinta NSImage template em Text/Image (sai em
+        // branco invisível — verificado por pixels), e os SVGs têm fills
+        // mistos (alibaba #111/deepseek currentColor = pretos, invisíveis na
+        // barra escura). Limite conhecido: barra CLARA exigiria tinta escura
+        // ou NSStatusItem AppKit (follow-up) — a do dono é escura.
+        NSColor.white.set()
+        NSRect(x: 0, y: 0, width: points, height: points).fill(using: .sourceIn)
+        // Sem flush o rep pode ser lido em branco (Regra 9: pixels mandam).
+        context.flushGraphics()
+        NSGraphicsContext.current = nil
         let out = NSImage(size: NSSize(width: points, height: points))
         out.addRepresentation(rep)
-        out.isTemplate = svg.isTemplate
+        // NÃO-template de propósito (ver acima): a máscara de template não
+        // pinta no label do status item. O painel segue com o SVG original.
+        out.isTemplate = false
         return out
     }
 

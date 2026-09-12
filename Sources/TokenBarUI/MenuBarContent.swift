@@ -40,30 +40,6 @@ public func formatEstimatedUSD(_ cost: Double) -> String {
     return String(format: "~$%.2f", cost)
 }
 
-/// Pace compacto p/ o item da menu bar — port do `MenuBarDisplayText.paceText`
-/// da referência MIT (CodexBar): "+11%" em déficit, "-8%" em reserva, "0%"
-/// no ritmo. `nil` = sem forecast (token omitido, nunca chute).
-public func menuBarPaceFragment(_ pacing: PacingForecast?) -> String? {
-    guard let pacing else { return nil }
-    if let deficit = pacing.deficitPct, deficit > 0 {
-        return "+\(Int(deficit.rounded()))%"
-    }
-    let projected = pacing.projectedFraction
-    if projected.isFinite, projected > 0, projected < 0.995 {
-        let reserve = Int(((1 - projected) * 100).rounded())
-        if reserve > 0 { return "-\(reserve)%" }
-    }
-    guard projected.isFinite, projected > 0 else { return nil }
-    return "0%"
-}
-
-/// Reset compacto p/ o item da menu bar — "↻ 2h 44m" (mesmo countdown do
-/// painel). `nil` = sem `resetsAt` ou já vencido (nada a prometer).
-public func menuBarResetFragment(resetsAt: Date?, now: Date = Date()) -> String? {
-    guard let resetsAt, resetsAt > now else { return nil }
-    return "↻ " + ProviderPanelModel.countdownText(from: now, to: resetsAt)
-}
-
 /// Linha de UMA conta no painel (F4 multi-conta): identidade + estado do
 /// ciclo da conta. `invalidCredential` = path registrado inexistente (badge
 /// de erro na linha — a conta degrada sozinha, sem derrubar o provider).
