@@ -359,10 +359,10 @@ struct PanelHeaderTests {
 
 @Suite
 struct PanelLogoTests {
-    @Test("os 4 SVGs portados (ProviderIcon-*) existem no bundle e carregam como NSImage template")
+    @Test("os 10 SVGs portados (ProviderIcon-*) existem no bundle e carregam como NSImage template")
     @MainActor
     func svgsLoadViaNSImage() throws {
-        for id in [ProviderID.claude, .codex, .gemini, .zai] {
+        for id in [ProviderID.claude, .codex, .gemini, .zai, .cursor, .openrouter, .alibaba, .antigravity, .deepseek, .grok] {
             let url = try #require(
                 Bundle.module.url(
                     forResource: "ProviderIcon-\(id.rawValue)",
@@ -377,10 +377,10 @@ struct PanelLogoTests {
         }
     }
 
-    @Test("provider sem SVG (cursor) → nil: painel cai no fallback da sigla D5")
+    @Test("provider sem SVG (copilot) → nil: painel cai no fallback da sigla D5")
     @MainActor
     func missingLogoFallsBack() {
-        #expect(ProviderLogo.image(for: .cursor) == nil)
+        #expect(ProviderLogo.image(for: .copilot) == nil)
     }
 
     @Test("cores de marca = tokens exatos da referência MIT (ProviderBranding)")

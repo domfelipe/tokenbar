@@ -10,7 +10,10 @@ os arquivos e trechos listados mantêm o aviso de copyright original.
    Caminho original: Sources/CodexBar/Resources/ProviderIcon-*.svg
    Arquivos: Sources/TokenBarUI/Resources/ProviderIcon-claude.svg,
              ProviderIcon-codex.svg, ProviderIcon-gemini.svg,
-             ProviderIcon-zai.svg
+             ProviderIcon-zai.svg, ProviderIcon-cursor.svg,
+             ProviderIcon-openrouter.svg, ProviderIcon-alibaba.svg,
+             ProviderIcon-antigravity.svg, ProviderIcon-deepseek.svg,
+             ProviderIcon-grok.svg
    Licença: MIT — Copyright (c) 2026 Peter Steinberger
 
 2. Design system do painel (port de layout/cores/métricas)

@@ -10,9 +10,9 @@ import TokenBarCore
 /// carregados via `NSImage(contentsOf:)`, que lê SVG no macOS 14.
 ///
 /// Contrato: `image(for:)` devolve `nil` quando o provider não tem SVG no
-/// bundle (ex.: cursor/openrouter/copilot, que não foram portados) —
-/// o painel então cai no FALLBACK: chip com a sigla D5 sobre a cor de marca
-/// (`brandColor`). Nunca inventa imagem.
+/// bundle (ex.: copilot, sem ícone na referência) — o painel então cai no
+/// FALLBACK: chip com a sigla D5 sobre a cor de marca (`brandColor`). Nunca
+/// inventa imagem.
 @MainActor
 public enum ProviderLogo {
     /// Cache de sessão (a view re-renderiza a cada ciclo; decode de SVG por

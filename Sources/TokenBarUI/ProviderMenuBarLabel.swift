@@ -10,6 +10,11 @@ import TokenBarCore
 /// [zai]50% [cursor]19%. Provider sem SVG porta o fallback da sigla D5
 /// (mesma fonte de verdade do texto). O valor continua o fragmento canônico
 /// (`menuBarFragment`: % quando há janela, tokens abreviados quando local).
+/// Extras VISUAIS (M1, port dos tokens da referência MIT): pace compacto
+/// ("+11%" só em déficit/reserva — "0%"/ausente omite, sem ruído) e reset
+/// ("↻ 2h 44m" quando a janela crítica tem `resetsAt` futuro). A string
+/// canônica (`menuBarText`, AX, heartbeat, render gate) NÃO muda — extras
+/// são só pintura.
 ///
 /// Render gate: a view observa `menuBarItems` (deriva de `content`, publicado
 /// por ciclo quando há mudança) — o item da menu bar não é re-criado, só
@@ -42,6 +47,16 @@ public struct ProviderMenuBarLabel: View {
                     parts.append(Text(MenuBarContent.sigla(for: item.id)))
                 }
                 parts.append(Text(item.value))
+                // Extras visuais (nunca entram na string canônica): pace só
+                // quando há sinal (déficit/reserva), reset só com data futura.
+                if let display = store.providers[item.id] {
+                    if let pace = menuBarPaceFragment(display.pacing), pace != "0%" {
+                        parts.append(Text(" " + pace).foregroundStyle(.secondary))
+                    }
+                    if let reset = menuBarResetFragment(resetsAt: display.resetsAt) {
+                        parts.append(Text(" " + reset).foregroundStyle(.secondary))
+                    }
+                }
             }
             return parts.reduce(Text(""), +)
         }()
