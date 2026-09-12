@@ -23,56 +23,33 @@ public struct ProviderMenuBarLabel: View {
         self.store = store
     }
 
-    /// SVG do logo escalado p/ 15pt (fora do ViewBuilder — o resize do
-    /// SwiftUI nem sempre comprime SVG no menu bar; escalar o NSImage é o
-    /// caminho confiável).
-    private func scaledLogo(for id: ProviderID) -> NSImage? {
-        guard let image = ProviderLogo.image(for: id) else { return nil }
-        let copy = image.copy() as! NSImage
-        copy.size = NSSize(width: 15, height: 15)
-        return copy
-    }
-
     public var body: some View {
-        // UM Text único com logos INLINE (Text + Text(Image) concatenados).
-        // O HStack de Image(nsImage:)/Text antigo era medido errado no
-        // contexto do MenuBarExtra: os Image(nsImage:) reportavam tamanho
-        // ~zero na fase de measurement (repro: panelrender --menulabel), o
-        // item recebia largura de ~1 par (49pt) e os providers após o
-        // primeiro sumiam do render ("sumiu as infos"). Text concatenado é
-        // o mesmo mecanismo do label original `Text(menuBarText)` — cuja
-        // medição sempre foi exata — e o logo NSImage de 15pt entra inline
-        // no fluxo do texto. (O ScrollView do painel não sofre disso; o
-        // bug era específico do sizing do item da status bar.)
+        // UM Text único com logos INLINE (Text + Text(Image) concatenados) —
+        // medição exata (mesmo mecanismo do label original Text(menuBarText),
+        // verificado pintando por diff de pixels). Os logos são BITMAPS 3x
+        // (`ProviderLogo.bitmap`): o SVG original quebrava o render do status
+        // item (label media ~zero → item colapsava p/ ~1 par). Sem SVG, sigla
+        // D5 no lugar (mesma fonte de verdade do fragmento textual).
         let items = store.menuBarItems
-        var label = mergedLabel(for: items)
-        if items.isEmpty {
-            label = Text("TB")
-        }
+        let label: Text = {
+            guard !items.isEmpty else { return Text("TB") }
+            var parts: [Text] = []
+            for (index, item) in items.enumerated() {
+                if index > 0 { parts.append(Text(" ")) }
+                if let logo = ProviderLogo.bitmap(for: item.id, points: 15) {
+                    parts.append(Text(Image(nsImage: logo)))
+                } else {
+                    parts.append(Text(MenuBarContent.sigla(for: item.id)))
+                }
+                parts.append(Text(item.value))
+            }
+            return parts.reduce(Text(""), +)
+        }()
         return label
             .font(.system(size: 11, weight: .medium))
             .monospacedDigit()
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(store.menuBarText)
-    }
-
-    /// Constrói o Text concatenado: [logo]valor [logo]valor … — logo via
-    /// `Text(Image)` (inline no fluxo do texto); sem SVG, sigla D5 no lugar
-    /// (mesma fonte de verdade do fragmento textual).
-    private func mergedLabel(
-        for items: [(id: ProviderID, value: String)]
-    ) -> Text {
-        var parts: [Text] = []
-        for (index, item) in items.enumerated() {
-            if index > 0 { parts.append(Text(" ")) }
-            if let logo = scaledLogo(for: item.id) {
-                parts.append(Text(Image(nsImage: logo)))
-            } else {
-                parts.append(Text(MenuBarContent.sigla(for: item.id)))
-            }
-            parts.append(Text(item.value))
-        }
-        return parts.reduce(Text(""), +)
     }
 }
 

@@ -36,6 +36,50 @@ public enum ProviderLogo {
         return image
     }
 
+    /// Cache dos RASTERIZADOS p/ o item da menu bar (chave id+points).
+    private static var bitmapCache: [String: NSImage] = [:]
+
+    /// Logo RASTERIZADO em bitmap p/ o label da MENU BAR. O SVG original
+    /// (representação vetorial, sem pixels fixos) quebra o render do status
+    /// item: no `MenuBarExtra` o label media ~zero e o item colapsava
+    /// (repro: panelrender --menulabel; fix verificado por diff de pixels do
+    /// bar — o label `Text` puro pinta, o com SVG não). Bitmap 3x dá margem
+    /// de escala sem ficar soft; o painel continua usando o SVG (nítido em
+    /// qualquer tamanho e imune ao bug — só o status item sofre).
+    public static func bitmap(for id: ProviderID, points: CGFloat) -> NSImage? {
+        let key = "\(id.rawValue)@\(Int(points))"
+        if let cached = bitmapCache[key] { return cached }
+        guard let svg = image(for: id) else { return nil }
+        guard let raster = Self.rasterize(svg, points: points) else { return nil }
+        bitmapCache[key] = raster
+        return raster
+    }
+
+    /// Desenha o SVG num NSBitmapImageRep 3x e devolve NSImage com size em
+    /// pontos exato. Falha → `nil` (o chamador cai no fallback da sigla).
+    private static func rasterize(_ svg: NSImage, points: CGFloat) -> NSImage? {
+        let pixels = Int(points * 3)
+        guard
+            let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                isPlanar: false, colorSpaceName: .deviceRGB,
+                bytesPerRow: 0, bitsPerPixel: 0)
+        else { return nil }
+        rep.size = NSSize(width: points, height: points)
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        guard let context = NSGraphicsContext(bitmapImageRep: rep) else {
+            return nil
+        }
+        NSGraphicsContext.current = context
+        svg.draw(in: NSRect(x: 0, y: 0, width: points, height: points))
+        let out = NSImage(size: NSSize(width: points, height: points))
+        out.addRepresentation(rep)
+        out.isTemplate = svg.isTemplate
+        return out
+    }
+
     /// Cores de marca da referência MIT (`ProviderBranding`, CodexBarCore —
     /// hex exato por provider). Alimentam o chip de fallback da sigla, o
     /// indicador de quota do chip e o fill da barra segmentada. Providers sem
