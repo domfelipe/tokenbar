@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import TokenBarCore
 
@@ -16,22 +17,36 @@ import TokenBarCore
 /// O label de acessibilidade é a string canônica — leitores de tela e o
 /// ui-smoke (AX name "C:…") continuam funcionando.
 public struct ProviderMenuBarLabel: View {
+    /// Item exibível: logo+valor (tuplas não entram no ForEach — struct
+    /// Identifiable).
+    public struct Item: Identifiable, Equatable {
+        public let id: ProviderID
+        public let value: String
+    }
+
     private let store: SnapshotStore
 
     public init(store: SnapshotStore) {
         self.store = store
     }
 
+    /// SVG do logo escalado p/ 15pt (fora do ViewBuilder — o resize do
+    /// SwiftUI nem sempre comprime SVG no menu bar; escalar o NSImage é o
+    /// caminho confiável).
+    private func scaledLogo(for id: ProviderID) -> NSImage? {
+        guard let image = ProviderLogo.image(for: id) else { return nil }
+        let copy = image.copy() as! NSImage
+        copy.size = NSSize(width: 15, height: 15)
+        return copy
+    }
+
     public var body: some View {
-        let items = store.menuBarItems
+        let items = store.menuBarItems.map { Item(id: $0.id, value: $0.value) }
         HStack(spacing: 5) {
-            ForEach(items, id: \.id) { item in
+            ForEach(items) { item in
                 HStack(spacing: 2) {
-                    if let nsImage = ProviderLogo.image(for: item.id) {
-                        Image(nsImage: nsImage)
-                            .resizable()
-                            .renderingMode(.template)
-                            .frame(width: 15, height: 15)
+                    if let logo = scaledLogo(for: item.id) {
+                        Image(nsImage: logo)
                     } else {
                         Text(MenuBarContent.sigla(for: item.id))
                             .font(.system(size: 11, weight: .semibold))
