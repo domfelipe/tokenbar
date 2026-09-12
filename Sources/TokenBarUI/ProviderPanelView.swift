@@ -26,7 +26,11 @@ public struct ProviderPanelView: View {
     static let panelWidth: CGFloat = 310
     /// Altura máxima da área rolável (orçamento do painel; o rodapé fica
     /// fixo embaixo, como no menu da referência).
-    static let contentMaxHeight: CGFloat = 470
+    /// Altura máxima do conteúdo: o caso comum (1 provider selecionado,
+    /// ≤2 contas) cabe INTEIRO sem rolagem (pedido do usuário: painel
+    /// "compactado com barra de rolagem"). O ScrollView com indicadores
+    /// ocultos segue como rede de segurança p/ listas longas.
+    static let contentMaxHeight: CGFloat = 560
 
     /// Store observável (dados chegam pelo ciclo do coordinator).
     let store: SnapshotStore
@@ -101,6 +105,10 @@ public struct ProviderPanelView: View {
                                 .padding(.bottom, 6)
                         }
                     }
+                    // Sem indicador visível (painel da referência não tem
+                    // barra de rolagem); o ScrollView permanece como rede de
+                    // segurança p/ muitas contas/seções.
+                    .scrollIndicators(.hidden)
                     .frame(maxHeight: Self.contentMaxHeight)
                     .accessibilityElement(children: .contain)
                     Divider()
