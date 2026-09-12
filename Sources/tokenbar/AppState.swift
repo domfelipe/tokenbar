@@ -15,7 +15,7 @@ private let appLog = Logger(subsystem: "dev.domhubs.TokenBar", category: "app")
 /// de ciclo/scheduler/heartbeat vive no coordinator (testável fora do
 /// executável — alvo `tokenbar` não é importável pelos testes).
 @MainActor
-final class AppState: NSObject, NSWindowDelegate {
+final class AppState: NSObject {
     private let coordinator: ProviderCoordinator
     /// Gerenciamento de contas (F4): registry do coordinator + providers com
     /// suporte. Mutação → refresh imediato (painel reflete na hora).
@@ -93,6 +93,7 @@ final class AppState: NSObject, NSWindowDelegate {
     }
 
     func stop() {
+        extraWindows.closeAll()  // nenhuma janela extra fica zumbi no quit
         coordinator.stop()
     }
 
@@ -109,73 +110,55 @@ final class AppState: NSObject, NSWindowDelegate {
         coordinator.menuDidClose()
     }
 
-    // MARK: - Multi-conta (F4): janela PRÓPRIA do "+ Add account"
+    // MARK: - Janelas extras (F3 analytics / F4 add-account)
 
-    /// Janela do formulário de add-account — `nil` = fechada. Janela própria
-    /// (não sheet no MenuBarExtra): NSOpenPanel precisa de app ativo, e a
-    /// janela garante isso; mesmo padrão de ciclo de vida do analytics.
-    private var addAccountWindow: NSWindow?
-    private var analyticsWindow: NSWindow?
+    /// Ciclo de vida das janelas extras (fix do painel): controller ÚNICO por
+    /// identidade, show idempotente, close limpa referência, ativação de app
+    /// acessório em todo show. Testável no target TokenBarUI.
+    private let extraWindows = ExtraWindowManager()
 
     /// Item "Add account…": abre (ou traz à frente) o formulário para o
-    /// provider indicado. Idempotente: janela já aberta só ganha foco.
+    /// provider indicado. Idempotente: janela já aberta do MESMO provider só
+    /// ganha foco; provider DIFERENTE fecha a atual e abre a nova (o alvo do
+    /// formulário nunca fica obsoleto).
     func showAddAccount(for provider: ProviderID) {
         guard accountsModel.registry != nil else {
             appLog.error("add account ignorado: sem banco (degradação F2)")
             return
         }
-        NSApp.activate(ignoringOtherApps: true)
-        if let addAccountWindow {
-            addAccountWindow.makeKeyAndOrderFront(nil)
-            return
+        let id = ExtraWindowManager.addAccountID(provider: provider.rawValue)
+        extraWindows.showWindow(id: id) { [accountsModel] in
+            let hosting = NSHostingView(
+                rootView: AddAccountView(provider: provider, model: accountsModel) {
+                    // Cancel/Add: fecha pela identidade (mesmo caminho do
+                    // close button — nunca referência direta de janela).
+                    NotificationCenter.default.post(
+                        name: ExtraWindowCloseRequest.name, object: nil,
+                        userInfo: [ExtraWindowCloseRequest.idKey: id])
+                })
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 420, height: 240),
+                                  styleMask: [.titled, .closable],
+                                  backing: .buffered, defer: false)
+            window.title = "Add Account"
+            window.contentView = hosting
+            window.center()
+            return window
         }
-        let hosting = NSHostingView(
-            rootView: AddAccountView(provider: provider, model: accountsModel) { [weak self] in
-                self?.addAccountWindow?.close()
-            })
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 420, height: 240),
-                              styleMask: [.titled, .closable],
-                              backing: .buffered, defer: false)
-        window.title = "Add Account"
-        window.contentView = hosting
-        window.isReleasedWhenClosed = false  // ciclo de vida é NOSSO (nil no close)
-        window.delegate = self
-        window.center()
-        window.makeKeyAndOrderFront(nil)
-        addAccountWindow = window
     }
 
-    /// Item "Analytics…": abre (ou traz à frente) a janela própria — nunca
-    /// o painel. Idempotente: janela já aberta só ganha foco.
+    /// Item "Usage dashboard": abre (ou traz à frente) a janela própria —
+    /// nunca o painel. Idempotente: janela já aberta só ganha foco.
     func showAnalytics() {
-        NSApp.activate(ignoringOtherApps: true)
-        if let analyticsWindow {
-            analyticsWindow.makeKeyAndOrderFront(nil)
-            return
-        }
-        let model = AnalyticsModel(database: coordinator.historyDatabase)
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 500),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable],
-            backing: .buffered, defer: false)
-        window.title = "TokenBar Analytics"
-        window.contentView = NSHostingView(rootView: AnalyticsView(model: model))
-        window.isReleasedWhenClosed = false  // ciclo de vida é NOSSO (nil no close)
-        window.delegate = self
-        window.center()
-        window.makeKeyAndOrderFront(nil)
-        analyticsWindow = window
-    }
-
-    /// Fecho da janela de analytics/add-account = descartar views + modelo
-    /// (spec F3: "fechar descarta"; F4 idem para o form de conta).
-    func windowWillClose(_ notification: Notification) {
-        let closing = notification.object as? NSWindow
-        if closing === analyticsWindow {
-            analyticsWindow = nil  // última referência: NSHostingView e o modelo vão junto
-        }
-        if closing === addAccountWindow {
-            addAccountWindow = nil
+        extraWindows.showWindow(id: ExtraWindowManager.analyticsID) { [coordinator] in
+            let model = AnalyticsModel(database: coordinator.historyDatabase)
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 720, height: 500),
+                styleMask: [.titled, .closable, .resizable, .miniaturizable],
+                backing: .buffered, defer: false)
+            window.title = "TokenBar Analytics"
+            window.contentView = NSHostingView(rootView: AnalyticsView(model: model))
+            window.center()
+            return window
         }
     }
 
