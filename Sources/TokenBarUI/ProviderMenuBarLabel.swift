@@ -17,13 +17,6 @@ import TokenBarCore
 /// O label de acessibilidade é a string canônica — leitores de tela e o
 /// ui-smoke (AX name "C:…") continuam funcionando.
 public struct ProviderMenuBarLabel: View {
-    /// Item exibível: logo+valor (tuplas não entram no ForEach — struct
-    /// Identifiable).
-    public struct Item: Identifiable, Equatable {
-        public let id: ProviderID
-        public let value: String
-    }
-
     private let store: SnapshotStore
 
     public init(store: SnapshotStore) {
@@ -41,29 +34,45 @@ public struct ProviderMenuBarLabel: View {
     }
 
     public var body: some View {
-        let items = store.menuBarItems.map { Item(id: $0.id, value: $0.value) }
-        HStack(spacing: 5) {
-            ForEach(items) { item in
-                HStack(spacing: 2) {
-                    if let logo = scaledLogo(for: item.id) {
-                        Image(nsImage: logo)
-                    } else {
-                        Text(MenuBarContent.sigla(for: item.id))
-                            .font(.system(size: 11, weight: .semibold))
-                            .monospacedDigit()
-                    }
-                    Text(item.value)
-                        .font(.system(size: 11, weight: .medium))
-                        .monospacedDigit()
-                }
-            }
-            if items.isEmpty {
-                Text("TB")
-                    .font(.system(size: 11, weight: .medium))
-            }
+        // UM Text único com logos INLINE (Text + Text(Image) concatenados).
+        // O HStack de Image(nsImage:)/Text antigo era medido errado no
+        // contexto do MenuBarExtra: os Image(nsImage:) reportavam tamanho
+        // ~zero na fase de measurement (repro: panelrender --menulabel), o
+        // item recebia largura de ~1 par (49pt) e os providers após o
+        // primeiro sumiam do render ("sumiu as infos"). Text concatenado é
+        // o mesmo mecanismo do label original `Text(menuBarText)` — cuja
+        // medição sempre foi exata — e o logo NSImage de 15pt entra inline
+        // no fluxo do texto. (O ScrollView do painel não sofre disso; o
+        // bug era específico do sizing do item da status bar.)
+        let items = store.menuBarItems
+        var label = mergedLabel(for: items)
+        if items.isEmpty {
+            label = Text("TB")
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(store.menuBarText)
+        return label
+            .font(.system(size: 11, weight: .medium))
+            .monospacedDigit()
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(store.menuBarText)
+    }
+
+    /// Constrói o Text concatenado: [logo]valor [logo]valor … — logo via
+    /// `Text(Image)` (inline no fluxo do texto); sem SVG, sigla D5 no lugar
+    /// (mesma fonte de verdade do fragmento textual).
+    private func mergedLabel(
+        for items: [(id: ProviderID, value: String)]
+    ) -> Text {
+        var parts: [Text] = []
+        for (index, item) in items.enumerated() {
+            if index > 0 { parts.append(Text(" ")) }
+            if let logo = scaledLogo(for: item.id) {
+                parts.append(Text(Image(nsImage: logo)))
+            } else {
+                parts.append(Text(MenuBarContent.sigla(for: item.id)))
+            }
+            parts.append(Text(item.value))
+        }
+        return parts.reduce(Text(""), +)
     }
 }
 

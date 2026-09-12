@@ -38,6 +38,8 @@ struct PanelRenderMain {
             let image = MainActor.assumeIsolated { render() }
             guard let image else { fail("render falhou") }
             writePNG(image, to: arguments[1])
+        case 3 where arguments[1] == "--menulabel":
+            MainActor.assumeIsolated { renderMenuBarLabel(prefix: arguments[2]) }
         case 4:
             MainActor.assumeIsolated {
                 composeSideBySide(
@@ -165,6 +167,38 @@ struct PanelRenderMain {
         let renderer = ImageRenderer(content: panel)
         renderer.scale = 2
         return renderer.nsImage
+    }
+
+    // MARK: Repro do sizing do label da menu bar
+
+    /// Render do `ProviderMenuBarLabel` em duas condições (repro do bug
+    /// "só 1 de N providers aparece"): `nil` (ideal) e `49×24` (a proposta
+    /// que o MenuBarExtra dá ao label — comprime o HStack e trunca os itens
+    /// após o primeiro). Imprime as larguras RESULTANTES no stdout.
+    @MainActor
+    static func renderMenuBarLabel(prefix: String) {
+        let store = SnapshotStore()
+        store.apply(MenuBarContent(providers: [
+            .codex: ProviderDisplay(percent: 7),
+            .zai: ProviderDisplay(percent: 17),
+            .cursor: ProviderDisplay(percent: 19),
+            .grok: ProviderDisplay(percent: 11),
+        ]))
+        for (name, proposed) in [
+            ("ideal", ProposedViewSize.unspecified),
+            ("squeezed49", ProposedViewSize(width: 49, height: 24)),
+        ] {
+            let renderer = ImageRenderer(content: ProviderMenuBarLabel(store: store))
+            renderer.scale = 2
+            renderer.proposedSize = proposed
+            guard let image = renderer.nsImage else { fail("menulabel \(name) falhou") }
+            writePNG(image, to: "\(prefix)-\(name).png")
+            if let rep = image.representations.first {
+                FileHandle.standardOutput.write(
+                    "menulabel \(name): \(rep.pixelsWide / 2)pt x \(rep.pixelsHigh / 2)pt\n"
+                        .data(using: .utf8)!)
+            }
+        }
     }
 
     // MARK: Evidência lado a lado
