@@ -100,6 +100,10 @@ public struct AnalyticsContent: View {
                 ledger
             }
 
+            section("Budget") {
+                budgetSection
+            }
+
             section("Daily cost heatmap") {
                 heatmap
             }
@@ -131,6 +135,53 @@ public struct AnalyticsContent: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    // MARK: - Budget (F7 Spend control)
+
+    /// Orçamento do mês: teto GLOBAL e por provider, gasto do mês-corrido e
+    /// projeção de fechamento. Sem teto configurado a seção diz ONDE configurar
+    /// — nunca inventa linha nem finge gasto zero.
+    @ViewBuilder
+    private var budgetSection: some View {
+        if model.budgetRows.isEmpty {
+            Text("No budget for this month. Set one in Settings › Budget.")
+                .foregroundStyle(.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(model.budgetRows) { row in
+                    budgetRow(row)
+                }
+                Text("Budget counts the calendar month (1st until today). Days without a known price are excluded and never counted as $0.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Monthly budget and projection")
+        }
+    }
+
+    /// Uma linha do resumo: nome do teto à esquerda; gasto, fração e projeção à
+    /// direita. Mês sem custo computável mostra "—" (NULL ≠ 0).
+    private func budgetRow(_ row: AnalyticsModel.BudgetRow) -> some View {
+        let name = row.provider.map { MenuBarContent.displayName(for: $0) } ?? "All providers"
+        var value = (row.spentUSD.map(formatEstimatedUSD) ?? "—")
+            + " of " + formatEstimatedUSD(row.budgetUSD)
+        if let spent = row.spentUSD {
+            value += " · " + String(Int(((spent / row.budgetUSD) * 100).rounded())) + "%"
+        }
+        if let projected = row.projectedUSD {
+            value += " · projected " + formatEstimatedUSD(projected)
+        }
+        return HStack(spacing: 12) {
+            Text(name)
+                .frame(width: 96, alignment: .leading)
+            Text(value)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .monospacedDigit()
+        }
+        .font(.caption)
+        .foregroundStyle(row.spentUSD == nil ? Color.secondary : Color.primary)
     }
 
     // MARK: - Usage & Spend

@@ -333,6 +333,10 @@ struct PanelRenderMain {
         try? db.persistBatch(
             provider: .codex, path: "/lab/codex.jsonl", events: codex,
             endOffset: 1_000_000, resetToZero: false)
+        // Orçamento do mês (F7 Spend control): a evidência da janela mostra a
+        // seção "Budget" com a linha global e uma por provider.
+        AppSettingsStore(database: db).saveBudget(
+            BudgetConfig(monthlyUSD: 500, perProvider: [.codex: 200]))
         return db
     }
 

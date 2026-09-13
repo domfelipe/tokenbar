@@ -138,6 +138,7 @@ final class AnalyticsModelTests {
         #expect(model.dayCosts.isEmpty)
         #expect(model.ledgerRows.isEmpty)
         #expect(model.heatmapCells.isEmpty)
+        #expect(model.budgetRows.isEmpty)
         #expect(model.totals.isEmpty)
         #expect(model.topModels.isEmpty)
         #expect(!model.isLoading)
@@ -266,6 +267,68 @@ final class AnalyticsModelTests {
         #expect(cells.allSatisfy { $0.intensity == 0 && $0.costUSD == nil })
         #expect(cells[1].tokens == 10)  // o dia TEM evento; o que falta é preço
         #expect(AnalyticsModel.heatmapCells(from: [], window: []).isEmpty)
+    }
+
+    // MARK: - Orçamento do mês (F7 Spend control)
+
+    @Test("budgetRows: linha global e por provider; sem teto não há linha")
+    func budgetRowsDerivation() {
+        func row(_ provider: String, _ cost: Double?) -> AppDatabase.MonthSpendRow {
+            .init(provider: provider, tokens: 100, costUSD: cost)
+        }
+        let window = db.monthWindow(now: now)  // agosto/2026, dia 30 de 31
+
+        // Sem teto nenhum → nada (a seção orienta a configurar).
+        #expect(AnalyticsModel.budgetRows(
+            budget: .empty, monthRows: [row("claude", 30)], now: now, calendar: utc).isEmpty)
+
+        // Teto global: uma linha, gasto = total do mês, projeção pelo mês real.
+        let global = AnalyticsModel.budgetRows(
+            budget: BudgetConfig(monthlyUSD: 100, perProvider: [:]),
+            monthRows: [row("claude", 30), row("codex", nil)], now: now, calendar: utc)
+        #expect(global.count == 1)
+        #expect(global[0].provider == nil)
+        #expect(global[0].spentUSD == 30)  // codex sem preço NÃO entra como zero
+        #expect(global[0].budgetUSD == 100)
+        #expect(global[0].projectedUSD == 31)  // 30/30 dias × 31 dias
+
+        // Por provider: teto próprio + GLOBAL; provider sem evento no mês entra
+        // com gasto nil ("—"), nunca 0 nem projeção inventada.
+        let mixed = AnalyticsModel.budgetRows(
+            budget: BudgetConfig(monthlyUSD: 100, perProvider: [.codex: 50, .zai: 20]),
+            monthRows: [row("claude", 30), row("codex", 25)], now: now, calendar: utc)
+        #expect(mixed.map(\.id) == ["all", "codex", "zai"])
+        #expect(mixed[1].spentUSD == 25)
+        #expect(mixed[1].budgetUSD == 50)
+        #expect(mixed[2].spentUSD == nil)
+        #expect(mixed[2].projectedUSD == nil)
+
+        // Mês sem NENHUM custo computável: total nil → linha sem projeção.
+        let allNull = AnalyticsModel.budgetRows(
+            budget: BudgetConfig(monthlyUSD: 100, perProvider: [:]),
+            monthRows: [row("claude", nil)], now: now, calendar: utc)
+        #expect(allNull.first?.spentUSD == nil)
+        #expect(allNull.first?.projectedUSD == nil)
+        _ = window
+    }
+
+    @Test("reload: orçamento do mês chega pronto na janela (global + por provider)")
+    @MainActor
+    func reloadFillsBudgetRows() async throws {
+        AppSettingsStore(database: db).saveBudget(
+            BudgetConfig(monthlyUSD: 100, perProvider: [.codex: 50]))
+        let model = AnalyticsModel(database: db)
+        await model.reload(now: now)
+
+        #expect(model.budgetRows.map(\.id) == ["all", "codex"])
+        // Hoje: claude 100 m-priced (0,0003) + codex 300 m-priced (0,0009);
+        // d-7: claude 400 m-priced (0,0012) → mês = 0,0024 (d-1 é 100% NULL).
+        let expectedMonth = (100.0 * 3 + 300 * 3 + 400 * 3) / 1e6
+        let global = try #require(model.budgetRows.first { $0.id == "all" })
+        #expect(abs((global.spentUSD ?? -1) - expectedMonth) < 1e-12)
+        let codex = try #require(model.budgetRows.first { $0.id == "codex" })
+        #expect(abs((codex.spentUSD ?? -1) - 300.0 * 3 / 1e6) < 1e-12)
+        #expect(codex.budgetUSD == 50)
     }
 
     @Test("reload: ledger e heatmap do período (7d = 7 células, grade esparsa)")

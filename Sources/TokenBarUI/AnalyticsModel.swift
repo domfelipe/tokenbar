@@ -112,6 +112,28 @@ public final class AnalyticsModel {
         }
     }
 
+    /// Uma linha do resumo de orçamento (F7): global (provider `nil`) ou de um
+    /// provider. `spentUSD` `nil` = mês sem custo computável (NULL ≠ 0 → a UI
+    /// mostra "—", nunca "$0.00"); `projectedUSD` `nil` = sem base para projetar.
+    public struct BudgetRow: Identifiable, Equatable, Sendable {
+        /// `nil` = linha GLOBAL (todos os providers somados).
+        public var provider: ProviderID?
+        public var spentUSD: Double?
+        public var budgetUSD: Double
+        public var projectedUSD: Double?
+        public var id: String { provider?.rawValue ?? "all" }
+
+        public init(
+            provider: ProviderID?, spentUSD: Double?, budgetUSD: Double,
+            projectedUSD: Double?
+        ) {
+            self.provider = provider
+            self.spentUSD = spentUSD
+            self.budgetUSD = budgetUSD
+            self.projectedUSD = projectedUSD
+        }
+    }
+
     /// Quantos modelos o breakdown exibe (spec: top 5).
     public static let topModelsLimit = 5
 
@@ -127,6 +149,11 @@ public final class AnalyticsModel {
     public private(set) var ledgerRows: [LedgerRow] = []
     /// Heatmap diário: TODOS os dias do período (inclusive sem evento).
     public private(set) var heatmapCells: [HeatmapCell] = []
+    /// Resumo de ORÇAMENTO do mês (F7 Spend control): linha GLOBAL (quando há
+    /// teto global) + uma por provider com teto próprio. Vazio = sem orçamento
+    /// configurado (a seção mostra o caminho das Settings, nada inventado).
+    /// Não depende do período do seletor: orçamento é sempre o MÊS-corrente.
+    public private(set) var budgetRows: [BudgetRow] = []
     public private(set) var isLoading = false
 
     public init(database: AppDatabase?) {
@@ -159,7 +186,15 @@ public final class AnalyticsModel {
             let totals = (try? database.totals(days: days, now: now)) ?? []
             let breakdown = (try? database.modelBreakdown(days: days, now: now)) ?? []
             let window = database.windowDays(days: days, now: now)
-            return Snapshot(series: series, totals: totals, breakdown: breakdown, window: window)
+            // Orçamento (F7): tetos da tabela `settings` + gasto do MÊS-corrente
+            // + projeção, tudo no calendar do banco (o mesmo do rollover).
+            let monthRows = (try? database.monthSpend(now: now)) ?? []
+            let budget = AppSettingsStore(database: database).loadBudget()
+            return Snapshot(
+                series: series, totals: totals, breakdown: breakdown, window: window,
+                budgetRows: Self.budgetRows(
+                    budget: budget, monthRows: monthRows, now: now,
+                    calendar: database.calendar))
         }.value
 
         // Período mudou enquanto a query rodava: descarta (a recarga nova
@@ -177,6 +212,7 @@ public final class AnalyticsModel {
         topModels = snapshot.breakdown.prefix(Self.topModelsLimit).map {
             ModelSlice(model: $0.model, tokens: $0.tokens, costUSD: $0.costUSD)
         }
+        budgetRows = snapshot.budgetRows
     }
 
     /// Fecha a janela: solta os dados (orçamento de RAM — nada fica vivo
@@ -186,6 +222,7 @@ public final class AnalyticsModel {
         dayCosts = []
         ledgerRows = []
         heatmapCells = []
+        budgetRows = []
         totals = []
         topModels = []
         isLoading = false
@@ -197,6 +234,8 @@ public final class AnalyticsModel {
         var breakdown: [AppDatabase.ModelBreakdownRow]
         /// Grade da janela (dias com data), para o heatmap não recalcular o calendário.
         var window: [AppDatabase.WindowDay]
+        /// Resumo do orçamento do mês (F7) — já calculado fora da MainActor.
+        var budgetRows: [BudgetRow]
     }
 
     /// Custo por dia derivado das séries por provider — MESMA semântica do
@@ -225,6 +264,41 @@ public final class AnalyticsModel {
             guard hasAnyByDay[day] == true else { return nil }
             return DayCost(day: day, costUSD: knownByDay[day] ?? 0)
         }
+    }
+
+    // MARK: - Orçamento do mês (F7 Spend control)
+
+    /// Linhas do resumo de orçamento: a GLOBAL primeiro (quando existe teto
+    /// global), depois uma por provider com teto PRÓPRIO, em ordem de rawValue.
+    /// Provider com teto próprio mas sem evento no mês entra com `spentUSD` nil
+    /// (a UI mostra "—": sem custo computável ≠ gastou zero). Função pura.
+    nonisolated public static func budgetRows(
+        budget: BudgetConfig, monthRows: [AppDatabase.MonthSpendRow],
+        now: Date, calendar: Calendar
+    ) -> [BudgetRow] {
+        guard !budget.isEmpty else { return [] }
+        var spendByProvider: [ProviderID: Double?] = [:]
+        for row in monthRows {
+            guard let provider = ProviderID(rawValue: row.provider) else { continue }
+            spendByProvider[provider] = row.costUSD
+        }
+        var rows: [BudgetRow] = []
+        if let global = budget.monthlyUSD {
+            let total = AppDatabase.monthSpendTotal(monthRows).costUSD
+            rows.append(BudgetRow(
+                provider: nil, spentUSD: total, budgetUSD: global,
+                projectedUSD: SpendProjection.project(
+                    monthToDate: total, now: now, calendar: calendar)?.projected))
+        }
+        for provider in budget.perProvider.keys.sorted(by: { $0.rawValue < $1.rawValue }) {
+            guard let limit = budget.perProvider[provider] else { continue }
+            let spent = spendByProvider[provider] ?? nil
+            rows.append(BudgetRow(
+                provider: provider, spentUSD: spent, budgetUSD: limit,
+                projectedUSD: SpendProjection.project(
+                    monthToDate: spent, now: now, calendar: calendar)?.projected))
+        }
+        return rows
     }
 
     // MARK: - Usage & Spend (ledger diário + heatmap)
