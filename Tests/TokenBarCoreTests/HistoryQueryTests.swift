@@ -210,4 +210,56 @@ final class HistoryQueryTests {
         #expect(codexOnly.count == 1)
         #expect(codexOnly.first?.provider == "codex")
     }
+
+    @Test("windowDays: 'hoje' e weekday seguem o calendar do BANCO, não o fuso do host")
+    func windowDaysUsesInjectedCalendar() throws {
+        // now = 2026-08-30T10:40Z. Em UTC+14 já é 31/08 00:40 → "hoje" é 31/08
+        // e a janela de 3 dias é 29, 30 e 31/08 (sáb, dom, seg). Um teste que só
+        // olhasse o calendar UTC passaria verde mesmo se a implementação usasse
+        // Calendar.current num host UTC — este não passa.
+        var plus14 = Calendar(identifier: .gregorian)
+        plus14.timeZone = TimeZone(identifier: "Pacific/Kiritimati")!
+        let tzDir = dir.appendingPathComponent("tz-plus14", isDirectory: true)
+        try FileManager.default.createDirectory(at: tzDir, withIntermediateDirectories: true)
+        let tzDB = try AppDatabase.open(
+            at: tzDir.appendingPathComponent(AppDatabase.databaseName), calendar: plus14)
+
+        let far = tzDB.windowDays(days: 3, now: now)
+        #expect(far.map(\.day) == ["2026-08-29", "2026-08-30", "2026-08-31"])
+        #expect(far.map(\.weekday) == [6, 7, 1])
+
+        // O MESMO instante no calendar UTC do banco principal: janela e colunas
+        // diferentes — weekday é do banco, não do relógio da máquina.
+        let utcDays = db.windowDays(days: 3, now: now)
+        #expect(utcDays.map(\.day) == ["2026-08-28", "2026-08-29", "2026-08-30"])
+        #expect(utcDays.map(\.weekday) == [5, 6, 7])
+    }
+
+    // MARK: - Grade da janela (Usage & Spend: heatmap diário)
+
+    @Test("windowDays: 7d termina hoje e começa onde o WHERE day >= ? corta")
+    func windowDaysGrid() throws {
+        let week = db.windowDays(days: 7, now: now)
+        #expect(week.map(\.day) == [
+            "2026-08-24", "2026-08-25", "2026-08-26", "2026-08-27",
+            "2026-08-28", "2026-08-29", "2026-08-30",
+        ])
+        #expect(week.first?.date == AppDatabase.date(fromDayString: "2026-08-24", calendar: utc))
+        #expect(week.last?.date == utc.startOfDay(for: now))
+        // 2026-08-30 é DOMINGO: a janela de 7 dias cai inteira em Mon..Sun.
+        #expect(week.map(\.weekday) == [1, 2, 3, 4, 5, 6, 7])
+        // Passo por Calendar (DST-safe), não soma de 86_400: dias consecutivos.
+        #expect(zip(week, week.dropFirst()).allSatisfy {
+            utc.dateComponents([.day], from: $0.date, to: $1.date).day == 1
+        })
+        // A grade começa EXATAMENTE no primeiro dia da série — por construção.
+        #expect(week.first?.day == (try db.dailySeries(days: 7, now: now).first?.day))
+
+        // days <= 1 → só hoje (mesma regra do windowStartDate).
+        #expect(db.windowDays(days: 1, now: now).map(\.day) == ["2026-08-30"])
+        #expect(db.windowDays(days: 0, now: now).map(\.day) == ["2026-08-30"])
+        // 30d tem 30 células, mesmo com poucos dias com evento (grade esparsa).
+        #expect(db.windowDays(days: 30, now: now).count == 30)
+        #expect(db.windowDays(days: 30, now: now).first?.day == "2026-08-01")
+    }
 }

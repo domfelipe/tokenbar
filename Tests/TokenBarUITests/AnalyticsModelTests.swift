@@ -136,6 +136,8 @@ final class AnalyticsModelTests {
         model.clear()
         #expect(model.providerSeries.isEmpty)
         #expect(model.dayCosts.isEmpty)
+        #expect(model.ledgerRows.isEmpty)
+        #expect(model.heatmapCells.isEmpty)
         #expect(model.totals.isEmpty)
         #expect(model.topModels.isEmpty)
         #expect(!model.isLoading)
@@ -206,5 +208,86 @@ final class AnalyticsModelTests {
             row("2026-08-30", 0.25),
         ])
         #expect(mixed.map { "\($0.day)|\($0.costUSD)" } == ["2026-08-30|0.75"])
+    }
+
+    // MARK: - Usage & Spend: ledger diário + heatmap
+
+    private func seriesRow(
+        _ day: String, _ provider: String, _ tokens: Int64, _ cost: Double?
+    ) -> AppDatabase.DailySeriesRow {
+        .init(day: day, provider: provider, tokens: tokens, costUSD: cost)
+    }
+
+    @Test("ledgerRows: desc, tokens somados entre providers; dia 100% NULL vira custo nil")
+    func ledgerRowsAggregateByDay() {
+        let rows = AnalyticsModel.ledgerRows(from: [
+            seriesRow("2026-08-29", "claude", 200, nil),
+            seriesRow("2026-08-30", "claude", 100, 0.003),
+            seriesRow("2026-08-30", "codex", 300, 0.009),
+            seriesRow("2026-08-30", "gemini", 50, nil),
+            seriesRow("2026-08-28", "claude", 0, 0),  // zero real: dia entra com custo 0
+        ])
+        #expect(rows.map(\.day) == ["2026-08-30", "2026-08-29", "2026-08-28"])
+        #expect(rows[0].tokens == 450)  // 100 + 300 + 50 (NULL entra nos tokens)
+        #expect(rows[0].costUSD == 0.012)  // só os precificados
+        #expect(rows[1].costUSD == nil)  // NULL ≠ 0 → a tabela mostra "—"
+        #expect(rows[2].costUSD == 0)  // zero real preservado
+        #expect(rows[2].tokens == 0)
+        #expect(AnalyticsModel.ledgerRows(from: []).isEmpty)
+    }
+
+    @Test("heatmapCells: grade inteira da janela, intensidade relativa ao maior custo")
+    func heatmapCellsCoverWindowAndNormalize() {
+        let window = db.windowDays(days: 4, now: now)  // 08-27..08-30
+        let cells = AnalyticsModel.heatmapCells(from: [
+            seriesRow("2026-08-30", "claude", 100, 0.5),
+            seriesRow("2026-08-29", "claude", 40, 0.25),
+            seriesRow("2026-08-28", "claude", 60, nil),  // tokens sim, custo não
+        ], window: window)
+
+        #expect(cells.map(\.day) == ["2026-08-27", "2026-08-28", "2026-08-29", "2026-08-30"])
+        #expect(cells.map(\.intensity) == [0, 0, 0.5, 1])
+        #expect(cells.map(\.tokens) == [0, 60, 40, 100])  // 08-27 sem evento = célula vazia
+        #expect(cells.map(\.costUSD) == [nil, nil, 0.25, 0.5])
+        // Coluna da semana vem do banco: 08-27 qui … 08-30 dom (Mon = 1).
+        #expect(cells.map(\.weekday) == [4, 5, 6, 7])
+        // 00:00 do dia no MESMO calendar do banco (UTC no teste), não uma data qualquer.
+        #expect(cells.first?.date == utc.date(from: DateComponents(year: 2026, month: 8, day: 27)))
+        #expect(cells.first?.id == "2026-08-27")
+    }
+
+    @Test("heatmapCells: período sem custo computável → todas as células vazias (0/nil)")
+    func heatmapWithoutComputableCost() {
+        let window = db.windowDays(days: 2, now: now)
+        let cells = AnalyticsModel.heatmapCells(from: [
+            seriesRow("2026-08-30", "claude", 10, nil),
+        ], window: window)
+        #expect(cells.count == 2)
+        #expect(cells.allSatisfy { $0.intensity == 0 && $0.costUSD == nil })
+        #expect(cells[1].tokens == 10)  // o dia TEM evento; o que falta é preço
+        #expect(AnalyticsModel.heatmapCells(from: [], window: []).isEmpty)
+    }
+
+    @Test("reload: ledger e heatmap do período (7d = 7 células, grade esparsa)")
+    @MainActor
+    func reloadFillsLedgerAndHeatmap() async throws {
+        let model = AnalyticsModel(database: db)
+        await model.reload(now: now)
+
+        // Ledger: só dias com evento (hoje e d-1), desc; d-1 é 100% NULL → "—".
+        #expect(model.ledgerRows.map(\.day) == ["2026-08-30", "2026-08-29"])
+        #expect(model.ledgerRows.first?.tokens == 660)  // 360 claude + 300 codex
+        let expectedTodayCost = 100.0 * 3 / 1e6 + 300.0 * 3 / 1e6
+        #expect(model.ledgerRows.first?.costUSD == expectedTodayCost)
+        #expect(model.ledgerRows.last?.costUSD == nil)
+
+        // Heatmap: o período INTEIRO, mesmo com evento em só 2 dos 7 dias.
+        #expect(model.heatmapCells.map(\.day) == [
+            "2026-08-24", "2026-08-25", "2026-08-26", "2026-08-27",
+            "2026-08-28", "2026-08-29", "2026-08-30",
+        ])
+        #expect(model.heatmapCells.last?.intensity == 1)  // hoje tem o maior custo
+        #expect(model.heatmapCells.filter { $0.intensity == 0 }.count == 6)
+        #expect(!model.heatmapCells.contains { $0.costUSD == 0 })  // nada de 0 inventado
     }
 }

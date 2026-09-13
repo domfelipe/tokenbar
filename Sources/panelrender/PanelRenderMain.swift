@@ -38,6 +38,8 @@ struct PanelRenderMain {
             let image = MainActor.assumeIsolated { render() }
             guard let image else { fail("render falhou") }
             writePNG(image, to: arguments[1])
+        case 3 where arguments[1] == "--analytics":
+            MainActor.assumeIsolated { renderAnalytics(to: arguments[2]) }
         case 3 where arguments[1] == "--menulabel":
             MainActor.assumeIsolated { renderMenuBarLabel(prefix: arguments[2]) }
         case 4:
@@ -248,6 +250,97 @@ struct PanelRenderMain {
         }
         try? png.write(to: URL(fileURLWithPath: outputPath))
         FileHandle.standardOutput.write("side-by-side: \(outputPath)\n".data(using: .utf8)!)
+    }
+
+    // MARK: Evidência do Usage & Spend (ledger + heatmap)
+
+    /// Render do miolo REAL da janela de Analytics (`AnalyticsContent`) sobre
+    /// um banco SINTÉTICO de 30 dias — mesmo caminho de dados do app
+    /// (`AppDatabase` → `AnalyticsModel.reload`), sem rede e sem credencial.
+    /// Existe porque a janela não tem captura de tela disponível como evidência
+    /// (permissão de Gravação de Tela) e porque o ScrollView não compõe no
+    /// ImageRenderer (limitação conhecida desde o QA F4).
+    @MainActor
+    static func renderAnalytics(to path: String) {
+        let model = AnalyticsModel(database: labAnalyticsDatabase())
+        model.setPeriod(.days30)
+        load(model, now: labNow)
+
+        let content = AnalyticsContent(model: model)
+            .frame(width: 760)
+            .environment(\.colorScheme, .dark)
+        let renderer = ImageRenderer(content: content)
+        renderer.scale = 2
+        guard let image = renderer.nsImage else { fail("render do analytics falhou") }
+        let withCost = model.heatmapCells.filter { $0.costUSD != nil }.count
+        let summary = "analytics: período \(model.period.label), \(model.ledgerRows.count) dias no ledger, "
+            + "\(model.heatmapCells.count) células no heatmap (\(withCost) com custo computável)\n"
+        FileHandle.standardOutput.write(summary.data(using: .utf8)!)
+        writePNG(image, to: path)
+    }
+
+    /// Banco temporário com 30 dias de eventos `fake-*`: 3 em cada 10 dias sem
+    /// preço computável (linha "—" no ledger, célula vazia no heatmap) e um
+    /// segundo provider em alguns dias (tokens somados entre providers).
+    static func labAnalyticsDatabase() -> AppDatabase {
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("panelrender-analytics-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let pricing = PricingTable(
+            version: 1, updated: "2026-01-01",
+            models: ["lab-priced": .init(input: 3, output: 15, cacheRead: nil, cacheWrite: nil)])
+        guard let db = try? AppDatabase.open(
+            at: dir.appendingPathComponent(AppDatabase.databaseName), calendar: utc, pricing: pricing)
+        else { fail("banco de lab do analytics falhou") }
+
+        let today = utc.startOfDay(for: labNow)
+        func event(_ day: Date, _ provider: ProviderID, _ model: String, _ tokens: Int64) -> UsageEvent {
+            UsageEvent(
+                ts: day.addingTimeInterval(9 * 3_600), provider: provider,
+                account: AccountID(provider: provider, key: "lab"), model: model,
+                inputTokens: tokens, outputTokens: 0, cacheReadTokens: 0,
+                cacheWriteTokens: 0, project: nil)
+        }
+        var claude: [UsageEvent] = []
+        var codex: [UsageEvent] = []
+        for offset in -29...0 {
+            let index = offset + 29  // 0…29, do mais antigo ao mais recente
+            let day = utc.date(byAdding: .day, value: offset, to: today) ?? today
+            let priced = index % 10 != 3
+            claude.append(event(
+                day, .claude, priced ? "lab-priced" : "fake-unpriced",
+                180_000 + Int64((index * 9_973) % 2_400_000)))
+            if index % 4 == 0 {
+                codex.append(event(
+                    day, .codex, "lab-priced", 90_000 + Int64((index * 4_409) % 1_100_000)))
+            }
+        }
+        try? db.persistBatch(
+            provider: .claude, path: "/lab/claude.jsonl", events: claude,
+            endOffset: 1_000_000, resetToZero: false)
+        try? db.persistBatch(
+            provider: .codex, path: "/lab/codex.jsonl", events: codex,
+            endOffset: 1_000_000, resetToZero: false)
+        return db
+    }
+
+    /// `AnalyticsModel.reload` é async e o harness é sync: dispara a task no
+    /// main actor e bombeia o run loop até terminar. Bloquear a main thread com
+    /// semáforo daria deadlock (a continuation do MainActor nunca rodaria).
+    @MainActor
+    static func load(_ model: AnalyticsModel, now: Date) {
+        var done = false
+        Task { @MainActor in
+            await model.reload(now: now)
+            done = true
+        }
+        let deadline = Date().addingTimeInterval(15)
+        while !done && Date() < deadline {
+            _ = RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.01))
+        }
+        if !done { fail("timeout carregando o AnalyticsModel de lab") }
     }
 
     static func writePNG(_ image: NSImage, to path: String) {

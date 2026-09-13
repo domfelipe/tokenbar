@@ -35,7 +35,7 @@
 - Commit: `feat(pricing): tabela versionada e custo estimado na persistência`
 
 ### Task 3: Histórico no painel + Analytics view + export
-- Painel: linha por provider ganha "7d: X tok ~$Y"; `AnalyticsView` (Swift Charts): barras dia/semana/mês por provider e por modelo, seletor de período 24h/7d/30d.
+- Painel: linha por provider ganha "7d: X tok ~$Y"; `AnalyticsView` (Swift Charts): barras dia/semana/mês por provider e por modelo, seletor de período 24h/7d/30d. (13/09: a view vive em `Sources/TokenBarUI/AnalyticsView.swift`, não mais no executável.)
 - Export CSV/JSON: item de menu "Export history…" → grava em `App Support/TokenBar/exports/` com reveal no Finder.
 - Views só existem com painel aberto (lazy — orçamento RAM).
 - Testes: queries de agregação vs. eventos conhecidos; formato CSV/JSON estável.

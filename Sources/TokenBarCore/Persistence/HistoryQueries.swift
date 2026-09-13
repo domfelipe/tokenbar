@@ -95,6 +95,48 @@ extension AppDatabase {
         return start
     }
 
+    /// Um dia da janela com o início do dia correspondente. O heatmap diário
+    /// (Usage & Spend) desenha a GRADE INTEIRA — inclusive dia sem evento
+    /// (célula vazia ≠ zero) — sem reimplementar o calendário do banco.
+    public struct WindowDay: Sendable, Equatable, Identifiable {
+        /// "yyyy-MM-dd" no calendar injetado — mesma chave de `daily_agg.day`.
+        public var day: String
+        /// 00:00 do dia NESSE calendar (posição na grade semanal).
+        public var date: Date
+        /// Coluna na grade semanal: 1 = segunda … 7 = domingo, no calendar do
+        /// BANCO. Vem daqui, e não da view: o `date` é 00:00 nesse calendar, e
+        /// recalcular com `Calendar.current` (fuso a oeste) jogaria o dia para
+        /// a coluna anterior.
+        public var weekday: Int
+        public var id: String { day }
+
+        public init(day: String, date: Date, weekday: Int) {
+            self.day = day
+            self.date = date
+            self.weekday = weekday
+        }
+    }
+
+    /// Dias da janela de `days` dias terminando HOJE, do mais antigo ao mais
+    /// recente. Mesma fonte do `windowStartDay` usado no `WHERE day >= ?`, então
+    /// grade do heatmap e `dailySeries` concordam por construção. Avança com
+    /// `Calendar.date(byAdding:)` (DST-safe), nunca somando 86_400s.
+    /// `days <= 1` → só hoje (mesma regra do `windowStartDate`).
+    public func windowDays(days: Int, now: Date = Date()) -> [WindowDay] {
+        let today = calendar.startOfDay(for: now)
+        var cursor = windowStartDate(days: days, now: now)
+        var result: [WindowDay] = []
+        while cursor <= today {
+            // .weekday do Gregorian: 1 = domingo … 7 = sábado → 1 = segunda … 7 = domingo.
+            let raw = calendar.component(.weekday, from: cursor)
+            result.append(WindowDay(
+                day: dayString(from: cursor), date: cursor, weekday: ((raw + 5) % 7) + 1))
+            guard let next = calendar.date(byAdding: .day, value: 1, to: cursor) else { break }
+            cursor = next
+        }
+        return result
+    }
+
     /// Série diária (dia, provider) dentro da janela — barras do Analytics
     /// (empilhadas por provider) e custo/dia. `provider`/`model` opcionais
     /// filtram; `nil` = todos. Dias sem eventos NÃO vêm do banco (o chart

@@ -3,7 +3,7 @@ import Observation
 import TokenBarCore
 
 /// View-model do Analytics (F3 Task 3) — TODO o trabalho de dados da janela,
-/// sem SwiftUI/Charts (o `AnalyticsView` do executável só desenha). Testável
+/// sem SwiftUI/Charts (o `AnalyticsView` — em TokenBarUI — só desenha). Testável
 /// headless; a renderização visual fica para o QA manual da Task 5.
 ///
 /// Orçamento de RAM: o modelo nasce com a janela e morre com ela — `clear()`
@@ -72,6 +72,46 @@ public final class AnalyticsModel {
         public var id: String { model }
     }
 
+    /// Linha do Ledger diário (Usage & Spend): agregação por dia, ordem desc.
+    /// Semântica NULL ≠ 0: custo nil = sem custo computável (exibe "—").
+    public struct LedgerRow: Identifiable, Equatable, Sendable {
+        public var day: String
+        public var tokens: Int64
+        public var costUSD: Double?
+        public var id: String { day }
+
+        public init(day: String, tokens: Int64, costUSD: Double?) {
+            self.day = day
+            self.tokens = tokens
+            self.costUSD = costUSD
+        }
+    }
+
+    /// Célula do Heatmap diário: intensidade relativa de custo no período (0.0 a 1.0).
+    public struct HeatmapCell: Identifiable, Equatable, Sendable {
+        public var day: String
+        public var date: Date
+        /// 1 = segunda … 7 = domingo, no calendar do banco (coluna da grade).
+        public var weekday: Int
+        public var tokens: Int64
+        public var costUSD: Double?
+        /// Custo relativo ao maior do período (0…1); 0 = célula vazia.
+        public var intensity: Double
+        public var id: String { day }
+
+        public init(
+            day: String, date: Date, weekday: Int, tokens: Int64,
+            costUSD: Double?, intensity: Double
+        ) {
+            self.day = day
+            self.date = date
+            self.weekday = weekday
+            self.tokens = tokens
+            self.costUSD = costUSD
+            self.intensity = intensity
+        }
+    }
+
     /// Quantos modelos o breakdown exibe (spec: top 5).
     public static let topModelsLimit = 5
 
@@ -82,6 +122,11 @@ public final class AnalyticsModel {
     public private(set) var dayCosts: [DayCost] = []
     public private(set) var totals: [ProviderTotal] = []
     public private(set) var topModels: [ModelSlice] = []
+    /// Ledger diário (Usage & Spend): só dias COM evento, do mais recente ao
+    /// mais antigo; `costUSD` nil = sem custo computável (a tabela mostra "—").
+    public private(set) var ledgerRows: [LedgerRow] = []
+    /// Heatmap diário: TODOS os dias do período (inclusive sem evento).
+    public private(set) var heatmapCells: [HeatmapCell] = []
     public private(set) var isLoading = false
 
     public init(database: AppDatabase?) {
@@ -113,7 +158,8 @@ public final class AnalyticsModel {
             let series = (try? database.dailySeries(days: days, now: now)) ?? []
             let totals = (try? database.totals(days: days, now: now)) ?? []
             let breakdown = (try? database.modelBreakdown(days: days, now: now)) ?? []
-            return Snapshot(series: series, totals: totals, breakdown: breakdown)
+            let window = database.windowDays(days: days, now: now)
+            return Snapshot(series: series, totals: totals, breakdown: breakdown, window: window)
         }.value
 
         // Período mudou enquanto a query rodava: descarta (a recarga nova
@@ -123,6 +169,8 @@ public final class AnalyticsModel {
             ProviderDay(provider: $0.provider, day: $0.day, tokens: $0.tokens, costUSD: $0.costUSD)
         }
         dayCosts = Self.dayCosts(from: snapshot.series)
+        ledgerRows = Self.ledgerRows(from: snapshot.series)
+        heatmapCells = Self.heatmapCells(from: snapshot.series, window: snapshot.window)
         totals = snapshot.totals.map {
             ProviderTotal(provider: $0.provider, tokens: $0.tokens, costUSD: $0.costUSD)
         }
@@ -136,6 +184,8 @@ public final class AnalyticsModel {
     public func clear() {
         providerSeries = []
         dayCosts = []
+        ledgerRows = []
+        heatmapCells = []
         totals = []
         topModels = []
         isLoading = false
@@ -145,6 +195,8 @@ public final class AnalyticsModel {
         var series: [AppDatabase.DailySeriesRow]
         var totals: [AppDatabase.ProviderTotalRow]
         var breakdown: [AppDatabase.ModelBreakdownRow]
+        /// Grade da janela (dias com data), para o heatmap não recalcular o calendário.
+        var window: [AppDatabase.WindowDay]
     }
 
     /// Custo por dia derivado das séries por provider — MESMA semântica do
@@ -174,4 +226,80 @@ public final class AnalyticsModel {
             return DayCost(day: day, costUSD: knownByDay[day] ?? 0)
         }
     }
+
+    // MARK: - Usage & Spend (ledger diário + heatmap)
+
+    /// Linhas do Ledger diário: um dia por linha, tokens SOMADOS entre
+    /// providers, ordem DESCENDENTE (mais recente primeiro) e só dias COM
+    /// evento. `costUSD` nil = nenhum provider do dia tinha preço computável
+    /// (a tabela mostra "—", nunca 0) — mesma semântica do `dayCosts`, aqui
+    /// preservando o dia em vez de omiti-lo do chart.
+    nonisolated public static func ledgerRows(
+        from series: [AppDatabase.DailySeriesRow]
+    ) -> [LedgerRow] {
+        dayAggregates(from: series)
+            .map { day, aggregate in
+                LedgerRow(
+                    day: day, tokens: aggregate.tokens,
+                    costUSD: aggregate.hasComputableCost ? aggregate.knownCost : nil)
+            }
+            .sorted { $0.day > $1.day }
+    }
+
+    /// Células do heatmap diário: um dia por dia da JANELA (inclusive os sem
+    /// evento — célula vazia, ≠ zero), na ordem da grade. `intensity` é
+    /// relativa ao MAIOR custo computável do PERÍODO (0…1); dia sem custo
+    /// computável — ou período sem nenhum custo — fica 0 com `costUSD` nil.
+    /// Custo zero REAL pinta igual a vazio mas chega como 0: a cor achata, o
+    /// dado não (NULL ≠ 0 preservado para o tooltip).
+    nonisolated public static func heatmapCells(
+        from series: [AppDatabase.DailySeriesRow], window: [AppDatabase.WindowDay]
+    ) -> [HeatmapCell] {
+        let aggregates = dayAggregates(from: series)
+        var maxCost: Double?
+        for day in window {
+            guard let aggregate = aggregates[day.day], aggregate.hasComputableCost else { continue }
+            maxCost = max(maxCost ?? aggregate.knownCost, aggregate.knownCost)
+        }
+        return window.map { day in
+            let aggregate = aggregates[day.day]
+            let cost: Double?
+            if let aggregate, aggregate.hasComputableCost {
+                cost = aggregate.knownCost
+            } else {
+                cost = nil
+            }
+            var intensity = 0.0
+            if let cost, let maxCost, maxCost > 0 {
+                intensity = cost / maxCost
+            }
+            return HeatmapCell(
+                day: day.day, date: day.date, weekday: day.weekday,
+                tokens: aggregate?.tokens ?? 0, costUSD: cost, intensity: intensity)
+        }
+    }
+}
+
+/// Agregação por dia compartilhada pelo ledger e pelo heatmap: tokens somados
+/// entre providers e custo com a MESMA regra do `dayCosts` (NULL ≠ 0).
+/// Fora da classe: tipo auxiliar não-isolado, usado por funções `nonisolated`.
+private struct DayAggregate {
+    var tokens: Int64 = 0
+    var knownCost: Double = 0
+    /// true quando ALGUM provider do dia tinha preço computável — zero real conta.
+    var hasComputableCost = false
+}
+
+private func dayAggregates(from series: [AppDatabase.DailySeriesRow]) -> [String: DayAggregate] {
+    var result: [String: DayAggregate] = [:]
+    for row in series {
+        var aggregate = result[row.day] ?? DayAggregate()
+        aggregate.tokens += row.tokens
+        if let cost = row.costUSD {
+            aggregate.knownCost += cost
+            aggregate.hasComputableCost = true
+        }
+        result[row.day] = aggregate
+    }
+    return result
 }
