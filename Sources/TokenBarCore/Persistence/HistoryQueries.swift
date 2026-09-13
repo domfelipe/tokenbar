@@ -37,6 +37,44 @@ extension AppDatabase {
         }
     }
 
+    /// Gasto de UM provider no MÊS-corrente (F7 Spend control).
+    public struct MonthSpendRow: Sendable, Equatable {
+        public var provider: String
+        public var tokens: Int64
+        /// `nil` = nenhum grupo do mês tinha preço computável (NULL ≠ 0).
+        public var costUSD: Double?
+
+        public init(provider: String, tokens: Int64, costUSD: Double?) {
+            self.provider = provider
+            self.tokens = tokens
+            self.costUSD = costUSD
+        }
+    }
+
+    /// Total do mês entre providers — o número do orçamento GLOBAL.
+    public struct MonthSpendTotal: Sendable, Equatable {
+        public var tokens: Int64
+        /// `nil` = nenhum provider do mês tem custo computável (NULL ≠ 0).
+        public var costUSD: Double?
+
+        public init(tokens: Int64, costUSD: Double?) {
+            self.tokens = tokens
+            self.costUSD = costUSD
+        }
+    }
+
+    /// Soma as linhas do mês preservando a semântica NULL ≠ 0: custos
+    /// computáveis somam; se NENHUM existir, o total é `nil` (nunca 0).
+    public static func monthSpendTotal(_ rows: [MonthSpendRow]) -> MonthSpendTotal {
+        var tokens: Int64 = 0
+        var cost: Double?
+        for row in rows {
+            tokens += row.tokens
+            if let value = row.costUSD { cost = (cost ?? 0) + value }
+        }
+        return MonthSpendTotal(tokens: tokens, costUSD: cost)
+    }
+
     /// Totais de um provider na janela.
     public struct ProviderTotalRow: Sendable, Equatable {
         public var provider: String
@@ -170,6 +208,48 @@ extension AppDatabase {
                 let cost: Double? = row["cost"]
                 let tokens: Int64 = row["tokens"] ?? 0
                 return DailySeriesRow(day: row["day"], provider: row["provider"], tokens: tokens, costUSD: cost)
+            }
+        }
+    }
+
+    /// 00:00 do dia 1 do MÊS de `now` no calendar injetado — mesma fonte do
+    /// `dayString`, então "mês" aqui é o mês do calendário do banco (o do
+    /// usuário), não "30 dias atrás". Internal p/ os testes (@testable).
+    func monthStartDate(now: Date) -> Date {
+        let components = calendar.dateComponents([.year, .month], from: now)
+        return calendar.date(from: components) ?? calendar.startOfDay(for: now)
+    }
+
+    /// Gasto do MÊS-CORRENTE por provider (F7 Spend control): tokens e custo
+    /// computável de `dia 1 ... hoje`, INCLUSIVE nas duas pontas.
+    ///
+    /// O limite SUPERIOR em hoje é deliberado e difere do `dailySeries` (que só
+    /// tem limite inferior, desde a F3, por motivos de gráfico): dia futuro em
+    /// `daily_agg` é anomalia de relógio/import e não pode inflar orçamento nem
+    /// projeção (decisão registrada em `decisoes-usage-spend-2026-09-13.md`).
+    ///
+    /// Custo preserva NULL ≠ 0: `SUM(cost_usd)` é NULL quando NENHUM grupo do
+    /// mês tem preço computável — nunca 0 inventado.
+    /// - Returns: ordenado por provider (rawValue).
+    public func monthSpend(now: Date = Date()) throws -> [MonthSpendRow] {
+        let start = dayString(from: monthStartDate(now: now))
+        let today = dayString(from: calendar.startOfDay(for: now))
+        return try writer.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT provider,
+                           SUM(input_tokens + output_tokens + cache_read_tokens + cache_write_tokens) AS tokens,
+                           SUM(cost_usd) AS cost
+                    FROM daily_agg
+                    WHERE day >= ? AND day <= ?
+                    GROUP BY provider ORDER BY provider
+                    """,
+                arguments: [start, today]
+            ).map { row in
+                let cost: Double? = row["cost"]
+                let tokens: Int64 = row["tokens"] ?? 0
+                return MonthSpendRow(provider: row["provider"], tokens: tokens, costUSD: cost)
             }
         }
     }

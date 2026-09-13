@@ -262,4 +262,59 @@ final class HistoryQueryTests {
         #expect(db.windowDays(days: 30, now: now).count == 30)
         #expect(db.windowDays(days: 30, now: now).first?.day == "2026-08-01")
     }
+
+    // MARK: - Gasto do mês (F7 Spend control)
+
+    @Test("monthSpend: mês-CALENDÁRIO (não 30 dias), limite superior em hoje e NULL ≠ 0")
+    func monthSpendCoversCalendarMonth() throws {
+        let rows = try db.monthSpend(now: now)
+        #expect(rows.map(\.provider) == ["claude", "codex"])
+
+        let claude = try #require(rows.first { $0.provider == "claude" })
+        // Hoje 300 + 1030 + 100; d-1 100; d-6 0; d-7 80 — o d-30 é de JULHO.
+        #expect(claude.tokens == 1_610)
+        let expectedClaude = (
+            100.0 * 3 + 200 * 15          // hoje +3h (m-priced 100/200)
+                + 10 * 3 + 20 * 15 + 1_000 * 0.3  // hoje +4h (cr 1000)
+                + 40 * 3 + 40 * 15        // d-7 (+ cache write sem preço)
+        ) / 1e6
+        #expect(abs((claude.costUSD ?? -1) - expectedClaude) < 1e-12)
+
+        let codex = try #require(rows.first { $0.provider == "codex" })
+        #expect(codex.tokens == 1_000_000)
+        #expect(codex.costUSD == 3.0)
+
+        let total = AppDatabase.monthSpendTotal(rows)
+        #expect(total.tokens == 1_001_610)
+        #expect(abs((total.costUSD ?? -1) - (expectedClaude + 3.0)) < 1e-12)
+
+        // Julho tem SÓ o d-30 (5 in + 5 out = 10 tokens, com preço) — prova da
+        // fronteira do mês: o evento de julho NÃO entra no mês de agosto.
+        let july = try db.monthSpend(now: now.addingTimeInterval(-30 * 86_400))
+        #expect(july.map(\.provider) == ["claude"])
+        #expect(july.first?.tokens == 10)
+        #expect(july.first?.costUSD != nil)
+    }
+
+    @Test("monthSpendTotal: sem NENHUM custo computável o total é nil, nunca 0")
+    func monthSpendTotalKeepsNullSemantics() {
+        let empty = AppDatabase.monthSpendTotal([])
+        #expect(empty.tokens == 0)
+        #expect(empty.costUSD == nil)
+
+        let allNull = AppDatabase.monthSpendTotal([
+            .init(provider: "claude", tokens: 100, costUSD: nil),
+            .init(provider: "codex", tokens: 200, costUSD: nil),
+        ])
+        #expect(allNull.tokens == 300)
+        #expect(allNull.costUSD == nil)
+
+        let mixed = AppDatabase.monthSpendTotal([
+            .init(provider: "claude", tokens: 100, costUSD: nil),
+            .init(provider: "codex", tokens: 200, costUSD: 1.5),
+            .init(provider: "zai", tokens: 50, costUSD: 0),
+        ])
+        #expect(mixed.tokens == 350)
+        #expect(mixed.costUSD == 1.5)  // zero real soma como zero, não como NULL
+    }
 }
