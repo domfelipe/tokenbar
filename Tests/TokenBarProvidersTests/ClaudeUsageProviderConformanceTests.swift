@@ -90,7 +90,11 @@ final class ClaudeUsageProviderConformanceTests {
         let first = try await provider.ingestLocal(localRef, from: IngestCursor(), now: now)
 
         #expect(first.eventsApplied == 2)
-        let expectedTotal: Int64 = 100 + 200 + 10 + 20 + 3000
+        // Somado em etapas de propósito: uma soma única de literais estoura o
+        // type-check do toolchain do runner do CI ("unable to type-check this
+        // expression in reasonable time", run de 13/09).
+        let promptTokens: Int64 = 100 + 200 + 10
+        let expectedTotal = promptTokens + 20 + 3000  // 3330
         #expect(first.providerTotals[.claude] == expectedTotal)
 
         let path = try #require(first.nextCursor.fileOffsets.keys.first)

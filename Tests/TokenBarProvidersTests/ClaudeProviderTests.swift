@@ -74,7 +74,11 @@ final class ClaudeProviderTests {
         #expect(outcome.eventsApplied == 2)
         // Int64 explícito: #expect do Swift Testing fixa soma de literais como Int,
         // e Optional<Int64> == Int avalia false dentro da captura do macro.
-        let expectedTotal: Int64 = 100 + 200 + 10 + 20 + 3000
+        // Somado em etapas de propósito: uma soma única de literais estoura o
+        // type-check do toolchain do runner do CI ("unable to type-check this
+        // expression in reasonable time", run de 13/09).
+        let promptTokens: Int64 = 100 + 200 + 10
+        let expectedTotal = promptTokens + 20 + 3000  // 3330
         #expect(outcome.providerTotals[.claude] == expectedTotal)
     }
 

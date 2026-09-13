@@ -321,7 +321,10 @@ final class AnalyticsModelTests {
         #expect(model.budgetRows.map(\.id) == ["all", "codex"])
         // Hoje: claude 100 m-priced (0,0003) + codex 300 m-priced (0,0009);
         // d-7: claude 400 m-priced (0,0012) → mês = 0,0024 (d-1 é 100% NULL).
-        let expectedMonth = (100.0 * 3 + 300 * 3 + 400 * 3) / 1e6
+        let claudeCost = 100.0 * 3
+        let codexCost = 300.0 * 3
+        let weekCost = 400.0 * 3
+        let expectedMonth = (claudeCost + codexCost + weekCost) / 1_000_000
         let global = try #require(model.budgetRows.first { $0.id == "all" })
         #expect(abs((global.spentUSD ?? -1) - expectedMonth) < 1e-12)
         let codex = try #require(model.budgetRows.first { $0.id == "codex" })
