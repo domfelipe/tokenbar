@@ -128,6 +128,11 @@ public struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        // SEM isto a aba renderiza no estilo "columns": os rótulos ficam numa
+        // coluna à ESQUERDA da janela (x=959 num cartão que começa em 1045,
+        // medido por AX em 13/09) e a janela aparece só com os campos — era o
+        // "Budget quebrado". As outras abas já usavam .grouped.
+        .formStyle(.grouped)
     }
 
     // MARK: - Alerts (global + thresholds + lembrete de reset)
@@ -271,9 +276,9 @@ private struct BudgetField: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        HStack {
-            Text(label)
-            Spacer(minLength: 12)
+        // LabeledContent (e não um HStack manual): o rótulo entra na coluna de
+        // rótulos do Form — é o que mantém o texto DENTRO da janela.
+        LabeledContent(label) {
             TextField("No budget", text: $draft)
                 .multilineTextAlignment(.trailing)
                 .monospacedDigit()

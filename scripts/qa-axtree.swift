@@ -144,6 +144,17 @@ case "--panel":
         for failure in failures { print("FAIL: " + failure) }
         exit(1)
     }
+case "--panel-text":
+    // Texto VISÍVEL do painel, linha a linha (com frame): é o que substitui a
+    // leitura por imagem quando não há captura de tela nem modelo com visão.
+    guard let panel = axWindows(app).first(where: { axFrame($0)?.width == panelWidth })
+    else { fail("painel não encontrado — abra o painel antes de ler o texto") }
+    for node in axDescendants(panel) {
+        let value = axText(node, kAXValueAttribute as String)
+            ?? axText(node, kAXDescriptionAttribute as String)
+        guard let value, !value.isEmpty, let frame = axFrame(node) else { continue }
+        print(String(format: "%7.0f,%-7.0f %@", frame.minX, frame.minY, value))
+    }
 case "--windows":
     for window in axWindows(app) { print(describe(window)) }
 case "--press":
