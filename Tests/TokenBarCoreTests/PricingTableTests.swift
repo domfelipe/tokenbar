@@ -110,6 +110,8 @@ struct PricingTableTests {
             "gpt-5.2", "gpt-5.3-codex", "gpt-5-codex",    // gpt-*/codex
             "gemini-2.5-flash", "gemini-2.5-pro",         // gemini-2.5-*
             "glm-4.7", "glm-4.7-mcp",                     // glm-* (Z.ai)
+            "gpt-6-astra",                                 // codex (F7: volume real do dono)
+            "muse-spark-1.3",                              // claude via API de terceiro (F7)
         ]
         for model in required {
             #expect(table.price(forModel: model) != nil, "\(model) precisa estar coberto")
@@ -124,6 +126,14 @@ struct PricingTableTests {
         #expect(table.price(forModel: "gpt-5.2")?.input == 1.75)
         #expect(table.price(forModel: "gemini-2.5-flash")?.cacheRead == 0.03)
         #expect(table.price(forModel: "glm-4.7")?.input == 0.6)
+        // F7 (13/09): dois modelos que apareciam SEM preço no dado real do dono.
+        #expect(table.price(forModel: "gpt-6-astra")?.input == 10)
+        #expect(table.price(forModel: "gpt-6-astra")?.output == 50)
+        #expect(table.price(forModel: "gpt-6-astra")?.cacheRead == 1)
+        #expect(table.price(forModel: "muse-spark-1.3")?.input == 0.10)
+        #expect(table.price(forModel: "muse-spark-1.3")?.output == 0.20)
+        // Prefixo: variantes datadas do Astra herdam a entrada.
+        #expect(table.price(forModel: "gpt-6-astra-2026-09-04") != nil)
 
         // Sem preço público confirmado → de fora (custo nil): gpt-5.3 chat não
         // está na pricing-page da OpenAI; gemini-3-pro não está na do Google.
@@ -145,13 +155,16 @@ struct PricingTableTests {
             "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite",
             "glm-4.5", "glm-4.6", "glm-4.7", "glm-4.7-flash",
             "glm-5", "glm-5.1", "glm-5.2", "glm-5.3",
+            "gpt-6-astra", "muse-spark-1.3",
         ]
         #expect(!models.isEmpty)
         for model in models {
             let price = try #require(table.price(forModel: model), "\(model) ausente da tabela")
             let source = try #require(price.source, "\(model) sem source")
             #expect(source.contains("https://"), "\(model): source precisa citar a URL")
-            #expect(source.contains("2026-09-08"), "\(model): source precisa citar a data")
+            // A data da coleta muda a cada revisão da tabela (F7 subiu para
+            // 2026-09-13): o contrato é citar A data, não uma data fixa.
+            #expect(source.contains("2026-09-"), "\(model): source precisa citar a data")
             #expect(price.input != nil && price.output != nil, "\(model): input/output são obrigatórios")
         }
     }
