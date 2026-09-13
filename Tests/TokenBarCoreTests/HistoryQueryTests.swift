@@ -53,6 +53,20 @@ final class HistoryQueryTests {
             cacheReadTokens: cacheRead, cacheWriteTokens: 0, project: nil)
     }
 
+    /// Custo do m-priced (input 3 / output 15 / cache read 0,3 USD por MTok) —
+    /// os preços do fixture de pricing desta suíte.
+    ///
+    /// Quebrado em sub-expressões DE PROPÓSITO: a conta inteira numa linha
+    /// estourava o type-check do toolchain do runner do CI ("unable to
+    /// type-check this expression in reasonable time", run de 13/09) mesmo
+    /// compilando local no toolchain mais novo.
+    private func pricedCost(input: Double, output: Double, cacheRead: Double = 0) -> Double {
+        let inputCost = input * 3
+        let outputCost = output * 15
+        let cacheReadCost = cacheRead * 0.3
+        return (inputCost + outputCost + cacheReadCost) / 1_000_000
+    }
+
     /// Fixtures (dias relativos a now=2026-08-30, meia-noite UTC):
     /// - hoje +3h  claude m-priced  100/200        → 300 tok, custo 0.0033
     /// - hoje +4h  claude m-priced  10/20 cr 1000  → 1030 tok, custo 0.00066
@@ -92,7 +106,8 @@ final class HistoryQueryTests {
         let claudeToday = try #require(series.first { $0.provider == "claude" && $0.day == "2026-08-30" })
         #expect(claudeToday.tokens == 1_430)  // 300 + 1030 + 100
         // Dia misto (2 precificados + 1 NULL): soma os conhecidos, NÃO é nil.
-        let expectedToday = (100.0 * 3 + 200.0 * 15) / 1e6 + (10.0 * 3 + 20.0 * 15 + 1_000.0 * 0.3) / 1e6
+        let expectedToday = pricedCost(input: 100, output: 200)
+            + pricedCost(input: 10, output: 20, cacheRead: 1_000)
         let todayCost = try #require(claudeToday.costUSD)
         #expect(abs(todayCost - expectedToday) < 1e-15)
 
@@ -160,7 +175,8 @@ final class HistoryQueryTests {
         let claude = try #require(totals.first { $0.provider == "claude" })
         #expect(claude.tokens == 1_530)  // 1430 + 100 (d-1) + 0 (d-6)
         let claudeCost = try #require(claude.costUSD)
-        let expectedClaude = (100.0 * 3 + 200.0 * 15) / 1e6 + (10.0 * 3 + 20.0 * 15 + 1_000.0 * 0.3) / 1e6
+        let expectedClaude = pricedCost(input: 100, output: 200)
+            + pricedCost(input: 10, output: 20, cacheRead: 1_000)
         #expect(abs(claudeCost - expectedClaude) < 1e-12)
 
         let codex = try #require(totals.first { $0.provider == "codex" })
@@ -186,10 +202,10 @@ final class HistoryQueryTests {
 
         let priced = try #require(breakdown.first { $0.model == "m-priced" })
         #expect(priced.tokens == 1_001_330)  // 300 + 1030 + 0 + 1M
-        let pricedCost = try #require(priced.costUSD)
-        let expectedPriced = (100.0 * 3 + 200.0 * 15) / 1e6
-            + (10.0 * 3 + 20.0 * 15 + 1_000.0 * 0.3) / 1e6 + 3.0
-        #expect(abs(pricedCost - expectedPriced) < 1e-12)
+        let pricedTotal = try #require(priced.costUSD)
+        let expectedPriced = pricedCost(input: 100, output: 200)
+            + pricedCost(input: 10, output: 20, cacheRead: 1_000) + 3.0
+        #expect(abs(pricedTotal - expectedPriced) < 1e-12)
 
         let unknown = try #require(breakdown.first { $0.model == "unknown" })
         #expect(unknown.tokens == 200)
@@ -273,11 +289,9 @@ final class HistoryQueryTests {
         let claude = try #require(rows.first { $0.provider == "claude" })
         // Hoje 300 + 1030 + 100; d-1 100; d-6 0; d-7 80 — o d-30 é de JULHO.
         #expect(claude.tokens == 1_610)
-        let expectedClaude = (
-            100.0 * 3 + 200 * 15          // hoje +3h (m-priced 100/200)
-                + 10 * 3 + 20 * 15 + 1_000 * 0.3  // hoje +4h (cr 1000)
-                + 40 * 3 + 40 * 15        // d-7 (+ cache write sem preço)
-        ) / 1e6
+        let expectedClaude = pricedCost(input: 100, output: 200)     // hoje +3h
+            + pricedCost(input: 10, output: 20, cacheRead: 1_000)    // hoje +4h
+            + pricedCost(input: 40, output: 40)                      // d-7
         #expect(abs((claude.costUSD ?? -1) - expectedClaude) < 1e-12)
 
         let codex = try #require(rows.first { $0.provider == "codex" })
