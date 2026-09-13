@@ -1,0 +1,95 @@
+# Painel do TokenBar — janela colapsada: medição, causa e correção (13/09/2026)
+
+Relato do dono: "eu só consigo ver os logos mas o analytics e as outras coisas
+eu não consigo ver no painel, aliás o painel só me traz os logos e as
+barrinhas".
+
+## Medição da janela REAL (CGWindowList, sem captura de tela)
+
+Build ANTES do fix (app rodando, item da menu bar = C:8.1M X:12% Z:8% U:19%):
+
+    [20:05:51] TokenBar layer=101 onscreen=true  310x129 @(2071,32)
+    [20:05:55] TokenBar layer=101 onscreen=true  310x129 @(2071,32)
+
+Build DEPOIS do fix (mesmo app, mesmo provider selecionado):
+
+    [20:07:22] TokenBar layer=101 onscreen=true  310x489 @(1725,1112)
+    [20:07:29] TokenBar layer=101 onscreen=true  310x489 @(2071,32)
+
+Painel do ui-smoke (hermético, provider claude):
+
+    painel: 310x524 @(-8563,1112)
+
+## Causa-raiz
+
+`ScrollView` não tem altura intrínseca e o `MenuBarExtra` dimensiona a JANELA
+pela altura IDEAL do conteúdo: com o scroll pedindo ~0pt, a janela abria com
+**129pt** (≈ chip bar 31 + rodapé ~96) e TUDO o que vinha entre eles ficava fora
+da janela — sem rolagem possível, porque não era overflow de conteúdo, era
+tamanho de janela. O teto `.frame(maxHeight: 560)` não define altura: só limita.
+
+Decomposição do valor medido: 129 ≈ chip(31) + divisor(1) + scroll(~0) +
+divisor(1) + rodapé(~96); 489 ≈ chip(31) + scroll(282 medido) + ações(3 linhas)
++ rodapé (ver árvore AX abaixo).
+
+## Prova na árvore de Acessibilidade (AX DIRETO, painel aberto)
+
+O instrumento `scripts/qa-axtree.swift` (API de Acessibilidade direta) mostra
+o painel inteiro com frames — System Events não enumera estas janelas, o que
+sustentou por meses a premissa errada de que "o AX não vê o painel".
+
+ANTES (janela 310x129 @(2071,32) → termina em y=161): só apareciam chip bar
+(y=38..78) e o começo da área rolável (y=85..161) — "logos e barrinhas".
+
+DEPOIS:
+
+    painel: 310x489 @(1725,1112)
+      Add account…    @(1737,1455) 286x16 dentro
+      Usage dashboard @(1737,1478) 286x16 dentro
+      Export          @(1737,1501) 286x17 dentro
+      Refresh         @(1737,1530) 286x16 dentro
+      Settings…       @(1737,1547) 286x16 dentro
+      About TokenBar  @(1737,1564) 286x16 dentro
+      Quit TokenBar   @(1737,1581) 286x16 dentro
+    PASS: painel 310x489 com 7 itens dentro da janela
+
+Estrutura visível no painel real (resumo da árvore): chip bar com os 4 logos
+(Claude/Codex/Z.ai/Cursor) @y=38..78; `AXScrollArea` 310x282 com header,
+"Daily window, Renews in 6h 51m", KPIs (Today —, 30d —, Recent tokens 8.1M,
+30d tokens 10M), o mini gráfico de 30 dias e as linhas "Last 7 days: 10M
+tokens" / "Top model: muse-spark-1.3"; e as 7 ações acima.
+
+## Correção
+
+1. `ProviderPanelView.scrollHeight(measured:cap:)`: altura DEFINIDA = altura
+   medida do detalhe, piso de 1pt (nunca 0 — era o colapso) e teto em
+   `contentMaxHeight`; a medida vem de um `PreferenceKey` alimentado por
+   `GeometryReader` dentro do scroll. Indicador de rolagem aparece SÓ quando o
+   conteúdo passa do teto.
+2. `ProviderActionRows` (Add account… / Usage dashboard / Export) saiu de
+   dentro do `ScrollView` para ficar entre o scroll e o rodapé: como ações do
+   app, não podem afundar abaixo do teto — era exatamente o caminho do
+   "Usage dashboard" que o dono não achava.
+
+## Gate (para não regredir em silêncio)
+
+`scripts/ui-smoke.sh` agora: (a) FALHA se o clique via AX no item não
+funcionar (antes o erro do `osascript` era silenciado com `2>/dev/null` e o
+script dizia "toggle do painel ok" sem ter clicado nada); (b) abre o painel e
+roda `qa-axtree --panel`, que exige altura ≥ 300pt e os 7 itens DENTRO da
+janela; (c) pressiona "Usage dashboard" via AXPress e exige que a janela
+"TokenBar Analytics" apareça.
+
+Saída do gate (verde):
+
+    painel: 310x524 @(-8563,1112)
+    PASS: painel 310x524 com 7 itens dentro da janela
+    [ui-smoke] painel: estrutura dentro da janela
+    [ui-smoke] Usage dashboard abre a janela do Analytics
+    [ui-smoke] PASS: boot hermético + item da menu bar + painel (estrutura + Usage dashboard) + encerramento
+
+## Limite conhecido
+
+O piso de 300pt do gate é um guarda contra o COLAPSO (129pt), não um contrato
+de layout: providers com muito conteúdo (>560pt) rolam dentro do teto, com
+indicador visível.

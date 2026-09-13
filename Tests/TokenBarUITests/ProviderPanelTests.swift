@@ -602,3 +602,31 @@ struct PanelCoordinatorF4Tests {
         #expect(claudeEntry["pacing"] == nil)  // sem forecast → omitido
     }
 }
+
+// MARK: - Altura do painel (regressão 13/09: janela colapsada em 129pt)
+
+/// O `ScrollView` do detalhe não tem altura intrínseca: com `.frame(maxHeight:)`
+/// o `MenuBarExtra` dimensionava a JANELA com o scroll em ~0 e o painel abria
+/// com **129pt** — só o chip bar e o começo das barrinhas apareciam, e
+/// "Usage dashboard" (y=398) ficava FORA da janela (que ia até y=161). Medido
+/// com o painel aberto em 13/09 (CGWindowList + AX). DEPOIS do fix: 310x489
+/// com os 7 itens (ações + rodapé) dentro da janela — ver
+/// `scripts/qa-axtree.swift --panel` e o gate no `ui-smoke`.
+@Suite
+struct PanelSizingTests {
+    @Test("scrollHeight: altura MEDIDA do conteúdo, piso de 1pt e teto em contentMaxHeight")
+    func scrollHeightClampsToMeasuredContent() {
+        // Não medido (0), negativo ou NaN → piso: pedir 0pt era o que colapsava a janela.
+        #expect(ProviderPanelView.scrollHeight(measured: 0) == 1)
+        #expect(ProviderPanelView.scrollHeight(measured: -40) == 1)
+        #expect(ProviderPanelView.scrollHeight(measured: .nan) == 1)
+        // Conteúdo que cabe → a altura EXATA (a janela passa a crescer com ele).
+        #expect(ProviderPanelView.scrollHeight(measured: 282) == 282)
+        #expect(ProviderPanelView.scrollHeight(measured: ProviderPanelView.contentMaxHeight)
+            == ProviderPanelView.contentMaxHeight)
+        // Acima do teto → rola dentro do teto (nunca maior).
+        #expect(ProviderPanelView.scrollHeight(measured: 900) == ProviderPanelView.contentMaxHeight)
+        #expect(ProviderPanelView.scrollHeight(measured: .infinity) == ProviderPanelView.contentMaxHeight)
+        #expect(ProviderPanelView.scrollHeight(measured: 700, cap: 600) == 600)
+    }
+}

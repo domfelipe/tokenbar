@@ -147,12 +147,17 @@ struct PanelRenderMain {
                 .padding(.vertical, 6)
             Divider()
             ProviderDetailContent(
-                provider: .codex, display: display, now: labNow,
-                accounts: nil, addAccountAction: { _ in },
-                analyticsAction: {}, exportAction: {})
+                provider: .codex, display: display, now: labNow, accounts: nil)
                 .padding(.horizontal, 20)
                 .padding(.top, 6)
                 .padding(.bottom, 6)
+            Divider()
+            // Ações FORA da área rolável — mesma estrutura do painel real.
+            ProviderActionRows(
+                provider: .codex, addAccountAction: { _ in },
+                analyticsAction: {}, exportAction: {})
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
             Divider()
             VStack(alignment: .leading, spacing: 1) {
                 MenuRowView(icon: "arrow.clockwise", title: "Refresh", shortcut: "⌘R", action: {})

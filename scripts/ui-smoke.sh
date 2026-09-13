@@ -1,22 +1,21 @@
 #!/bin/bash
 # UI Smoke — verificação AUTOMATIZÁVEL das interações do painel.
 #
-# ESCOPO (honesto — achado empírico 2026-09-12): o painel do MenuBarExtra
-# .window NÃO expõe conteúdo ao Accessibility/System Events quando dirigido
-# programaticamente neste macOS (click+frontmost em invocação única → 0
-# janelas/0 botões; enumerações bem-sucedidas anteriores eram janelas de
-# sorte após transições de foco REAIS). Por isso o smoke valida o que o AX
-# consegue provar de verdade:
+# ESCOPO (atualizado em 13/09): a premissa antiga ("o painel do MenuBarExtra
+# .window NÃO expõe conteúdo ao AX") valia só para **System Events**, que não
+# enumera as janelas deste app. A API de Acessibilidade DIRETA devolve a árvore
+# completa do painel aberto (textos, frames, botões) e o AXPress funciona —
+# `scripts/qa-axtree.swift`. Foi assim que se mediu a janela colapsada em
+# 129pt que escondia o painel (relato do dono: "só os logos e as barrinhas").
 #
+# O smoke valida:
 #   1. Boot hermético (nenhum provider da máquina é tocado) + heartbeat;
 #   2. Item da menu bar existe com o texto esperado (C:…);
-#   3. Toggle do painel (2 cliques no item) não mata o app;
-#   4. ⌘Q global encerra sem zumbi.
-#
-# As INTERAÇÕES DOS BOTÕES (refresh/analytics/export/add-account/quit) são
-# cobertas por: PanelWindowManagerTests (lifecycle: show idempotente, close
-# com release adiado — fix do bug reportado), view-models, e QA manual com
-# mouse real (docs/qa/) — não por automação AX.
+#   3. Painel abre de verdade (o clique AX não pode falhar em silêncio) e o
+#      conteúdo está DENTRO da janela: ações + rodapé alcançáveis
+#      (`qa-axtree --panel`, piso de altura incluso);
+#   4. "Usage dashboard" abre a janela do Analytics (AXPress + janela);
+#   5. ⌘Q global encerra sem zumbi.
 #
 # POR QUE O NOME PRÓPRIO (tokenbar-ui-smoke): pkill/killall por nome derruba
 # também o app real do usuário — este script só toca o PID que criou.
@@ -100,12 +99,28 @@ case "$ITEM_NAME" in
   *) fail "item sem texto esperado: '$ITEM_NAME'" ;;
 esac
 
-# Toggle do painel 2× (abre/fecha) — o app tem que continuar vivo.
-ax 'click menu bar item 1 of menu bar 2' >/dev/null; sleep 2
+# Ferramenta de AX DIRETO (System Events não enumera as janelas do painel).
+AXTOOL="$TMP/qa-axtree"
+if ! xcrun swiftc -O scripts/qa-axtree.swift -o "$AXTOOL" 2>"$TMP/axtool.log"; then
+  fail "qa-axtree não compilou: $(tail -2 "$TMP/axtool.log")"
+fi
+
+# Abrir o painel: o clique tem que funcionar DE VERDADE (antes o erro do
+# osascript era silenciado e o smoke dizia "toggle do painel ok" sem clicar).
+ax 'click menu bar item 1 of menu bar 2' >/dev/null || fail "clique no item via AX falhou (Acesso Assistivo negado?)"
+sleep 2
 kill -0 "$APP_PID" 2>/dev/null || fail "app morreu ao abrir o painel"
-ax 'click menu bar item 1 of menu bar 2' >/dev/null; sleep 1.5
-kill -0 "$APP_PID" 2>/dev/null || fail "app morreu ao fechar o painel"
-say "toggle do painel ok (app vivo)"
+
+# Conteúdo DENTRO da janela (regressão de 13/09: janela colapsada em 129pt
+# mostrava só chip bar + barrinhas e escondia "Usage dashboard").
+"$AXTOOL" --panel "$APP_PID" || fail "painel não passou na verificação de estrutura"
+say "painel: estrutura dentro da janela"
+
+# Ação alcançável de fato: "Usage dashboard" abre a janela do Analytics.
+"$AXTOOL" --press "$APP_PID" "Usage dashboard" >/dev/null || fail "AXPress em Usage dashboard falhou"
+"$AXTOOL" --wait-window "$APP_PID" "TokenBar Analytics" 8 >/dev/null || fail "janela do Analytics não abriu"
+say "Usage dashboard abre a janela do Analytics"
+kill -0 "$APP_PID" 2>/dev/null || fail "app morreu depois das ações do painel"
 
 # ⌘Q global encerra limpo (sem zumbi) — quit SEM precisar do conteúdo AX.
 osascript -e "tell application \"System Events\" to keystroke \"q\" using command down" >/dev/null 2>&1
@@ -119,5 +134,5 @@ else
   say "⌘Q encerrou limpo"
 fi
 
-say "PASS: boot hermético + item da menu bar + toggle do painel + encerramento"
+say "PASS: boot hermético + item da menu bar + painel (estrutura + Usage dashboard) + encerramento"
 exit 0

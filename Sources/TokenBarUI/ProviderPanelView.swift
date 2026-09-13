@@ -32,6 +32,20 @@ public struct ProviderPanelView: View {
     /// ocultos segue como rede de segurança p/ listas longas.
     static let contentMaxHeight: CGFloat = 560
 
+    /// Altura da área rolável do detalhe: a altura MEDIDA do conteúdo, com
+    /// piso de 1pt e teto em `contentMaxHeight`.
+    ///
+    /// O piso não é cosmético. `ScrollView` não tem altura intrínseca, e o
+    /// `MenuBarExtra` dimensiona a JANELA pela altura ideal do conteúdo: com
+    /// ela em ~0, a janela do painel abria com **129pt** (medido em 13/09 por
+    /// CGWindowList, com o painel aberto) e tudo abaixo — KPIs, dashboard,
+    /// contas, ações e até o rodapé — ficava fora da janela, sem rolagem
+    /// possível. Medir o conteúdo devolve ao painel a altura da referência.
+    static func scrollHeight(measured: CGFloat, cap: CGFloat = contentMaxHeight) -> CGFloat {
+        guard !measured.isNaN, measured > 0 else { return 1 }
+        return min(measured, cap)
+    }
+
     /// Store observável (dados chegam pelo ciclo do coordinator).
     let store: SnapshotStore
     /// Gerenciamento de contas (F4). `nil` = sem registry (sem DB) — controles
@@ -51,6 +65,12 @@ public struct ProviderPanelView: View {
     /// "Agora" local do countdown — atualizado a cada tick de 30 s. NUNCA
     /// alimenta texto do menu bar.
     @State private var countdownNow = Date()
+    /// Altura ideal MEDIDA do detalhe (preference do conteúdo dentro do scroll).
+    /// Zero = ainda não medido → `scrollHeight` usa o piso de 1pt.
+    @State private var detailHeight: CGFloat = 0
+
+    /// O detalhe passa do teto? Só então o indicador de rolagem aparece.
+    private var isDetailOverflowing: Bool { detailHeight > Self.contentMaxHeight }
     /// Tick de 30 s; a assinatura existe enquanto a view está instalada
     /// (painel aberto) — fechar o painel cancela a subscrição (spec F4).
     private let ticker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
@@ -96,21 +116,38 @@ public struct ProviderPanelView: View {
                                 provider: selected,
                                 display: display,
                                 now: countdownNow,
-                                accounts: accounts,
-                                addAccountAction: addAccountAction,
-                                analyticsAction: analyticsAction,
-                                exportAction: exportAction)
+                                accounts: accounts)
                                 .padding(.horizontal, 20)
                                 .padding(.top, 6)
                                 .padding(.bottom, 6)
+                                .background(
+                                    GeometryReader { proxy in
+                                        Color.clear.preference(
+                                            key: DetailHeightPreferenceKey.self,
+                                            value: proxy.size.height)
+                                    })
                         }
                     }
-                    // Sem indicador visível (painel da referência não tem
-                    // barra de rolagem); o ScrollView permanece como rede de
-                    // segurança p/ muitas contas/seções.
-                    .scrollIndicators(.hidden)
-                    .frame(maxHeight: Self.contentMaxHeight)
+                    // Indicador VISÍVEL só com overflow real: sem ele o painel
+                    // fica como na referência (sem barra de rolagem); com ele,
+                    // o usuário vê que há mais conteúdo abaixo.
+                    .scrollIndicators(isDetailOverflowing ? .visible : .hidden)
+                    .frame(height: Self.scrollHeight(measured: detailHeight))
+                    .onPreferenceChange(DetailHeightPreferenceKey.self) { detailHeight = $0 }
                     .accessibilityElement(children: .contain)
+                    Divider()
+                    // Ações do app FORA da área rolável: dentro do scroll,
+                    // "Usage dashboard" afundava abaixo do teto e ficava
+                    // inalcançável (relato do dono em 13/09).
+                    if let selected {
+                        ProviderActionRows(
+                            provider: selected,
+                            addAccountAction: addAccountAction,
+                            analyticsAction: analyticsAction,
+                            exportAction: exportAction)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 4)
+                    }
                     Divider()
                     footer
                 }
@@ -295,9 +332,6 @@ struct ProviderDetailContent: View {
     let display: ProviderDisplay
     let now: Date
     let accounts: AccountsModel?
-    let addAccountAction: ((ProviderID) -> Void)?
-    let analyticsAction: (() -> Void)?
-    let exportAction: (() -> Void)?
 
     var body: some View {
         let rows = ProviderPanelModel.windowRows(
@@ -317,7 +351,6 @@ struct ProviderDetailContent: View {
             }
             dashboardSection
             accountsSection(rows: rows, visible: accountsVisible)
-            actionRows(separated: accountsVisible)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -427,14 +460,25 @@ struct ProviderDetailContent: View {
             rows: accountRows, registeredCount: registered.count)
     }
 
-    // MARK: Linhas de ação (chevron — port do menu da referência)
+}
 
-    /// ORDEM DA REFERÊNCIA (carry-forward review T1, conferida no screenshot:
-    /// "+ Add account…" PRIMEIRO, depois "Usage dashboard", depois "Export").
-    @ViewBuilder
-    private func actionRows(separated: Bool) -> some View {
+/// Linhas de ação do painel (chevron — port do menu da referência).
+///
+/// ORDEM DA REFERÊNCIA (carry-forward review T1, conferida no screenshot:
+/// "+ Add account…" PRIMEIRO, depois "Usage dashboard", depois "Export").
+///
+/// VIVE FORA do `ScrollView` do detalhe (13/09): como última coisa da área
+/// rolável, "Usage dashboard" ficava abaixo do teto de 560pt — invisível e,
+/// com o indicador de rolagem oculto, sem nenhuma pista de que existia.
+/// São ações do app, não conteúdo do provider: ficam fixas acima do rodapé.
+struct ProviderActionRows: View {
+    let provider: ProviderID
+    let addAccountAction: ((ProviderID) -> Void)?
+    let analyticsAction: (() -> Void)?
+    let exportAction: (() -> Void)?
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 1) {
-            if separated { Divider() }
             if let addAccountAction {
                 ActionRowView(
                     icon: "plus", title: "Add account…", showsChevron: false)
@@ -449,6 +493,16 @@ struct ProviderDetailContent: View {
                     { exportAction() }
             }
         }
+    }
+}
+
+/// Altura ideal do conteúdo do detalhe, medida dentro do `ScrollView` — é o
+/// que dá à janela do `MenuBarExtra` uma altura definida (ver
+/// `ProviderPanelView.scrollHeight`).
+private struct DetailHeightPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
