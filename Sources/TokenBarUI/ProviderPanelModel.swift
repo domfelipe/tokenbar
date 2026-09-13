@@ -168,6 +168,7 @@ public enum ProviderPanelModel {
         case .session: return "Session"
         case .weekly: return "Weekly"
         case .daily: return "Daily"
+        case .monthly: return "Monthly"
         }
     }
 

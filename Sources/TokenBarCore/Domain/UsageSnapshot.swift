@@ -1,6 +1,11 @@
 import Foundation
 
-public enum WindowKind: String, Sendable, Codable, CaseIterable { case session, weekly, daily }
+/// Janela de uso. `monthly` não vem de provider nenhum: é o período do
+/// ORÇAMENTO (F7 Spend control) — o mês-calendário — e existe para o alerta de
+/// orçamento carregar o tipo certo em vez de fingir ser `daily`.
+public enum WindowKind: String, Sendable, Codable, CaseIterable {
+    case session, weekly, daily, monthly
+}
 public enum AuthState: String, Sendable, Codable { case ok, missing, invalid }
 public enum DataSource: String, Sendable, Codable { case api, localOnly }
 

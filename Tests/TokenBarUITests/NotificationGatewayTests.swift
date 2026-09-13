@@ -250,4 +250,88 @@ struct CoordinatorAlertsWiringTests {
         #expect(fake.delivered.isEmpty)
         #expect(coordinator.store.alertsStatus == .enabled)
     }
+
+    // MARK: - Orçamento (F7 Spend control)
+
+    /// Evento precificado no banco do PRÓPRIO coordinator: o coordinator abre o
+    /// banco com a tabela de preços EMBUTIDA, então o teste escolhe um modelo
+    /// que existe nela (e falha alto se a tabela mudar de nome).
+    func seedPricedEvent(_ database: AppDatabase, tokens: Int64, now: Date) throws {
+        let model = "claude-sonnet-4-6"
+        let pricing = try #require(PricingTable.bundled())
+        _ = try #require(
+            pricing.price(forModel: model)?.input,
+            "tabela de preços embutida sem preço de input para \(model)")
+        try database.persistBatch(
+            provider: .claude, path: "/fixture/claude.jsonl",
+            events: [UsageEvent(
+                ts: now, provider: .claude,
+                account: AccountID(provider: .claude, key: "local"),
+                model: model, inputTokens: tokens, outputTokens: 0,
+                cacheReadTokens: 0, cacheWriteTokens: 0, project: nil)],
+            endOffset: 1_000, resetToZero: false)
+    }
+
+    @Test("orçamento: ciclo entrega o alerta de gasto e de PROJEÇÃO pelo gateway")
+    func dispatchDeliversBudgetAlerts() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let fake = FakeNotificationGateway()
+        let coordinator = makeCoordinator(fixture, gateway: fake)
+        await coordinator.alertEngine.apply(config: AlertConfig(
+            enabled: true, thresholds: [50], resetReminderMinutes: nil))
+
+        let database = try #require(coordinator.historyDatabase)
+        // 1M tokens de input num modelo com preço real de input → o mês tem
+        // custo computável; teto de $1 → a fração estoura o teto.
+        try seedPricedEvent(database, tokens: 1_000_000, now: base)
+        AppSettingsStore(database: database).saveBudget(
+            BudgetConfig(monthlyUSD: 1, perProvider: [:]))
+
+        await coordinator.dispatchAlerts(snapshots: [], now: base)
+        let budgetAlerts = fake.delivered.filter { $0.kind == .budget }
+        #expect(!budgetAlerts.isEmpty)
+        #expect(budgetAlerts.allSatisfy { $0.windowKind == .monthly })
+        #expect(budgetAlerts.allSatisfy { $0.account.key == AccountID.allAccountsKey })
+        #expect(budgetAlerts.allSatisfy { $0.provider == .claude })
+        // Projeção do mês no ritmo do dia (também acima de 50% do teto).
+        #expect(fake.delivered.contains { $0.kind == .budgetProjection })
+
+        // Mesmo ciclo de novo → dedupe do engine, gateway não re-recebe.
+        let delivered = fake.delivered.count
+        await coordinator.dispatchAlerts(snapshots: [], now: base + 60)
+        #expect(fake.delivered.count == delivered)
+    }
+
+    @Test("orçamento: sem teto ou sem custo computável o gateway fica intocado")
+    func budgetWithoutLimitOrComputableCostStaysQuiet() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let fake = FakeNotificationGateway()
+        let coordinator = makeCoordinator(fixture, gateway: fake)
+        await coordinator.alertEngine.apply(config: AlertConfig(
+            enabled: true, thresholds: [50], resetReminderMinutes: nil))
+        let database = try #require(coordinator.historyDatabase)
+
+        // Gasto no mês SEM preço computável (modelo fora da tabela → cost NULL):
+        // com teto configurado continua sem evento (NULL ≠ 0).
+        try database.persistBatch(
+            provider: .claude, path: "/fixture/claude.jsonl",
+            events: [UsageEvent(
+                ts: base, provider: .claude,
+                account: AccountID(provider: .claude, key: "local"),
+                model: "modelo-sem-preco", inputTokens: 1_000_000, outputTokens: 0,
+                cacheReadTokens: 0, cacheWriteTokens: 0, project: nil)],
+            endOffset: 1_000, resetToZero: false)
+        AppSettingsStore(database: database).saveBudget(
+            BudgetConfig(monthlyUSD: 1, perProvider: [:]))
+        await coordinator.dispatchAlerts(snapshots: [], now: base)
+        #expect(fake.delivered.isEmpty)
+
+        // E sem teto nenhum, mesmo com gasto precificado, também nada.
+        AppSettingsStore(database: database).saveBudget(.empty)
+        try seedPricedEvent(database, tokens: 5_000_000, now: base)
+        await coordinator.dispatchAlerts(snapshots: [], now: base + 60)
+        #expect(fake.delivered.isEmpty)
+    }
 }

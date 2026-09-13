@@ -172,7 +172,7 @@ public struct PacingEngine {
         switch window.kind {
         case .weekly: spanDays = 7
         case .daily: spanDays = 1
-        case .session: return nil
+        case .session, .monthly: return nil  // o mês do orçamento não é janela de provider
         }
         return calendar.date(byAdding: .day, value: -spanDays, to: resetsAt)
     }

@@ -886,7 +886,11 @@ public final class ProviderCoordinator {
             return
         }
         let events = await alertEngine.evaluate(snapshots: snapshots, now: now)
-        for event in events {
+        // Orçamento (F7 Spend control): gasto do MÊS por provider + tetos da
+        // tabela `settings` → eventos de gasto e de PROJEÇÃO. Sem DB, sem teto
+        // ou sem custo computável a lista volta vazia (nada a despachar).
+        let budgetEvents = await budgetAlertEvents(now: now)
+        for event in events + budgetEvents {
             await notifications.deliver(event)
         }
         switch await notifications.authorizationState() {
@@ -894,6 +898,30 @@ public final class ProviderCoordinator {
         case .notDetermined: store.setAlertsStatus(.notConfigured)
         case .denied: store.setAlertsStatus(.blocked)
         }
+    }
+
+    /// Eventos de ORÇAMENTO do ciclo (F7): uma query do mês + duas leituras de
+    /// `settings`, decididas pelo engine (dedupe 1× por mês). As leituras rodam
+    /// FORA da MainActor, como o resto do histórico — o engine avalia depois.
+    private func budgetAlertEvents(now: Date) async -> [AlertEvent] {
+        guard let database else { return [] }
+        let snapshot = await Task.detached(priority: .utility) {
+            () -> (spend: [ProviderID: Double?], budget: BudgetConfig, month: AppDatabase.MonthWindow)? in
+            let rows = (try? database.monthSpend(now: now)) ?? []
+            guard !rows.isEmpty else { return nil }
+            var spend: [ProviderID: Double?] = [:]
+            for row in rows {
+                guard let provider = ProviderID(rawValue: row.provider) else { continue }
+                spend[provider] = row.costUSD
+            }
+            let budget = AppSettingsStore(database: database).loadBudget()
+            guard !budget.isEmpty else { return nil }
+            return (spend, budget, database.monthWindow(now: now))
+        }.value
+        guard let snapshot else { return [] }
+        return await alertEngine.evaluateBudgets(
+            spend: snapshot.spend, budget: snapshot.budget, month: snapshot.month,
+            now: now, calendar: database.calendar)
     }
 
     // MARK: - Settings vivas (F5 Task 3)

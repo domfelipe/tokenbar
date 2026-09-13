@@ -220,6 +220,27 @@ extension AppDatabase {
         return calendar.date(from: components) ?? calendar.startOfDay(for: now)
     }
 
+    /// Limites do MÊS corrente no calendar do banco: `start` = dia 1 às 00:00 e
+    /// `next` = dia 1 do mês seguinte (quando o orçamento renova). Público
+    /// porque o motor de alertas e o painel precisam do MESMO mês que o
+    /// `monthSpend` — reimplementar isso na UI é como o fuso se desalinha.
+    public struct MonthWindow: Sendable, Equatable {
+        public var start: Date
+        public var next: Date
+
+        public init(start: Date, next: Date) {
+            self.start = start
+            self.next = next
+        }
+    }
+
+    public func monthWindow(now: Date = Date()) -> MonthWindow {
+        let start = monthStartDate(now: now)
+        let next = calendar.date(byAdding: .month, value: 1, to: start)
+            ?? start.addingTimeInterval(31 * 86_400)
+        return MonthWindow(start: start, next: next)
+    }
+
     /// Gasto do MÊS-CORRENTE por provider (F7 Spend control): tokens e custo
     /// computável de `dia 1 ... hoje`, INCLUSIVE nas duas pontas.
     ///

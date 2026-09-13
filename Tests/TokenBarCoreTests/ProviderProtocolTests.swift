@@ -94,7 +94,7 @@ struct ProviderProtocolTests {
         #expect(WindowKind.session.rawValue == "session")
         #expect(WindowKind.weekly.rawValue == "weekly")
         #expect(WindowKind.daily.rawValue == "daily")
-        #expect(WindowKind.allCases == [.session, .weekly, .daily])
+        #expect(WindowKind.allCases == [.session, .weekly, .daily, .monthly])
         #expect(AuthState(rawValue: "invalid") == .invalid)
         #expect(DataSource(rawValue: "localOnly") == .localOnly)
     }

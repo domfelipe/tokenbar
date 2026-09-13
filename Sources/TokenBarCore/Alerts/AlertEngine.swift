@@ -34,7 +34,14 @@ public struct AlertConfig: Sendable, Equatable {
 /// (a renderização EN vive no gateway, TokenBarUI). `thresholdPct == nil`
 /// no lembrete de reset.
 public struct AlertEvent: Sendable, Equatable, Codable {
-    public enum Kind: String, Sendable, Codable { case threshold, resetReminder }
+    public enum Kind: String, Sendable, Codable {
+        case threshold, resetReminder
+        /// Orçamento do mês (F7): o gasto JÁ feito cruzou um threshold do teto.
+        case budget
+        /// Projeção do mês (F7): no ritmo atual o fechamento cruza o threshold —
+        /// é o aviso de estouro ANTES de acontecer.
+        case budgetProjection
+    }
 
     public let kind: Kind
     public let provider: ProviderID
@@ -98,6 +105,15 @@ public actor AlertEngine {
     private var thresholdState: [ThresholdKey: FiredEntry] = [:]
     /// Estado dos lembretes: chave inclui `resetsAt` (renewal re-arma).
     private var reminderState: [ReminderKey: Date] = [:]
+    /// Estado do orçamento (F7): chave por provider × tipo × threshold; o
+    /// `resetsAt` carimba a VIRADA do mês — é o "renewal" do orçamento.
+    private var budgetState: [BudgetKey: FiredEntry] = [:]
+
+    private struct BudgetKey: Hashable {
+        let provider: ProviderID
+        let kind: String
+        let threshold: Int
+    }
 
     private struct ThresholdKey: Hashable {
         let provider: ProviderID
@@ -123,6 +139,8 @@ public actor AlertEngine {
     private struct PersistedState: Codable {
         var thresholds: [PersistedThreshold] = []
         var reminders: [PersistedReminder] = []
+        /// Aditivo (F7): estado de orçamento; ausente em JSON de versão anterior.
+        var budgets: [PersistedBudget]?
     }
 
     private struct PersistedThreshold: Codable {
@@ -140,6 +158,14 @@ public actor AlertEngine {
         let window: String
         let resetsAt: Date
         let firedAt: Date
+    }
+
+    private struct PersistedBudget: Codable {
+        let provider: String
+        let kind: String
+        let threshold: Int
+        let firedAt: Date
+        let resetsAt: Date
     }
 
     public init(database: AppDatabase?) {
@@ -165,6 +191,12 @@ public actor AlertEngine {
                 reminderState[ReminderKey(
                     provider: provider, account: entry.account, window: window,
                     resetsAt: entry.resetsAt)] = entry.firedAt
+            }
+            for entry in state.budgets ?? [] {
+                guard let provider = ProviderID(rawValue: entry.provider) else { continue }
+                budgetState[BudgetKey(
+                    provider: provider, kind: entry.kind, threshold: entry.threshold
+                )] = FiredEntry(firedAt: entry.firedAt, resetsAt: entry.resetsAt)
             }
         }
     }
@@ -244,6 +276,75 @@ public actor AlertEngine {
         return events.sorted { Self.ordering($0) < Self.ordering($1) }
     }
 
+    /// Avaliação de ORÇAMENTO (F7 Spend control): gasto do mês por provider
+    /// contra o teto configurado, com DOIS tipos de evento — o que já passou
+    /// (`.budget`) e o que a projeção indica que vai passar
+    /// (`.budgetProjection`).
+    ///
+    /// CONTRATOS:
+    /// - `spend` é o custo COMPUTÁVEL do mês por provider: provider ausente ou
+    ///   com custo `nil` NÃO gera evento (sem base real não há aviso, NULL ≠ 0).
+    /// - Provider sem teto (nem próprio, nem global) → nenhum evento.
+    /// - Dedupe: 1× por (provider, tipo, threshold) POR MÊS; re-arma quando a
+    ///   fração cai abaixo do threshold ou quando o mês vira (`month.next`
+    ///   diferente do carimbado no disparo).
+    /// - Alertas desligados → lista vazia (o master switch manda).
+    public func evaluateBudgets(
+        spend: [ProviderID: Double?],
+        budget: BudgetConfig,
+        month: AppDatabase.MonthWindow,
+        now: Date,
+        calendar: Calendar
+    ) -> [AlertEvent] {
+        guard config.enabled, !budget.isEmpty else { return [] }
+        var events: [AlertEvent] = []
+        for provider in spend.keys.sorted(by: { $0.rawValue < $1.rawValue }) {
+            guard let cost = spend[provider] ?? nil, cost.isFinite, cost >= 0,
+                  let limit = budget.budget(for: provider)
+            else { continue }
+            evaluateBudgetKind(
+                kind: .budget, provider: provider, fraction: cost / limit,
+                month: month, now: now, into: &events)
+            if let projection = SpendProjection.project(
+                monthToDate: cost, now: now, calendar: calendar),
+               let projected = projection.projectedFraction(ofBudget: limit)
+            {
+                evaluateBudgetKind(
+                    kind: .budgetProjection, provider: provider, fraction: projected,
+                    month: month, now: now, into: &events)
+            }
+        }
+        pruneStaleState(now: now)
+        persistStateIfDirty()
+        return events.sorted { Self.ordering($0) < Self.ordering($1) }
+    }
+
+    private func evaluateBudgetKind(
+        kind: AlertEvent.Kind, provider: ProviderID, fraction: Double,
+        month: AppDatabase.MonthWindow, now: Date, into events: inout [AlertEvent]
+    ) {
+        guard fraction.isFinite else { return }
+        for threshold in config.thresholds {
+            let key = BudgetKey(provider: provider, kind: kind.rawValue, threshold: threshold)
+            if let fired = budgetState[key] {
+                let renewed = fired.resetsAt != month.next
+                if !renewed && fraction >= Double(threshold) / 100 {
+                    continue  // segue suprimido (1× por threshold até re-armar)
+                }
+                budgetState[key] = nil
+                stateDirty = true
+            }
+            guard fraction >= Double(threshold) / 100 else { continue }
+            budgetState[key] = FiredEntry(firedAt: now, resetsAt: month.next)
+            stateDirty = true
+            events.append(AlertEvent(
+                kind: kind, provider: provider,
+                account: AccountID(provider: provider, key: AccountID.allAccountsKey),
+                windowKind: .monthly, thresholdPct: threshold, usedFraction: fraction,
+                resetsAt: month.next, firedAt: now))
+        }
+    }
+
     /// Ordem determinística (provider, conta, janela, tipo, threshold).
     static func ordering(_ event: AlertEvent) -> (String, String, String, String, Int) {
         (
@@ -315,10 +416,18 @@ public actor AlertEngine {
             if let resetsAt = entry.resetsAt, resetsAt < now { return key }
             return nil
         }
-        guard !staleReminders.isEmpty || !staleThresholds.isEmpty else { return }
+        // Orçamento: o carimbo é a virada do mês — passou dela, o estado não
+        // re-arma nada (a chave nova do mês seguinte é que decide).
+        let staleBudgets = budgetState.compactMap { key, entry -> BudgetKey? in
+            guard let resetsAt = entry.resetsAt, resetsAt < now else { return nil }
+            return key
+        }
+        guard !staleReminders.isEmpty || !staleThresholds.isEmpty || !staleBudgets.isEmpty
+        else { return }
         stateDirty = true
         for key in staleReminders.keys { reminderState[key] = nil }
         for key in staleThresholds { thresholdState[key] = nil }
+        for key in staleBudgets { budgetState[key] = nil }
     }
 
     // MARK: - Estado ↔ settings (JSON)
@@ -340,6 +449,14 @@ public actor AlertEngine {
             persisted.reminders.append(PersistedReminder(
                 provider: key.provider.rawValue, account: key.account,
                 window: key.window.rawValue, resetsAt: key.resetsAt, firedAt: firedAt))
+        }
+        if !budgetState.isEmpty {
+            persisted.budgets = budgetState.map { key, entry in
+                PersistedBudget(
+                    provider: key.provider.rawValue, kind: key.kind,
+                    threshold: key.threshold, firedAt: entry.firedAt,
+                    resetsAt: entry.resetsAt ?? Date(timeIntervalSince1970: 0))
+            }
         }
         guard let data = try? JSONEncoder().encode(persisted) else { return }
         try? database.setSetting(String(decoding: data, as: UTF8.self), forKey: Self.stateKey)

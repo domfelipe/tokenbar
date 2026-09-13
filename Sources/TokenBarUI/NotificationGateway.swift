@@ -108,6 +108,14 @@ public struct UserNotificationGateway: NotificationSending {
             )
         case .resetReminder:
             return ("\(name) · \(event.windowKind.rawValue) window resets soon", countdown)
+        case .budget:
+            // O título diz o que JÁ aconteceu (a fração real), nunca a projeção —
+            // quem projeta é o caso abaixo, com texto próprio.
+            let threshold = event.thresholdPct ?? 0
+            return ("\(name) · \(threshold)% of the monthly budget used", countdown)
+        case .budgetProjection:
+            let threshold = event.thresholdPct ?? 0
+            return ("\(name) · on pace for \(threshold)% of the monthly budget", countdown)
         }
     }
 }

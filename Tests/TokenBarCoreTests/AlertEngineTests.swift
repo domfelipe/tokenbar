@@ -326,4 +326,140 @@ final class AlertEngineTests {
         #expect(await memoryEngine.evaluate(snapshots: [hot], now: base).count == 1)
         #expect(await memoryEngine.evaluate(snapshots: [hot], now: base + 60).isEmpty)
     }
+
+    // MARK: - Orçamento (F7 Spend control)
+
+    /// Calendar UTC fixo: a projeção depende do DIA do mês, então o teste não
+    /// pode depender do fuso da máquina.
+    var utc: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }
+
+    /// base = 2023-11-14T22:13:20Z → novembro/2023 (30 dias), dia 14.
+    func november2023() -> AppDatabase.MonthWindow {
+        AppDatabase.MonthWindow(
+            start: utc.date(from: DateComponents(year: 2023, month: 11, day: 1))!,
+            next: utc.date(from: DateComponents(year: 2023, month: 12, day: 1))!)
+    }
+
+    func december2023() -> AppDatabase.MonthWindow {
+        AppDatabase.MonthWindow(
+            start: utc.date(from: DateComponents(year: 2023, month: 12, day: 1))!,
+            next: utc.date(from: DateComponents(year: 2024, month: 1, day: 1))!)
+    }
+
+    @Test("orçamento: dispara nos dois tipos (gasto e projeção), deduplica e re-arma")
+    func budgetFiresForSpendAndProjection() async throws {
+        let db = try makeDatabase()
+        let engine = AlertEngine(database: db)
+        await engine.apply(config: AlertConfig(
+            enabled: true, thresholds: [10, 50, 90], resetReminderMinutes: nil))
+        let month = november2023()
+        let budget = BudgetConfig(monthlyUSD: 100, perProvider: [:])
+
+        // $12 de $100 no dia 14: gasto cruza 10%; projeção (12/14×30 = $25.71)
+        // também cruza 10% — dois eventos, tipos distintos.
+        let first = await engine.evaluateBudgets(
+            spend: [.claude: 12], budget: budget, month: month, now: base, calendar: utc)
+        #expect(first.filter { $0.kind == .budget }.compactMap(\.thresholdPct) == [10])
+        #expect(first.filter { $0.kind == .budgetProjection }.compactMap(\.thresholdPct) == [10])
+        // Forma do evento: janela mensal, conta agregada e reset na virada do mês.
+        #expect(first.allSatisfy { $0.windowKind == .monthly })
+        #expect(first.allSatisfy { $0.account.key == AccountID.allAccountsKey })
+        #expect(first.allSatisfy { $0.resetsAt == month.next })
+        #expect(first.allSatisfy { $0.provider == .claude })
+
+        // Mesmo gasto de novo: nada (dedupe 1× por threshold e por tipo).
+        #expect(await engine.evaluateBudgets(
+            spend: [.claude: 12], budget: budget, month: month,
+            now: base + 3_600, calendar: utc).isEmpty)
+
+        // $60: gasto cruza 50%; projeção (60/14×30 = $128.57) cruza 50% e 90%.
+        let higher = await engine.evaluateBudgets(
+            spend: [.claude: 60], budget: budget, month: month,
+            now: base + 7_200, calendar: utc)
+        #expect(higher.filter { $0.kind == .budget }.compactMap(\.thresholdPct) == [50])
+        #expect(higher.filter { $0.kind == .budgetProjection }.compactMap(\.thresholdPct) == [50, 90])
+
+        // Cai para $2 (gasto 2% e projeção 4,3%, ambos abaixo de 10%) e volta a
+        // $12: re-arma o 10% nos DOIS tipos.
+        #expect(await engine.evaluateBudgets(
+            spend: [.claude: 2], budget: budget, month: month,
+            now: base + 10_800, calendar: utc).isEmpty)
+        let rearmed = await engine.evaluateBudgets(
+            spend: [.claude: 12], budget: budget, month: month,
+            now: base + 14_400, calendar: utc)
+        #expect(rearmed.filter { $0.kind == .budget }.compactMap(\.thresholdPct) == [10])
+        #expect(rearmed.filter { $0.kind == .budgetProjection }.compactMap(\.thresholdPct) == [10])
+    }
+
+    @Test("orçamento: sem teto, sem custo computável ou alertas desligados não há evento")
+    func budgetRequiresLimitAndComputableCost() async throws {
+        let db = try makeDatabase()
+        let engine = await enabledEngine(db)  // thresholds [50, 75, 90, 95]
+        let month = november2023()
+
+        // Sem orçamento nenhum → nada (e o master switch não é a razão).
+        #expect(await engine.evaluateBudgets(
+            spend: [.claude: 90], budget: .empty, month: month, now: base, calendar: utc).isEmpty)
+
+        // Custo do mês desconhecido (nil = nenhum evento com preço) → nada: sem
+        // base real não há aviso (NULL ≠ 0 — $0 de verdade também não alerta).
+        #expect(await engine.evaluateBudgets(
+            spend: [.claude: nil], budget: BudgetConfig(monthlyUSD: 10, perProvider: [:]),
+            month: month, now: base, calendar: utc).isEmpty)
+        #expect(await engine.evaluateBudgets(
+            spend: [.claude: 0], budget: BudgetConfig(monthlyUSD: 10, perProvider: [:]),
+            month: month, now: base, calendar: utc).isEmpty)
+
+        // Teto do provider vence o global; sem teto próprio cai no global.
+        let budget = BudgetConfig(monthlyUSD: 100, perProvider: [.codex: 10])
+        let events = await engine.evaluateBudgets(
+            spend: [.claude: 400, .codex: 9, .zai: 400], budget: budget,
+            month: month, now: base, calendar: utc)
+        // claude: 400% do global (todos os thresholds); codex: $9 de um teto de
+        // $10 = 90% (cruza 50, 75 e 90 — o teto do provider vence o global);
+        // zai: 400% do global.
+        #expect(events.filter { $0.provider == .codex }.filter { $0.kind == .budget }
+            .compactMap(\.thresholdPct) == [50, 75, 90])
+        #expect(events.contains { $0.provider == .claude && $0.kind == .budget })
+
+        // Alertas desligados: o master switch manda, mesmo com teto e gasto.
+        let off = AlertEngine(database: db)
+        await off.apply(config: AlertConfig(
+            enabled: false, thresholds: [50], resetReminderMinutes: nil))
+        #expect(await off.evaluateBudgets(
+            spend: [.claude: 400], budget: BudgetConfig(monthlyUSD: 10, perProvider: [:]),
+            month: month, now: base, calendar: utc).isEmpty)
+    }
+
+    @Test("orçamento: dedupe sobrevive ao restart e re-arma quando o mês vira")
+    func budgetStateSurvivesRestartAndNewMonth() async throws {
+        let db = try makeDatabase()
+        let budget = BudgetConfig(monthlyUSD: 100, perProvider: [:])
+        let engine = AlertEngine(database: db)
+        await engine.apply(config: AlertConfig(
+            enabled: true, thresholds: [10], resetReminderMinutes: nil))
+        let november = november2023()
+        #expect(await engine.evaluateBudgets(
+            spend: [.claude: 12], budget: budget, month: november,
+            now: base, calendar: utc).isEmpty == false)
+
+        // Restart: MESMO mês → estado persistido impede re-disparo.
+        let restarted = AlertEngine(database: db)
+        #expect(await restarted.evaluateBudgets(
+            spend: [.claude: 12], budget: budget, month: november,
+            now: base + 60, calendar: utc).isEmpty)
+
+        // Mês NOVO: a chave do mês anterior é podada e o cruzamento dispara de novo.
+        let december = december2023()
+        let newMonth = await restarted.evaluateBudgets(
+            spend: [.claude: 12], budget: budget, month: december,
+            now: utc.date(from: DateComponents(year: 2023, month: 12, day: 14))!,
+            calendar: utc)
+        #expect(newMonth.contains { $0.kind == .budget && $0.thresholdPct == 10 })
+        #expect(newMonth.allSatisfy { $0.resetsAt == december.next })
+    }
 }
