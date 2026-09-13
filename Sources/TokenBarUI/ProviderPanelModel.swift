@@ -377,6 +377,16 @@ public enum ProviderPanelModel {
     /// configurado. Com teto e sem custo computável no mês: "— of $X" (NULL ≠ 0:
     /// nunca "$0.00 de $X", que diria que o mês não gastou nada). Com custo:
     /// "$A of $B · N% · projected $C" (a projeção some quando não há base).
+    /// Texto da fração do orçamento ("42%"). Guarda a finitude e o teto do
+    /// ratio ANTES da conversão para Int (review F7, Minor 3): o caminho de
+    /// alerta já guarda `isFinite`; a UI precisa da mesma proteção (NaN/inf
+    /// não podem virar trap num Text). `nil` = sem base válida.
+    public static func budgetPercentText(_ spent: Double, of budget: Double) -> String? {
+        guard spent.isFinite, budget.isFinite, budget > 0 else { return nil }
+        let percent = min(max(spent / budget, 0), 1_000) * 100
+        return String(Int(percent.rounded())) + "%"
+    }
+
     public static func budgetLine(
         budgetUsd: Double?,
         monthToDateUsd: Double?,
@@ -386,7 +396,9 @@ public enum ProviderPanelModel {
         var parts: [String] = []
         if let monthToDateUsd {
             parts.append(kpiCostString(monthToDateUsd) + " of " + kpiCostString(budgetUsd))
-            parts.append("\(Int(((monthToDateUsd / budgetUsd) * 100).rounded()))%")
+            if let percent = budgetPercentText(monthToDateUsd, of: budgetUsd) {
+                parts.append(percent)
+            }
         } else {
             parts.append("— of " + kpiCostString(budgetUsd))
         }

@@ -61,11 +61,22 @@ public struct UserNotificationGateway: NotificationSending {
         try? await UNUserNotificationCenter.current().add(request)
     }
 
-    /// Identificador estável por (provider, conta, janela, causa): substitui
-    /// o banner anterior da mesma causa em vez de empilhar.
+    /// Identificador estável por (provider, conta, janela, causa, TIPO):
+    /// substitui o banner anterior da MESMA causa em vez de empilhar.
+    ///
+    /// Review F7 (Important): os dois tipos de orçamento dividem conta ("*") e
+    /// janela ("monthly") e o mesmo threshold, então sem o tipo no id o aviso
+    /// "já gastou 75%" era SUBSTITUÍDO pelo "on pace for 75%" no mesmo ciclo
+    /// (mesmo identificador = mesmo banner). O sufixo entra só nos tipos novos:
+    /// os ids de janela/lembrete ficam byte a byte como antes (e2e e Red Team
+    /// os fixam em teste).
     static func identifier(for event: AlertEvent) -> String {
         let cause = event.thresholdPct.map { "t\($0)" } ?? "reminder"
-        return "tokenbar.alert.\(event.provider.rawValue).\(event.account.key).\(event.windowKind.rawValue).\(cause)"
+        let base = "tokenbar.alert.\(event.provider.rawValue).\(event.account.key).\(event.windowKind.rawValue).\(cause)"
+        switch event.kind {
+        case .threshold, .resetReminder: return base
+        case .budget, .budgetProjection: return base + "." + event.kind.rawValue
+        }
     }
 
     // MARK: - Renderização EN (strings de UI vivem na UI, não no Core)

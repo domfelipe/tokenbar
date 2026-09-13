@@ -276,8 +276,7 @@ final class AnalyticsModelTests {
         func row(_ provider: String, _ cost: Double?) -> AppDatabase.MonthSpendRow {
             .init(provider: provider, tokens: 100, costUSD: cost)
         }
-        let window = db.monthWindow(now: now)  // agosto/2026, dia 30 de 31
-
+        // agosto/2026, dia 30 de 31 dias.
         // Sem teto nenhum → nada (a seção orienta a configurar).
         #expect(AnalyticsModel.budgetRows(
             budget: .empty, monthRows: [row("claude", 30)], now: now, calendar: utc).isEmpty)
@@ -309,7 +308,6 @@ final class AnalyticsModelTests {
             monthRows: [row("claude", nil)], now: now, calendar: utc)
         #expect(allNull.first?.spentUSD == nil)
         #expect(allNull.first?.projectedUSD == nil)
-        _ = window
     }
 
     @Test("reload: orçamento do mês chega pronto na janela (global + por provider)")

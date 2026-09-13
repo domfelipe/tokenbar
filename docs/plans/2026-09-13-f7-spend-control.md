@@ -46,3 +46,19 @@ de meses fechados; notificação fora do gateway existente.
 Cada task fecha com teste headless (núcleo puro) e a UI fecha com evidência
 verificável — o gate do painel (`qa-axtree --panel`) e o `ui-smoke` já provam
 estrutura e cliques, então a fase NÃO se fecha com "parece certo".
+
+## Status (13/09) — fase ENTREGUE
+
+| Task | Commit | Estado |
+|---|---|---|
+| T1 núcleo (mês, projeção, orçamento) | `b6d22d5` | ✅ |
+| T2 orçamento persistido + aba de Settings | `4d5b941` | ✅ |
+| T3 alertas de gasto/projeção + wiring no ciclo | `1e467d9` | ✅ |
+| T4a linha "Budget" no painel | `159cbb7` | ✅ |
+| Fix da aba Budget (estilo do Form) | `30a2157` | ✅ |
+| T4b seção "Budget" no Analytics | `65e7a11` | ✅ |
+| T5 review independente + docs | este commit | ✅ |
+
+Decisões, verificação e limites em `docs/decisoes-f7-spend-control-2026-09-13.md`.
+Pendência aberta registrada lá: preços dos modelos locais (Claude do dono com
+custo NULL) — decisão do dono, fora do escopo.

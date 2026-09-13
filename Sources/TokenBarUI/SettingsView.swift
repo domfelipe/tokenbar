@@ -110,7 +110,7 @@ public struct SettingsView: View {
                     label: "All providers",
                     value: model.budget.monthlyUSD,
                     set: { newValue in Task { await model.setMonthlyBudget(newValue) } })
-                Text("Spend counts the calendar month (1st until today). An empty field means no budget — it is not $0.")
+                Text("Default cap for every provider that has no budget of its own. Spend counts the calendar month (1st until today). An empty field means no budget — it is not $0.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -304,12 +304,17 @@ private struct BudgetField: View {
             return
         }
         let normalized = trimmed.replacingOccurrences(of: ",", with: "")
-        guard let parsed = Double(normalized), parsed.isFinite, parsed > 0 else {
+        // Sanitiza AQUI também (review F7, Minor): sem isto um typo acima do teto
+        // de sanidade virava "sem orçamento" e o teto gravado era apagado sem
+        // aviso — ou o campo mostrava um valor que não existia no banco.
+        guard let parsed = Double(normalized), parsed.isFinite,
+              let sanitized = BudgetConfig.sanitize(parsed)
+        else {
             draft = Self.text(for: value)
             return
         }
-        set(parsed)
-        draft = Self.text(for: parsed)
+        set(sanitized)
+        draft = Self.text(for: sanitized)
     }
 
     private static func text(for value: Double?) -> String {

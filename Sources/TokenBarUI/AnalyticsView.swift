@@ -152,7 +152,7 @@ public struct AnalyticsContent: View {
                 ForEach(model.budgetRows) { row in
                     budgetRow(row)
                 }
-                Text("Budget counts the calendar month (1st until today). Days without a known price are excluded and never counted as $0.")
+                Text("Budget counts the calendar month (1st until today). The global value caps each provider individually (alerts compare per provider); the sum line is informative. Days without a known price are excluded and never counted as $0.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -164,11 +164,16 @@ public struct AnalyticsContent: View {
     /// Uma linha do resumo: nome do teto à esquerda; gasto, fração e projeção à
     /// direita. Mês sem custo computável mostra "—" (NULL ≠ 0).
     private func budgetRow(_ row: AnalyticsModel.BudgetRow) -> some View {
-        let name = row.provider.map { MenuBarContent.displayName(for: $0) } ?? "All providers"
+        // A linha global é a SOMA (informativa): os alertas comparam CADA
+        // provider com o teto global, salvo quem tem teto próprio — o rótulo diz
+        // isso em vez de sugerir que o teto global é um teto de total.
+        let name = row.provider.map { MenuBarContent.displayName(for: $0) } ?? "All providers (sum)"
         var value = (row.spentUSD.map(formatEstimatedUSD) ?? "—")
             + " of " + formatEstimatedUSD(row.budgetUSD)
-        if let spent = row.spentUSD {
-            value += " · " + String(Int(((spent / row.budgetUSD) * 100).rounded())) + "%"
+        if let spent = row.spentUSD,
+           let percent = ProviderPanelModel.budgetPercentText(spent, of: row.budgetUSD)
+        {
+            value += " · " + percent
         }
         if let projected = row.projectedUSD {
             value += " · projected " + formatEstimatedUSD(projected)

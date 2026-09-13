@@ -293,7 +293,8 @@ final class HistoryQueryTests {
         let july = try db.monthSpend(now: now.addingTimeInterval(-30 * 86_400))
         #expect(july.map(\.provider) == ["claude"])
         #expect(july.first?.tokens == 10)
-        #expect(july.first?.costUSD != nil)
+        // 5 in + 5 out do m-priced (3 / 15 USD por MTok) = 9e-5 exatos.
+        #expect(abs((july.first?.costUSD ?? -1) - (5 * 3 + 5 * 15) / 1e6) < 1e-12)
     }
 
     @Test("monthSpendTotal: sem NENHUM custo computável o total é nil, nunca 0")

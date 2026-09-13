@@ -91,6 +91,35 @@ struct NotificationGatewayTests {
             != threshold)
     }
 
+    @Test("identificador: orçamento e projeção com o mesmo threshold NÃO se substituem")
+    func budgetIdentifiersDoNotCollide() {
+        // Os dois tipos dividem conta ("*") e janela (.monthly): sem o TIPO no
+        // id, o banner "já gastou 75%" era engolido pelo "on pace for 75%" no
+        // mesmo ciclo (review F7, achado Important).
+        let spent = UserNotificationGateway.identifier(for: budgetEvent(kind: .budget))
+        let projected = UserNotificationGateway.identifier(for: budgetEvent(kind: .budgetProjection))
+        #expect(spent != projected)
+        #expect(spent.hasSuffix(".budget"))
+        #expect(projected.hasSuffix(".budgetProjection"))
+
+        // Os ids de janela/lembrete seguem byte a byte como antes (e2e/Red Team
+        // os fixam): só os tipos novos ganharam sufixo.
+        #expect(UserNotificationGateway.identifier(for: event(threshold: 90))
+            == "tokenbar.alert.claude.local.weekly.t90")
+        #expect(UserNotificationGateway.identifier(
+            for: event(kind: .resetReminder, threshold: nil, resetsAt: base + 60))
+            == "tokenbar.alert.claude.local.weekly.reminder")
+    }
+
+    /// Evento de orçamento (F7): janela .monthly e conta agregada "*".
+    func budgetEvent(kind: AlertEvent.Kind) -> AlertEvent {
+        AlertEvent(
+            kind: kind, provider: .claude,
+            account: AccountID(provider: .claude, key: AccountID.allAccountsKey),
+            windowKind: .monthly, thresholdPct: 75, usedFraction: 0.8,
+            resetsAt: base + 86_400, firedAt: base)
+    }
+
     @Test("nomes de provider (D5) cobrem todos os ProviderID")
     func providerNamesCoverAllProviders() {
         for id in ProviderID.allCases {
@@ -301,6 +330,29 @@ struct CoordinatorAlertsWiringTests {
         let delivered = fake.delivered.count
         await coordinator.dispatchAlerts(snapshots: [], now: base + 60)
         #expect(fake.delivered.count == delivered)
+    }
+
+    @Test("orçamento: o CICLO estampa teto, mês-corrido e projeção no display do provider")
+    func cycleStampsBudgetOnDisplay() async throws {
+        let fixture = try makeFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let coordinator = makeCoordinator(fixture, gateway: FakeNotificationGateway())
+        let database = try #require(coordinator.historyDatabase)
+        // Evento de HOJE: o ciclo usa o relógio real para o mês-corrente.
+        try seedPricedEvent(database, tokens: 1_000_000, now: Date())
+        AppSettingsStore(database: database).saveBudget(
+            BudgetConfig(monthlyUSD: 1_000, perProvider: [:]))
+
+        await coordinator.refreshAllNow()
+        let display = try #require(coordinator.store.providers[.claude])
+        #expect(display.budgetUsd == 1_000)
+        #expect(display.monthToDateUsd != nil)  // custo computável do mês
+        #expect(display.monthProjectedUsd != nil)  // e a projeção do dia
+
+        // Sem teto o campo volta a nil — nada de valor velho preso no display.
+        AppSettingsStore(database: database).saveBudget(.empty)
+        await coordinator.refreshAllNow()
+        #expect(coordinator.store.providers[.claude]?.budgetUsd == nil)
     }
 
     @Test("orçamento: sem teto ou sem custo computável o gateway fica intocado")
