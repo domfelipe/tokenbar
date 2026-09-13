@@ -73,6 +73,31 @@ do requisito: `PanelSizingTests` (piso, teto, NaN/infinito).
   o ledger real com `2026-09-11 | 37.139.242 | —` (NULL ≠ 0 ao vivo, dado do
   dono).
 
+## Achado de operação (apareceu durante a verificação)
+
+Depois de `./scripts/make-app.sh release` — que **re-assina** o bundle ad-hoc a
+cada build — o `open build/TokenBar.app` pode subir o processo **sem criar o
+item da menu bar** (AX responde "menu bar 2 … índice inválido", nenhuma janela
+do app). Não é o código: o registro do app no **LaunchServices** fica velho
+quando a assinatura do bundle muda. Correção:
+
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f -R build/TokenBar.app
+    open build/TokenBar.app
+
+E **nunca subir duas instâncias** (`open -n` + exec direto): cada uma cria o
+próprio item na menu bar e as consultas AX por nome de processo ficam ambíguas —
+foi o que me fez perseguir um "hang" que não existia. Sempre `pkill -x tokenbar`
+antes de relançar.
+
+## Como reproduzir a verificação
+
+    osascript -e 'tell application "System Events" to tell process "tokenbar" to get name of menu bar item 1 of menu bar 2'
+    osascript -e 'tell application "System Events" to tell process "tokenbar" to click menu bar item 1 of menu bar 2'
+    xcrun swiftc -O scripts/qa-axtree.swift -o /tmp/qa-axtree
+    /tmp/qa-axtree --panel $(pgrep -x tokenbar)                    # → PASS: 310x489, 7 itens dentro
+    /tmp/qa-axtree --press $(pgrep -x tokenbar) "Usage dashboard"  # → abre a janela
+    /tmp/qa-axtree --wait-window $(pgrep -x tokenbar) "TokenBar Analytics"
+
 ## Limite conhecido
 
 O piso de 300pt do gate é guarda contra o COLAPSO, não contrato de layout:
