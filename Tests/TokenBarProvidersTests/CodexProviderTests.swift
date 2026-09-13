@@ -410,7 +410,10 @@ final class CodexProviderTests {
         let batch = try await provider.ingestLocal(CodexFixtures.localRef, from: IngestCursor(), now: CodexFixtures.now)
 
         #expect(batch.eventsApplied == 2)
-        let expected: Int64 = (100 + 40 + 10 + 110) + (5 + 0 + 0 + 112)
+        // Em etapas: soma longa de literais estoura o type-check do runner do CI.
+        let firstTurn: Int64 = 100 + 40 + 10 + 110
+        let secondTurn: Int64 = 5 + 0 + 0 + 112
+        let expected = firstTurn + secondTurn
         #expect(batch.providerTotals[.codex] == expected)
 
         let path = try #require(batch.nextCursor.fileOffsets.keys.first)

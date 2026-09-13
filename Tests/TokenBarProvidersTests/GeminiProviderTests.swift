@@ -306,8 +306,8 @@ final class GeminiProviderTests {
         // type-check do toolchain do runner do CI ("unable to type-check this
         // expression in reasonable time", run de 13/09).
         let sessionTokens: Int64 = 100 + 54 + 39 + 0
-        let otherTokens: Int64 = 10 + 20 + 7 + 3 + 5
-        let expected = sessionTokens + otherTokens
+        let otherTokens: Int64 = 10 + 20 + 7
+        let expected = sessionTokens + otherTokens + 3 + 5
         #expect(batch.providerTotals[.gemini] == expected)
 
         let path = try #require(batch.nextCursor.fileOffsets.keys.first)

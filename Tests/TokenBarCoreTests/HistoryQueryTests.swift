@@ -308,7 +308,7 @@ final class HistoryQueryTests {
         #expect(july.map(\.provider) == ["claude"])
         #expect(july.first?.tokens == 10)
         // 5 in + 5 out do m-priced (3 / 15 USD por MTok) = 9e-5 exatos.
-        #expect(abs((july.first?.costUSD ?? -1) - (5 * 3 + 5 * 15) / 1e6) < 1e-12)
+        #expect(abs((july.first?.costUSD ?? -1) - pricedCost(input: 5, output: 5)) < 1e-12)
     }
 
     @Test("monthSpendTotal: sem NENHUM custo computável o total é nil, nunca 0")

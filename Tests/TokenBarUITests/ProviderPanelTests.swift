@@ -128,7 +128,8 @@ struct PanelPacingTests {
 
     @Test("forecast com déficit e esgotamento → '20% in deficit · Exhausts in 2h 44m'")
     func exhaustText() {
-        let forecast = PacingForecast(exhaustedIn: 2 * 3_600 + 44 * 60, projectedFraction: 1.2, deficitPct: 20)
+        let twoHoursFortyFour: TimeInterval = 2 * 3_600 + 44 * 60
+        let forecast = PacingForecast(exhaustedIn: twoHoursFortyFour, projectedFraction: 1.2, deficitPct: 20)
         #expect(ProviderPanelModel.pacingText(forecast, now: now) == "20% in deficit · Exhausts in 2h 44m")
     }
 
