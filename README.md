@@ -1,15 +1,19 @@
 # TokenBar
 
-[![CI](https://github.com/OWNER/tokenbar/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/tokenbar/actions/workflows/ci.yml)
+[![CI](https://github.com/domfelipe/tokenbar/actions/workflows/ci.yml/badge.svg)](https://github.com/domfelipe/tokenbar/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey)](#install)
-[![Release](https://img.shields.io/badge/release-v1.0.0-green)](#install)
+[![Release](https://img.shields.io/badge/release-v1.1.0-green)](#install)
 
 Native macOS menu bar app that keeps your AI coding usage visible — light enough to never think about it.
 
-**Current release: v1.0.0** — 10 providers, the panel ported 1:1 from the MIT reference CodexBar (`NOTICE` in the repo root), SQLite history with estimated cost + Analytics window + CSV/JSON export, multi-account, limit alerts with dedupe, and a Settings window (⌘,). Everything below ships in this release.
+**Current release: v1.1.0** — 10 providers with **logos in the menu bar**, the panel ported 1:1 from the MIT reference CodexBar (`NOTICE` in the repo root), SQLite history with estimated cost, **Usage & Spend** (daily ledger + cost heatmap) and **spend control** (monthly budget per provider, month-to-date, month-end projection and budget alerts), Analytics window + CSV/JSON export, multi-account, limit alerts with dedupe, and a Settings window (⌘,). Everything below ships in this release.
 
 ![Panel side-by-side with the CodexBar reference](docs/qa/evidence/f5-design-side-by-side.png)
+
+Spend control, as it renders today — the panel line (month-to-date, budget and month-end projection) and the Analytics budget section:
+
+![Spend control: panel budget line](docs/qa/evidence/panel-budget-2026-09-13.png)
 
 | Panel (Claude) | Panel (Codex) | Panel (Z.ai) | Accounts |
 |---|---|---|---|

@@ -5,11 +5,11 @@
 # pipeline automaticamente no push de uma tag `v*`).
 #
 # Uso: ./scripts/release.sh [VERSION]
-#   VERSION aceita "1.0.0" ou "v1.0.0" (default: 1.0.0)
+#   VERSION aceita "1.1.0" ou "v1.1.0" (default: 1.1.0)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="${1:-1.0.0}"
+VERSION="${1:-1.1.0}"
 VERSION="${VERSION#v}"
 export TOKENBAR_VERSION="$VERSION"
 

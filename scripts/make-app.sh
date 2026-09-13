@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 CONFIG="${1:-release}"
 # Versão do app estampada no Info.plist (scripts/release.sh e o job de
 # release do CI passam TOKENBAR_VERSION da tag; default = release corrente).
-VERSION="${TOKENBAR_VERSION:-1.0.0}"
+VERSION="${TOKENBAR_VERSION:-1.1.0}"
 swift build -c "$CONFIG"
 BIN=".build/$CONFIG/tokenbar"
 APP="build/TokenBar.app"
