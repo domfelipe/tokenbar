@@ -41,6 +41,10 @@ public final class SettingsModel {
     public private(set) var idleRefreshSeconds: Int
     /// Providers presentes no texto do menu bar (Task 3). Default = todos.
     public private(set) var visibleProviders: Set<ProviderID>
+    /// Orçamento do MÊS (F7 Spend control): teto global + tetos por provider.
+    /// Fonte da verdade é a tabela `settings` (`budget:*`); o painel e o
+    /// Analytics leem do ciclo do coordinator.
+    public private(set) var budget: BudgetConfig
 
     public private(set) var alertsEnabled: Bool
     /// Thresholds em ordem CRESCENTE (invariante mantido por edição).
@@ -91,6 +95,7 @@ public final class SettingsModel {
         foregroundRefreshSeconds = store.loadMenuIntervalSeconds()
         idleRefreshSeconds = store.loadIdleIntervalSeconds()
         visibleProviders = store.loadVisibleProviders()
+        budget = store.loadBudget()
 
         // Config de alertas: leitura ÚNICA via engine (mesmo decode), para a
         // janela abrir refletindo o que está persistido.
@@ -140,6 +145,31 @@ public final class SettingsModel {
         visibleProviders = updated
         store.saveVisibleProviders(updated)
         republishVisibility?(updated)
+    }
+
+    // MARK: - Orçamento mensal (F7 Spend control)
+
+    /// Teto GLOBAL do mês. `nil` (ou valor inválido) = sem teto global — a
+    /// sanitização é do `BudgetConfig`, então "0" e "-5" não viram orçamento.
+    public func setMonthlyBudget(_ value: Double?) async {
+        let updated = BudgetConfig(monthlyUSD: value, perProvider: budget.perProvider)
+        guard updated != budget else { return }
+        budget = updated
+        store.saveBudget(updated)
+    }
+
+    /// Teto do mês de UM provider (vence o global). `nil` remove o teto próprio.
+    public func setProviderBudget(_ value: Double?, for provider: ProviderID) async {
+        var perProvider = budget.perProvider
+        if let sanitized = BudgetConfig.sanitize(value) {
+            perProvider[provider] = sanitized
+        } else {
+            perProvider[provider] = nil
+        }
+        let updated = BudgetConfig(monthlyUSD: budget.monthlyUSD, perProvider: perProvider)
+        guard updated != budget else { return }
+        budget = updated
+        store.saveBudget(updated)
     }
 
     // MARK: - Alertas (ruling F5-NOTIF: requestAuthorization EXPLÍCITO aqui)

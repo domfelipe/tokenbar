@@ -173,4 +173,51 @@ final class AppSettingsTests {
         // Sem DB → defaults (nada inventado).
         #expect(AlertEngine.readConfig(database: nil) == .default)
     }
+
+    // MARK: - Orçamento mensal (F7 Spend control)
+
+    @Test("budget: roundtrip na tabela settings (global + por provider)")
+    func budgetRoundtrip() throws {
+        let db = try makeDatabase()
+        let store = AppSettingsStore(database: db)
+        #expect(store.loadBudget() == .empty)
+
+        store.saveBudget(BudgetConfig(monthlyUSD: 150, perProvider: [.claude: 400, .codex: 25.5]))
+        let loaded = store.loadBudget()
+        #expect(loaded.monthlyUSD == 150)
+        #expect(loaded.perProvider == [.claude: 400, .codex: 25.5])
+        #expect(loaded.budget(for: .claude) == 400)
+        #expect(loaded.budget(for: .cursor) == 150)  // sem teto próprio → global
+
+        // Limpar o global NÃO pode virar "orçamento 0": a chave some.
+        store.saveBudget(BudgetConfig(monthlyUSD: nil, perProvider: [.claude: 400]))
+        #expect(store.loadBudget().monthlyUSD == nil)
+        #expect(store.loadBudget().perProvider == [.claude: 400])
+
+        store.saveBudget(.empty)
+        #expect(store.loadBudget() == .empty)
+    }
+
+    @Test("budget: valor inválido não vira orçamento (sanitização na leitura)")
+    func budgetSanitizesOnRead() throws {
+        let db = try makeDatabase()
+        let store = AppSettingsStore(database: db)
+        // Escrita crua na tabela: simula banco corrompido/de versão futura.
+        try db.setSetting("0", forKey: AppSettingsStore.budgetMonthlyKey)
+        try db.setSetting(
+            "{\"claude\": -5, \"codex\": 30, \"nao-existe\": 10}",
+            forKey: AppSettingsStore.budgetPerProviderKey)
+        let loaded = store.loadBudget()
+        #expect(loaded.monthlyUSD == nil)  // 0 não é orçamento
+        #expect(loaded.perProvider == [.codex: 30])  // -5 fora, provider desconhecido fora
+
+        try db.setSetting("nao-e-json", forKey: AppSettingsStore.budgetMonthlyKey)
+        #expect(store.loadBudget().monthlyUSD == nil)
+
+        // Sem DB: leitura vazia, escrita no-op (persistência é aditiva).
+        let detached = AppSettingsStore(database: nil)
+        #expect(detached.loadBudget() == .empty)
+        detached.saveBudget(BudgetConfig(monthlyUSD: 100, perProvider: [:]))
+        #expect(detached.loadBudget() == .empty)
+    }
 }

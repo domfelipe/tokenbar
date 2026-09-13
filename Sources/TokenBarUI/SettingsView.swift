@@ -22,6 +22,8 @@ public struct SettingsView: View {
                 .tabItem { Label("Alerts", systemImage: "bell") }
             menuBarTab
                 .tabItem { Label("Menu Bar", systemImage: "menubar.rectangle") }
+            budgetTab
+                .tabItem { Label("Budget", systemImage: "dollarsign.circle") }
         }
         .frame(width: 470)
         .task {
@@ -93,6 +95,39 @@ public struct SettingsView: View {
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title) refresh interval: \(seconds) seconds")
+    }
+
+    // MARK: - Budget (F7 Spend control)
+
+    /// Orçamento do MÊS: teto global + teto por provider (o do provider vence).
+    /// O valor entra em USD, como todo o app; o cálculo do gasto é o do
+    /// mês-calendário (dia 1 até hoje) com a mesma precificação do resto —
+    /// dia sem preço conhecido fica FORA, nunca contado como $0.
+    private var budgetTab: some View {
+        Form {
+            Section("Monthly budget") {
+                BudgetField(
+                    label: "All providers",
+                    value: model.budget.monthlyUSD,
+                    set: { newValue in Task { await model.setMonthlyBudget(newValue) } })
+                Text("Spend counts the calendar month (1st until today). An empty field means no budget — it is not $0.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section("Per provider") {
+                ForEach(model.allProviders, id: \.self) { provider in
+                    BudgetField(
+                        label: MenuBarContent.displayName(for: provider),
+                        value: model.budget.perProvider[provider],
+                        set: { newValue in
+                            Task { await model.setProviderBudget(newValue, for: provider) }
+                        })
+                }
+                Text("A provider budget overrides the global one.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     // MARK: - Alerts (global + thresholds + lembrete de reset)
@@ -220,6 +255,61 @@ public struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Campo de orçamento em USD (F7): texto livre com commit no Enter ou ao sair
+/// do foco. Entrada inválida NÃO apaga o que estava gravado — o campo volta ao
+/// valor real (nada de zerar orçamento por typo); vazio = sem orçamento, que é
+/// diferente de $0.
+private struct BudgetField: View {
+    let label: String
+    let value: Double?
+    let set: (Double?) -> Void
+
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack {
+            Text(label)
+            Spacer(minLength: 12)
+            TextField("No budget", text: $draft)
+                .multilineTextAlignment(.trailing)
+                .monospacedDigit()
+                .frame(width: 110)
+                .focused($focused)
+                .onSubmit(commit)
+                .onChange(of: focused) { _, isFocused in
+                    if !isFocused { commit() }
+                }
+                .accessibilityIdentifier("budgetField")
+        }
+        .onAppear { draft = Self.text(for: value) }
+        .onChange(of: value) { _, newValue in draft = Self.text(for: newValue) }
+    }
+
+    /// Aceita "150", "1,250.50" (vírgula de milhar tolerada; decimal é ponto —
+    /// o app é USD). Vazio limpa o teto; inválido reverte para o valor gravado.
+    private func commit() {
+        let trimmed = draft.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else {
+            if value != nil { set(nil) }
+            draft = Self.text(for: nil)
+            return
+        }
+        let normalized = trimmed.replacingOccurrences(of: ",", with: "")
+        guard let parsed = Double(normalized), parsed.isFinite, parsed > 0 else {
+            draft = Self.text(for: value)
+            return
+        }
+        set(parsed)
+        draft = Self.text(for: parsed)
+    }
+
+    private static func text(for value: Double?) -> String {
+        guard let value else { return "" }
+        return value.formatted(.number.precision(.fractionLength(0...2)))
     }
 }
 

@@ -127,6 +127,46 @@ final class SettingsModelTests {
             republishVisibility: onVisibility)
     }
 
+    // MARK: - Orçamento mensal (F7 Spend control)
+
+    @Test("orçamento: setter publica e persiste; provider vence o global; inválido não apaga")
+    @MainActor
+    func budgetSettersPublishAndPersist() async throws {
+        let db = try makeDatabase()
+        let model = makeModel(database: db)
+        #expect(model.budget == .empty)
+
+        await model.setMonthlyBudget(150)
+        #expect(model.budget.monthlyUSD == 150)
+        #expect(AppSettingsStore(database: db).loadBudget().monthlyUSD == 150)
+
+        await model.setProviderBudget(400, for: .claude)
+        #expect(model.budget.budget(for: .claude) == 400)
+        #expect(model.budget.budget(for: .codex) == 150)
+        #expect(AppSettingsStore(database: db).loadBudget().perProvider == [.claude: 400])
+
+        // Inválido não vira orçamento nem derruba o que já existe.
+        await model.setProviderBudget(-1, for: .zai)
+        #expect(model.budget.perProvider[.zai] == nil)
+        #expect(model.budget.budget(for: .zai) == 150)
+
+        // Sem DB: publica em memória, não persiste, não crasha.
+        let detached = makeModel(database: nil)
+        await detached.setMonthlyBudget(99)
+        #expect(detached.budget.monthlyUSD == 99)
+    }
+
+    @Test("orçamento: a janela carrega o que está persistido")
+    @MainActor
+    func budgetLoadsPersistedState() async throws {
+        let db = try makeDatabase()
+        AppSettingsStore(database: db).saveBudget(
+            BudgetConfig(monthlyUSD: 500, perProvider: [.cursor: 50]))
+        let model = makeModel(database: db)
+        #expect(model.budget.monthlyUSD == 500)
+        #expect(model.budget.perProvider == [.cursor: 50])
+    }
+
     // MARK: - Carga e roundtrip
 
     @Test("janela carrega o que está persistido (intervalos, visibilidade, alertas)")

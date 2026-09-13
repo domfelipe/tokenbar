@@ -24,6 +24,10 @@ public struct AppSettingsStore: Sendable {
     public static let menuIntervalKey = "scheduler:menuIntervalSeconds"
     public static let idleIntervalKey = "scheduler:idleIntervalSeconds"
     public static let menuBarVisibleKey = "menubar:visibleProviders"
+    /// Orçamento mensal (F7 Spend control): teto GLOBAL do mês (número JSON).
+    public static let budgetMonthlyKey = "budget:monthlyUSD"
+    /// Tetos por provider (objeto JSON {"claude": 400.0, ...}); ausente = nenhum.
+    public static let budgetPerProviderKey = "budget:perProvider"
 
     /// Faixas da UI (Task 3): foreground 30–300 s, background/ocioso 60–1800 s.
     public static let menuRange = 30...300
@@ -115,5 +119,53 @@ public struct AppSettingsStore: Sendable {
         // A partir daqui a lista persistida É a escolha do usuário (novos
         // providers nascem escondidos — o checkbox na Settings é o caminho).
         try? database.setSetting("true", forKey: Self.visibleTouchedKey)
+    }
+
+    // MARK: - Orçamento mensal (F7 Spend control)
+
+    /// Lê o orçamento do mês. Ausente, corrompido ou fora de faixa → AUSENTE
+    /// (o `BudgetConfig` sanitiza: nunca crash, nunca chute). Provider com
+    /// rawValue desconhecido (banco de versão futura) simplesmente não conta.
+    public func loadBudget() -> BudgetConfig {
+        guard let database else { return .empty }
+        let monthly = Self.decodeSetting(
+            Double.self, database: database, key: Self.budgetMonthlyKey)
+        let raw = Self.decodeSetting(
+            [String: Double].self, database: database, key: Self.budgetPerProviderKey) ?? [:]
+        var perProvider: [ProviderID: Double] = [:]
+        for (key, value) in raw {
+            guard let provider = ProviderID(rawValue: key),
+                  let sanitized = BudgetConfig.sanitize(value)
+            else { continue }
+            perProvider[provider] = sanitized
+        }
+        return BudgetConfig(monthlyUSD: monthly, perProvider: perProvider)
+    }
+
+    /// Grava o orçamento do mês (sanitização já feita no `BudgetConfig`).
+    /// Teto ausente LIMPA a chave — "sem orçamento" e "orçamento zero" não podem
+    /// virar a mesma coisa no banco.
+    public func saveBudget(_ budget: BudgetConfig) {
+        guard let database else { return }
+        try? database.setSetting(
+            budget.monthlyUSD.flatMap(Self.encodeSetting), forKey: Self.budgetMonthlyKey)
+        let encoded: [String: Double] = budget.perProvider.reduce(into: [:]) {
+            $0[$1.key.rawValue] = $1.value
+        }
+        try? database.setSetting(
+            encoded.isEmpty ? nil : Self.encodeSetting(encoded),
+            forKey: Self.budgetPerProviderKey)
+    }
+
+    private static func decodeSetting<T: Decodable>(
+        _ type: T.Type, database: AppDatabase, key: String
+    ) -> T? {
+        guard let raw = try? database.setting(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: Data(raw.utf8))
+    }
+
+    private static func encodeSetting<T: Encodable>(_ value: T) -> String? {
+        guard let data = try? JSONEncoder().encode(value) else { return nil }
+        return String(decoding: data, as: UTF8.self)
     }
 }
