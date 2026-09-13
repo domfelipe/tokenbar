@@ -23,7 +23,37 @@ parte do gasto.
 |---|---|---|
 | T1 | `AppDatabase.repriceMissingCosts(pricing:)` — preenche `usage_events.cost_usd` NULL com a tabela ATUAL, ajusta os grupos de `daily_agg` afetados na MESMA transação, idempotente, nunca inventa (evento sem modelo continua NULL) | a fazer |
 | T2 | Superfície: subcomando `tokenbar reprice` (mesmo padrão de `history`/`selfcheck`) imprimindo o relatório | a fazer |
-| T3 | `unknown` do codex: descobrir de onde vem usage sem modelo; se for limite do payload, decidir com o dono sobre preço-fallback por provider | a fazer |
+| T3 | `unknown` do codex: causa encontrada e CORRIGIDA (ver abaixo); falta re-atribuir o histórico já gravado | feito (código) / aberto (dados) |
+
+## Achado da T3 (13/09) — o que o grupo "unknown" É
+
+**Não é limitação do payload nem modelo não precificado**: são eventos do Codex
+ingeridos SEM model, porque o model só existe em linhas `turn_context` e vive
+APENAS na memória do `CodexModelTracker` (limpo na troca de arquivo, por
+higiene). Uma leitura INCREMENTAL que começa depois do último `turn_context` —
+app reiniciado com o cursor salvo, ou eventos anexados ao arquivo depois daquele
+`turn_context` — não vê a linha e gravava o evento com `model = nil` ⇒ grupo
+"unknown" no banco (no dado do dono: 307M tokens em 08/09, 44M em 10/09, 30M em
+12/09, 355K em 13/09 — sempre na conta `local`).
+
+Evidências:
+1. Simulação do parser sobre os 633 arquivos de sessão: 10,4B tokens e ZERO
+   `token_count` antes do primeiro `turn_context` ⇒ uma releitura completa hoje
+   atribuiria model a tudo.
+2. Teste de reprodução fiel (`incrementalReadSeedsModelFromFilePrefix`): duas
+   leituras com tracker NOVO na segunda e um `token_count` anexado sem
+   `turn_context` antes — falha com `model == nil` sem o fix e passa com ele.
+3. `grep` confirma: o único ponto que cria evento no Codex
+   (`CodexSessionIngester`) cria com `model: nil` e depende do stamp do tracker.
+
+**Fix**: antes do primeiro stamp de cada arquivo, o ingester semeia o tracker com
+o último `turn_context` ANTERIOR ao offset do cursor (lê só o prefixo, 1× por
+arquivo por processo; offset 0 não precisa). Nenhuma mudança de schema.
+
+**Aberto**: os ~390M de tokens já gravados continuam "unknown" — o dado antigo
+não se corrige sozinho. Re-atribuir exige um passe que releia as sessões e
+corrija (ou reconstrua) as linhas afetadas por dia; entra junto do re-pricing da
+T1, com o mesmo cuidado de idempotência e transação.
 
 ## Contratos
 

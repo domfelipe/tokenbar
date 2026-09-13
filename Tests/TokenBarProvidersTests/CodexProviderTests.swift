@@ -269,6 +269,54 @@ struct CodexLineParserTests {
         #expect(stamped.account == CodexFixtures.codexAccount)
     }
 
+    /// F8 — origem do grupo "unknown" do banco (achado no dado do dono: 390M de
+    /// tokens sem modelo, só no Codex). O model existe SÓ em linhas
+    /// `turn_context` e vive SÓ na memória do tracker: numa leitura INCREMENTAL
+    /// que começa no meio do arquivo (app reiniciado com o cursor salvo), o
+    /// turn_context já consumido não é visto de novo e o evento saía sem model.
+    /// O ingester agora semeia o tracker com o último turn_context ANTERIOR ao
+    /// offset, uma vez por arquivo por execução.
+    @Test func incrementalReadSeedsModelFromFilePrefix() throws {
+        let lines = CodexFixtures.rolloutLines(ts1: CodexFixtures.now, ts2: CodexFixtures.now)
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codex-restart-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("rollout-restart.jsonl")
+
+        // 1ª leitura: cabeçalho + turn_context(gpt-5.2) + token_count#1.
+        try (lines[0...2].joined(separator: "\n") + "\n").write(to: file, atomically: true, encoding: .utf8)
+        var firstCapture: [UsageEvent] = []
+        let first = try CodexSessionIngester(
+            account: CodexFixtures.codexAccount, modelTracker: CodexModelTracker()
+        ).ingestChangedFilesStreaming(under: dir, cursors: [:]) { _, events, _, _ in
+            firstCapture.append(contentsOf: events)
+        }
+        #expect(firstCapture.count == 1)
+        #expect(firstCapture.first?.model == "gpt-5.2")
+
+        // O app continua escrevendo: chega um token_count novo SEM turn_context
+        // antes dele (é o formato real: o turn_context abre o turno, os
+        // token_count vêm depois).
+        let handle = try FileHandle(forWritingTo: file)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data((lines[4] + "\n").utf8))
+        try handle.close()
+
+        // "Restart": tracker NOVO (perdeu o model da memória) + cursor salvo.
+        let savedCursors = Dictionary(uniqueKeysWithValues: first.map { ($0.path, $0.cursor) })
+        var secondCapture: [UsageEvent] = []
+        _ = try CodexSessionIngester(
+            account: CodexFixtures.codexAccount, modelTracker: CodexModelTracker()
+        ).ingestChangedFilesStreaming(under: dir, cursors: savedCursors) { _, events, _, _ in
+            secondCapture.append(contentsOf: events)
+        }
+
+        #expect(secondCapture.count == 1, "só o token_count novo")
+        #expect(secondCapture.first?.model == "gpt-5.2",
+                "model recuperado do turn_context ANTERIOR ao cursor (semeadura do prefixo)")
+    }
+
     @Test func modelComesFromLastTurnContext() throws {
         let lines = CodexFixtures.rolloutLines(ts1: CodexFixtures.now, ts2: CodexFixtures.now)
         // Ordem do pipeline real: parse → stamp imediato por linha (o makeEvent

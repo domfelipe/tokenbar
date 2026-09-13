@@ -29,6 +29,14 @@ public struct CodexSessionIngester: Sendable {
     }
 
     /// Núcleo streaming da F1 com o `makeEvent` do Codex embutido.
+    ///
+    /// F8 (investigação do grupo "unknown"): o model vive SÓ na memória do
+    /// tracker e só existe em linhas `turn_context`. Numa leitura INCREMENTAL
+    /// que começa no MEIO do arquivo (app reiniciado com o cursor salvo), as
+    /// linhas antes do offset nunca são vistas e o evento saía sem model —
+    /// foi assim que centenas de milhões de tokens viraram "unknown" no banco.
+    /// Antes do primeiro stamp de cada arquivo, semeia o tracker com o último
+    /// `turn_context` ANTERIOR ao offset.
     public func ingestChangedFilesStreaming(
         under directory: URL,
         cursors: [String: FileCursor],
@@ -37,9 +45,54 @@ public struct CodexSessionIngester: Sendable {
         try ingester.ingestChangedFilesStreaming(
             under: directory,
             cursors: cursors,
-            makeEvent: stamp,
+            makeEvent: { [self] event, path in
+                seedModelIfNeeded(path: path, offset: cursors[path]?.offset ?? 0)
+                return stamp(event, path: path)
+            },
             onEvents: onEvents
         )
+    }
+
+    /// Caminhos JÁ semeados neste processo (a semeadura é 1× por arquivo por
+    /// execução: o tracker mantém o model enquanto o arquivo não muda).
+    private var seeded: OSAllocatedUnfairLock<Set<String>> { Self.seededPaths }
+
+    private static let seededPaths = OSAllocatedUnfairLock<Set<String>>(initialState: [])
+
+    /// Lê o PREFIXO do arquivo (até `offset`) atrás do último `turn_context` e
+    /// grava no tracker. Offset 0 = leitura desde o começo (o próprio parser vê
+    /// a linha) → nada a fazer. Falha de I/O é silenciosa: sem semeadura o
+    /// evento volta ao comportamento anterior (sem model), nunca crash.
+    private func seedModelIfNeeded(path: String, offset: UInt64) {
+        guard offset > 0 else { return }
+        let isFirst = Self.seededPaths.withLock { $0.insert(path).inserted }
+        guard isFirst else { return }
+        guard let handle = FileHandle(forReadingAtPath: path) else { return }
+        defer { try? handle.close() }
+        let limit = Int(min(offset, 64 * 1024 * 1024))
+        guard let data = try? handle.read(upToCount: limit),
+              let text = String(data: data, encoding: .utf8)
+        else { return }
+        var latest: String?
+        for line in text.split(separator: "\n") where line.contains("turn_context") {
+            if let model = Self.modelName(from: String(line)) { latest = model }
+        }
+        if let latest { modelTracker.record(model: latest) }
+    }
+
+    /// `payload.model` de uma linha `turn_context`. Lê só os campos que
+    /// interessam (o decoder tipado do parser é privado e não cobre os campos
+    /// extras da linha); roda apenas nas poucas linhas de turn_context do
+    /// prefixo, então o custo é irrelevante.
+    static func modelName(from line: String) -> String? {
+        guard let data = line.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              object["type"] as? String == "turn_context",
+              let payload = object["payload"] as? [String: Any],
+              let model = payload["model"] as? String,
+              !model.isEmpty
+        else { return nil }
+        return model
     }
 
     /// `makeEvent` do padrão F1: stamp de account/project/model. `project` =
