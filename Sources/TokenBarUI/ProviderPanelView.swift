@@ -534,7 +534,10 @@ struct DashboardSectionView: View {
                 weekTokens: display.weekTokens,
                 topModel: display.topModel7d,
                 showsEstimate: display.todayCostUsd != nil || display.monthCostUsd != nil
-                    || display.pacing != nil)
+                    || display.pacing != nil,
+                budgetUsd: display.budgetUsd,
+                monthToDateUsd: display.monthToDateUsd,
+                monthProjectedUsd: display.monthProjectedUsd)
             if !lines.isEmpty {
                 VStack(alignment: .leading, spacing: 3) {
                     ForEach(lines, id: \.self) { line in

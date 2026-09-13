@@ -530,9 +530,23 @@ public final class ProviderCoordinator {
                     pacingByAccount[key] = (try? database.pacingInput(
                         provider: id, account: AccountID(provider: id, key: key), days: 30)) ?? []
                 }
+                // Orçamento (F7 Spend control): teto efetivo (próprio ou
+                // global) + gasto do MÊS-corrente + projeção de fechamento,
+                // com o MESMO calendar do banco (o do rollover do ledger).
+                let cycleNow = Date()
+                let budget = AppSettingsStore(database: database).loadBudget()
+                let monthRow = (try? database.monthSpend(now: cycleNow))?.first {
+                    $0.provider == id.rawValue
+                }
+                let monthToDate = monthRow.flatMap(\.costUSD)
                 return HistoryStats(
                     week: week, month: month, series: series,
-                    todayCost: todayCost, topModel: topModel, pacingByAccount: pacingByAccount)
+                    todayCost: todayCost, topModel: topModel, pacingByAccount: pacingByAccount,
+                    budgetUsd: budget.budget(for: id),
+                    monthToDateUsd: monthToDate,
+                    monthProjectedUsd: SpendProjection.project(
+                        monthToDate: monthToDate, now: cycleNow,
+                        calendar: database.calendar)?.projected)
             }.value
             : nil
 
@@ -622,6 +636,10 @@ public final class ProviderCoordinator {
                 }
                 // "Top model" do painel (F5) — painel-only, menu bar intocado.
                 aggregate.topModel7d = stats.topModel
+                // Orçamento do mês (F7) — painel-only, menu bar intocado.
+                aggregate.budgetUsd = stats.budgetUsd
+                aggregate.monthToDateUsd = stats.monthToDateUsd
+                aggregate.monthProjectedUsd = stats.monthProjectedUsd
             } else {
                 aggregate.weekHistoryAvailable = false
                 aggregate.monthHistoryAvailable = false
@@ -1015,4 +1033,11 @@ private struct HistoryStats: Sendable {
     /// Input do PacingEngine por chave de conta (daily_agg por conta; contas
     /// sem ingest ficam de fora — engine recebe vazio e devolve nil).
     var pacingByAccount: [String: [(day: Date, total: Int64)]]
+    /// Orçamento do mês (F7): teto EFETIVO do provider (próprio ou global);
+    /// `nil` = sem orçamento configurado.
+    var budgetUsd: Double?
+    /// Gasto computável do mês-corrente (nil = nenhum evento do mês com preço).
+    var monthToDateUsd: Double?
+    /// Projeção de fechamento do mês (nil = sem base para projetar).
+    var monthProjectedUsd: Double?
 }

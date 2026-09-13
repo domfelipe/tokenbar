@@ -92,6 +92,11 @@ struct PanelRenderMain {
         display.monthTokens = 8_900_000_000
         display.monthCostUsd = 1_116.52
         display.monthHistoryAvailable = true
+        // Orçamento do mês (F7 Spend control): teto de lab + gasto do mês-corrido
+        // e projeção — a linha "Budget:" da evidência.
+        display.budgetUsd = 500
+        display.monthToDateUsd = 412.30
+        display.monthProjectedUsd = 638.90
         display.pacing = PacingForecast(
             exhaustedIn: 2 * 3_600 + 44 * 60, projectedFraction: 1.69, deficitPct: 69)
         // Série 30d de lab: 22 dias com custo, pico $282 no último dia

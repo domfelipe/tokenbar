@@ -630,3 +630,65 @@ struct PanelSizingTests {
         #expect(ProviderPanelView.scrollHeight(measured: 700, cap: 600) == 600)
     }
 }
+
+// MARK: - Orçamento do mês no painel (F7 Spend control)
+
+/// A linha "Budget:" é o que o dono vê do Spend control no painel: teto do mês,
+/// gasto do mês-corrente e projeção. Os contratos de honestidade são os mesmos
+/// do resto do app — NULL ≠ 0 e nada de número sem base.
+@Suite
+struct PanelBudgetTests {
+    @Test("budgetLine: sem teto não nasce linha; teto zerado não é orçamento")
+    func noBudgetNoLine() {
+        #expect(ProviderPanelModel.budgetLine(
+            budgetUsd: nil, monthToDateUsd: 10, monthProjectedUsd: 20) == nil)
+        #expect(ProviderPanelModel.budgetLine(
+            budgetUsd: 0, monthToDateUsd: 10, monthProjectedUsd: 20) == nil)
+    }
+
+    @Test("budgetLine: mês sem custo computável mostra travessão, nunca $0.00")
+    func missingCostShowsDash() throws {
+        let line = try #require(ProviderPanelModel.budgetLine(
+            budgetUsd: 100, monthToDateUsd: nil, monthProjectedUsd: nil))
+        #expect(line.contains("—"))
+        #expect(!line.contains("0%"))
+        #expect(!line.contains("projected"))  // sem base não há projeção
+        // "$0.00" só apareceria como teto se o teto fosse 0 — que não é orçamento.
+        #expect(!line.contains("$0.00"))
+    }
+
+    @Test("budgetLine: com custo mostra valor, fração e projeção; zero REAL é 0%")
+    func costShowsFractionAndProjection() throws {
+        let line = try #require(ProviderPanelModel.budgetLine(
+            budgetUsd: 100, monthToDateUsd: 42.1, monthProjectedUsd: 93.4))
+        #expect(line.contains("42%"))
+        #expect(line.contains("projected"))
+        #expect(line.hasPrefix("Budget: "))
+
+        // Custo zero REAL (evento com preço que custou zero) ≠ ausência de preço.
+        let zero = try #require(ProviderPanelModel.budgetLine(
+            budgetUsd: 100, monthToDateUsd: 0, monthProjectedUsd: 0))
+        #expect(zero.contains("0%"))
+        #expect(!zero.contains("—"))
+    }
+
+    @Test("detailLines: a linha do orçamento entra sem quebrar as outras")
+    func detailLinesIncludeBudget() {
+        let withBudget = ProviderPanelModel.detailLines(
+            weekCostUsd: 585.43, weekTokens: 3_100_000_000, topModel: "gpt-5.6",
+            showsEstimate: true, budgetUsd: 100, monthToDateUsd: 42.1,
+            monthProjectedUsd: 93.4)
+        #expect(withBudget.count == 4)
+        #expect(withBudget[0].hasPrefix("Last 7 days:"))
+        #expect(withBudget[1].hasPrefix("Top model:"))
+        #expect(withBudget[2].hasPrefix("Budget:"))
+        #expect(withBudget[3].hasPrefix("Estimated from token usage"))
+
+        // Sem teto, a lista é a de antes (compatibilidade do painel).
+        let without = ProviderPanelModel.detailLines(
+            weekCostUsd: 585.43, weekTokens: 3_100_000_000, topModel: "gpt-5.6",
+            showsEstimate: false)
+        #expect(without.count == 2)
+        #expect(!without.contains { $0.hasPrefix("Budget:") })
+    }
+}

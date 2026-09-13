@@ -373,11 +373,37 @@ public enum ProviderPanelModel {
     /// $585.43 · 3.1B tokens", "Top model: gpt-5.6", e o disclaimer de
     /// estimativa quando há custo/projeção na tela. Segmento sem dado some
     /// (NULL ≠ 0); linha sem segmentos não nasce.
+    /// Linha do orçamento do mês (F7 Spend control) — `nil` sem teto
+    /// configurado. Com teto e sem custo computável no mês: "— of $X" (NULL ≠ 0:
+    /// nunca "$0.00 de $X", que diria que o mês não gastou nada). Com custo:
+    /// "$A of $B · N% · projected $C" (a projeção some quando não há base).
+    public static func budgetLine(
+        budgetUsd: Double?,
+        monthToDateUsd: Double?,
+        monthProjectedUsd: Double?
+    ) -> String? {
+        guard let budgetUsd, budgetUsd > 0 else { return nil }
+        var parts: [String] = []
+        if let monthToDateUsd {
+            parts.append(kpiCostString(monthToDateUsd) + " of " + kpiCostString(budgetUsd))
+            parts.append("\(Int(((monthToDateUsd / budgetUsd) * 100).rounded()))%")
+        } else {
+            parts.append("— of " + kpiCostString(budgetUsd))
+        }
+        if let monthProjectedUsd {
+            parts.append("projected " + kpiCostString(monthProjectedUsd))
+        }
+        return "Budget: " + parts.joined(separator: " · ")
+    }
+
     public static func detailLines(
         weekCostUsd: Double?,
         weekTokens: Int64,
         topModel: String?,
-        showsEstimate: Bool
+        showsEstimate: Bool,
+        budgetUsd: Double? = nil,
+        monthToDateUsd: Double? = nil,
+        monthProjectedUsd: Double? = nil
     ) -> [String] {
         var lines: [String] = []
         var weekParts: [String] = []
@@ -386,6 +412,12 @@ public enum ProviderPanelModel {
         if !weekParts.isEmpty { lines.append("Last 7 days: " + weekParts.joined(separator: " · ")) }
         if let topModel, !topModel.isEmpty {
             lines.append("Top model: " + shortModelName(topModel))
+        }
+        if let budget = budgetLine(
+            budgetUsd: budgetUsd, monthToDateUsd: monthToDateUsd,
+            monthProjectedUsd: monthProjectedUsd)
+        {
+            lines.append(budget)
         }
         if showsEstimate {
             lines.append("Estimated from token usage · not a subscription bill")

@@ -125,6 +125,16 @@ public struct ProviderDisplay: Equatable, Sendable {
     /// DeepSeek; linha "Credits" do painel). `nil` = provider sem crédito no
     /// ciclo (linha omitida). Painel/heartbeat-only: menu bar intocado.
     public var credits: CreditsInfo?
+    /// Orçamento do MÊS do provider (F7 Spend control): teto EFETIVO (o dele,
+    /// senão o global). `nil` = sem orçamento → a linha "Budget" não nasce.
+    public var budgetUsd: Double?
+    /// Gasto COMPUTÁVEL do mês-corrente (dia 1 até hoje — NÃO é o
+    /// `monthCostUsd`, que é a janela de 30 dias). `nil` = nenhum evento do
+    /// mês com preço conhecido (NULL ≠ 0) → a linha mostra "—".
+    public var monthToDateUsd: Double?
+    /// Projeção de fechamento do mês no ritmo dos dias corridos (`nil` = sem
+    /// custo computável: sem base não há projeção).
+    public var monthProjectedUsd: Double?
 
     public init(
         percent: Double? = nil,
@@ -145,7 +155,10 @@ public struct ProviderDisplay: Equatable, Sendable {
         monthSeries: [PanelDayPoint] = [],
         accounts: [AccountDisplay] = [],
         topModel7d: String? = nil,
-        credits: CreditsInfo? = nil
+        credits: CreditsInfo? = nil,
+        budgetUsd: Double? = nil,
+        monthToDateUsd: Double? = nil,
+        monthProjectedUsd: Double? = nil
     ) {
         self.percent = percent
         self.todayTokens = todayTokens
@@ -166,6 +179,9 @@ public struct ProviderDisplay: Equatable, Sendable {
         self.accounts = accounts
         self.topModel7d = topModel7d
         self.credits = credits
+        self.budgetUsd = budgetUsd
+        self.monthToDateUsd = monthToDateUsd
+        self.monthProjectedUsd = monthProjectedUsd
     }
 
     /// Estado inicial (nada ciclo ainda): sem dado — some da string do menu.
